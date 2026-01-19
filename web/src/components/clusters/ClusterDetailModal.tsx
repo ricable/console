@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, CheckCircle, AlertTriangle, WifiOff, Pencil, ChevronRight, ChevronDown, Layers, Server, Network, HardDrive, Box, FolderOpen, Loader2, Cpu, MemoryStick, Database } from 'lucide-react'
+import { X, CheckCircle, AlertTriangle, WifiOff, Pencil, ChevronRight, ChevronDown, Layers, Server, Network, HardDrive, Box, FolderOpen, Loader2, Cpu, MemoryStick, Database, Wand2, Stethoscope, Wrench, Bot } from 'lucide-react'
 import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes, useNodes, useNamespaceStats, useDeployments } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
+import { useMissions } from '../../hooks/useMissions'
 import { Gauge } from '../charts/Gauge'
 import { NodeListItem } from './NodeListItem'
 import { NodeDetailPanel } from './NodeDetailPanel'
@@ -24,6 +25,7 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
   const { stats: namespaceStats, isLoading: nsLoading } = useNamespaceStats(clusterName)
   const { deployments: clusterDeployments } = useDeployments(clusterName)
   const { drillToPod } = useDrillDownActions()
+  const { startMission } = useMissions()
   const [showAllNamespaces, setShowAllNamespaces] = useState(false)
   const [showPodsByNamespace, setShowPodsByNamespace] = useState(false)
   const [showNodeDetails, setShowNodeDetails] = useState(false)
@@ -49,6 +51,75 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
 
   const clusterGPUs = gpuNodes.filter(n => n.cluster === clusterName || n.cluster.includes(clusterName.split('/')[0]))
   const clusterDeploymentIssues = deploymentIssues.filter(d => d.cluster === clusterName || d.cluster?.includes(clusterName.split('/')[0]))
+
+  // Klaude diagnose/repair handlers
+  const handleDiagnose = () => {
+    const issuesSummary = [
+      ...podIssues.map(p => `Pod ${p.name} in ${p.namespace}: ${p.status}`),
+      ...clusterDeploymentIssues.map(d => `Deployment ${d.name} in ${d.namespace}: ${d.readyReplicas}/${d.replicas} ready`)
+    ].slice(0, 10).join('\n')
+
+    startMission({
+      title: `Diagnose ${clusterName.split('/').pop()}`,
+      description: `Analyzing cluster health and identifying issues`,
+      type: 'troubleshoot',
+      cluster: clusterName,
+      initialPrompt: `Analyze the health of Kubernetes cluster "${clusterName}" and identify any issues that need attention.
+
+Current cluster state:
+- Nodes: ${health?.nodeCount || 0} total, ${health?.readyNodes || 0} ready
+- Pods: ${health?.podCount || 0} total
+- CPU: ${health?.cpuCores || 0} cores
+- Memory: ${health?.memoryGB || 0} GB
+- GPUs: ${clusterGPUs.reduce((sum, n) => sum + n.gpuCount, 0)} total
+
+Known issues (${podIssues.length + clusterDeploymentIssues.length} total):
+${issuesSummary || 'No known issues'}
+
+Please analyze this cluster and provide:
+1. Health assessment summary
+2. Identified issues and their severity
+3. Recommended actions to resolve issues
+4. Preventive measures to avoid future problems`,
+      context: {
+        clusterName,
+        health,
+        podIssuesCount: podIssues.length,
+        deploymentIssuesCount: clusterDeploymentIssues.length,
+      }
+    })
+  }
+
+  const handleRepair = () => {
+    const issuesList = [
+      ...podIssues.slice(0, 5).map(p => `- Pod "${p.name}" in namespace "${p.namespace}": ${p.status} (${p.restarts} restarts)`),
+      ...clusterDeploymentIssues.slice(0, 5).map(d => `- Deployment "${d.name}" in namespace "${d.namespace}": ${d.readyReplicas}/${d.replicas} ready - ${d.reason || 'Unknown reason'}`)
+    ].join('\n')
+
+    startMission({
+      title: `Repair ${clusterName.split('/').pop()}`,
+      description: `Automatically fixing cluster issues`,
+      type: 'repair',
+      cluster: clusterName,
+      initialPrompt: `I need help repairing issues in Kubernetes cluster "${clusterName}".
+
+Current issues that need to be fixed:
+${issuesList}
+
+For each issue, please:
+1. Diagnose the root cause
+2. Suggest a fix with the exact kubectl commands needed
+3. Explain what each command does
+4. Warn about any potential side effects
+
+After I approve, help me execute the repairs step by step.`,
+      context: {
+        clusterName,
+        podIssues: podIssues.slice(0, 10),
+        deploymentIssues: clusterDeploymentIssues.slice(0, 10),
+      }
+    })
+  }
 
   // Determine cluster status
   const isUnreachable = !health?.nodeCount || health.nodeCount === 0
@@ -103,6 +174,57 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Klaude AI Actions */}
+        <div className="mb-6 p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+          <div className="flex items-center gap-2 mb-3">
+            <Bot className="w-5 h-5 text-purple-400" />
+            <span className="text-sm font-medium text-foreground">Klaude AI Assistant</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleDiagnose}
+              disabled={isUnreachable}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Ask Klaude to analyze cluster health and identify issues"
+            >
+              <Stethoscope className="w-4 h-4" />
+              Diagnose Cluster
+            </button>
+            <button
+              onClick={handleRepair}
+              disabled={isUnreachable || (podIssues.length === 0 && clusterDeploymentIssues.length === 0)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title={podIssues.length === 0 && clusterDeploymentIssues.length === 0 ? 'No issues to repair' : 'Ask Klaude to help fix cluster issues'}
+            >
+              <Wrench className="w-4 h-4" />
+              Repair Issues
+              {(podIssues.length > 0 || clusterDeploymentIssues.length > 0) && (
+                <span className="px-1.5 py-0.5 rounded bg-orange-500/30 text-xs">
+                  {podIssues.length + clusterDeploymentIssues.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => {
+                startMission({
+                  title: `Ask about ${clusterName.split('/').pop()}`,
+                  description: 'Custom question about the cluster',
+                  type: 'custom',
+                  cluster: clusterName,
+                  initialPrompt: `I have a question about Kubernetes cluster "${clusterName}". The cluster currently has ${health?.nodeCount || 0} nodes, ${health?.podCount || 0} pods, ${health?.cpuCores || 0} CPU cores, and ${health?.memoryGB || 0} GB memory. How can I help you?`,
+                  context: { clusterName, health }
+                })
+              }}
+              disabled={isUnreachable}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Ask Klaude any question about this cluster"
+            >
+              <Wand2 className="w-4 h-4" />
+              Ask Klaude
+            </button>
+          </div>
         </div>
 
         {/* Stats - Interactive Cards */}
