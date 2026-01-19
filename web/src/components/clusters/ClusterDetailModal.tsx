@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { X, CheckCircle, AlertTriangle, WifiOff, Pencil, ChevronRight, ChevronDown, Layers, Server, Network, HardDrive, Box, FolderOpen, Loader2 } from 'lucide-react'
 import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes, useNodes, useNamespaceStats, useDeployments } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
@@ -62,16 +63,17 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
   }, [clusterGPUs])
 
   if (isLoading) {
-    return (
+    return createPortal(
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
         <div className="glass p-8 rounded-lg">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
-      </div>
+      </div>,
+      document.body
     )
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="glass p-6 rounded-lg w-[800px] max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header with status icons */}
@@ -390,6 +392,7 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
