@@ -11,7 +11,7 @@ import (
 	"github.com/kubestellar/console/pkg/agent/protocol"
 )
 
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // Config holds agent configuration
 type Config struct {

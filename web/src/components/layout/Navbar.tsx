@@ -42,7 +42,7 @@ export function Navbar() {
   const { t, i18n } = useTranslation()
   const { theme, toggleTheme } = useTheme()
   const { usage, alertLevel, percentage, remaining } = useTokenUsage()
-  const { status: agentStatus, connectionEvents, isConnected } = useLocalAgent()
+  const { status: agentStatus, health: agentHealth, connectionEvents, isConnected, isDegraded, dataErrorCount, lastDataError } = useLocalAgent()
   const {
     selectedClusters,
     toggleCluster,
@@ -100,6 +100,8 @@ export function Navbar() {
   const [showLanguageMenu, setShowLanguageMenu] = useState(false)
   const [showClusterFilter, setShowClusterFilter] = useState(false)
   const [showAgentStatus, setShowAgentStatus] = useState(false)
+  const [tokenAnimating, setTokenAnimating] = useState(false)
+  const previousTokensRef = useRef<number>(usage.used)
   const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const tokenRef = useRef<HTMLDivElement>(null)
@@ -122,6 +124,18 @@ export function Navbar() {
           item.description?.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : []
+
+  // Animate token icon when usage increases significantly
+  useEffect(() => {
+    const increase = usage.used - previousTokensRef.current
+    // Trigger animation if tokens increased by more than 500
+    if (increase > 500) {
+      setTokenAnimating(true)
+      const timer = setTimeout(() => setTokenAnimating(false), 1000)
+      return () => clearTimeout(timer)
+    }
+    previousTokensRef.current = usage.used
+  }, [usage.used])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -614,13 +628,15 @@ export function Navbar() {
             onClick={() => setShowAgentStatus(!showAgentStatus)}
             className={cn(
               'flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors',
-              isConnected
+              isDegraded
+                ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
+                : isConnected
                 ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
                 : agentStatus === 'connecting'
                 ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                 : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
             )}
-            title={isConnected ? 'KKC Agent connected' : agentStatus === 'connecting' ? 'Connecting to agent...' : 'KKC Agent disconnected'}
+            title={isDegraded ? `KKC Agent degraded (${dataErrorCount} errors)` : isConnected ? 'KKC Agent connected' : agentStatus === 'connecting' ? 'Connecting to agent...' : 'KKC Agent disconnected'}
           >
             {isConnected ? (
               <Wifi className="w-4 h-4" />
@@ -629,7 +645,7 @@ export function Navbar() {
             )}
             <span className={cn(
               'w-2 h-2 rounded-full',
-              isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+              isDegraded ? 'bg-yellow-400 animate-pulse' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
             )} />
           </button>
 
@@ -640,20 +656,33 @@ export function Navbar() {
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     'w-3 h-3 rounded-full',
-                    isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
+                    isDegraded ? 'bg-yellow-400' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
                   )} />
                   <span className="text-sm font-medium text-foreground">
-                    KKC Agent: {isConnected ? 'Connected' : agentStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                    KKC Agent: {isDegraded ? 'Degraded' : isConnected ? 'Connected' : agentStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
                   </span>
+                  {isConnected && agentHealth?.version && agentHealth.version !== 'demo' && (
+                    <span className="text-xs text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
+                      v{agentHealth.version}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {isConnected
-                    ? 'Connected to local agent at 127.0.0.1:8585'
+                  {isDegraded
+                    ? `Connected but experiencing data errors (${dataErrorCount} in last minute)`
+                    : isConnected
+                    ? `Connected to local agent at 127.0.0.1:8585`
                     : 'Unable to connect to local agent'
                   }
                 </p>
+                {isDegraded && lastDataError && (
+                  <p className="text-xs text-yellow-400 mt-1">
+                    Last error: {lastDataError}
+                  </p>
+                )}
               </div>
-              <div className="p-2 max-h-64 overflow-y-auto">
+
+              <div className="p-2 max-h-48 overflow-y-auto">
                 <div className="text-xs text-muted-foreground px-2 py-1 font-medium">Connection Log</div>
                 {connectionEvents.length === 0 ? (
                   <div className="text-xs text-muted-foreground text-center py-4">No events yet</div>
@@ -681,6 +710,34 @@ export function Navbar() {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {/* Install instructions - always visible at bottom */}
+              <div className="p-3 border-t border-border bg-secondary/20">
+                <h4 className="text-xs font-medium text-foreground mb-2 flex items-center gap-2">
+                  <Server className="w-3 h-3 text-purple-400" />
+                  Install KKC Agent
+                </h4>
+                <p className="text-xs text-muted-foreground mb-2">
+                  The KKC Agent enables real-time cluster data and kubectl operations.
+                </p>
+                <div className="bg-black/50 rounded p-2 font-mono text-[11px] text-green-400 mb-2 space-y-1">
+                  <div className="text-muted-foreground"># Install via Homebrew</div>
+                  <code className="block">brew tap kubestellar/tap</code>
+                  <code className="block">brew install kkc-agent</code>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Visit{' '}
+                  <a
+                    href="https://github.com/kubestellar/homebrew-tap"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-400 hover:text-purple-300 underline"
+                  >
+                    github.com/kubestellar/homebrew-tap
+                  </a>
+                  {' '}for more information.
+                </p>
               </div>
             </div>
           )}
@@ -737,7 +794,7 @@ export function Navbar() {
             }`}
             title={`Token usage: ${percentage.toFixed(0)}%`}
           >
-            <Coins className="w-4 h-4" />
+            <Coins className={cn("w-4 h-4 transition-transform", tokenAnimating && "animate-bounce text-yellow-400")} />
             <span className="text-xs font-medium hidden sm:inline">{percentage.toFixed(0)}%</span>
             <div className="w-12 h-1.5 bg-secondary rounded-full overflow-hidden hidden sm:block">
               <div
