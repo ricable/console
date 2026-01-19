@@ -1732,7 +1732,21 @@ export function Clusters() {
           )}
         </div>
 
-        {showStats && <StatsOverview stats={stats} />}
+        {showStats && (
+          <StatsOverview
+            stats={stats}
+            onFilterByStatus={(status) => {
+              setFilter(status)
+              setShowClusterGrid(true) // Ensure cluster grid is visible
+            }}
+            onCPUClick={() => window.location.href = '/compute'}
+            onMemoryClick={() => window.location.href = '/compute'}
+            onStorageClick={() => window.location.href = '/storage'}
+            onGPUClick={() => window.location.href = '/gpu'}
+            onNodesClick={() => window.location.href = '/compute'}
+            onPodsClick={() => window.location.href = '/workloads'}
+          />
+        )}
       </div>
 
       {/* Cluster Cards - collapsible */}
@@ -1994,6 +2008,7 @@ export function Clusters() {
       {selectedCluster && (
         <ClusterDetailModal
           clusterName={selectedCluster}
+          clusterUser={clusters.find(c => c.name === selectedCluster)?.user}
           onClose={() => setSelectedCluster(null)}
           onRename={(name) => {
             setSelectedCluster(null)

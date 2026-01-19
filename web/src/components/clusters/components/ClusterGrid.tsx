@@ -2,6 +2,7 @@ import { Pencil, Loader2, Globe, User, ShieldAlert, ChevronRight, Star, WifiOff,
 import { ClusterInfo } from '../../../hooks/useMCP'
 import { StatusIndicator } from '../../charts/StatusIndicator'
 import { isClusterUnreachable, isClusterLoading } from '../utils'
+import { CloudProviderIcon, detectCloudProvider, getProviderLabel, getProviderColor } from '../../ui/CloudProviderIcon'
 
 interface GPUInfo {
   total: number
@@ -48,19 +49,33 @@ export function ClusterGrid({
         // Determine status: loading > unreachable > healthy
         const status = loading ? 'loading' : unreachable ? 'warning' : 'healthy'
 
+        // Detect cloud provider (pass user for OKE pattern detection)
+        const provider = detectCloudProvider(cluster.name, cluster.server, undefined, cluster.user)
+        const providerLabel = getProviderLabel(provider)
+        const providerColor = getProviderColor(provider)
+
         return (
           <div
             key={cluster.name}
             onClick={() => onSelectCluster(cluster.name)}
-            className={`glass p-5 rounded-lg cursor-pointer transition-all hover:scale-[1.02] hover:border-primary/50 border ${
-              unreachable ? 'border-yellow-500/30' : 'border-transparent'
-            }`}
+            className="relative glass p-5 rounded-lg cursor-pointer transition-all hover:scale-[1.02] border overflow-hidden"
+            style={{ borderColor: `${providerColor}60` }}
           >
-            <div className="flex items-start justify-between mb-4">
+            {/* Background provider icon - bottom left, 0% transparent at corner fading to 70% transparent */}
+            <div className="absolute -bottom-4 -left-4 pointer-events-none" style={{ opacity: 0.15, maskImage: 'linear-gradient(45deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 70%)', WebkitMaskImage: 'linear-gradient(45deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.3) 70%)' }}>
+              <CloudProviderIcon provider={provider} size={120} />
+            </div>
+            <div className="flex items-start justify-between mb-4 relative z-10">
               <div className="flex items-center gap-3">
                 <StatusIndicator status={status} size="lg" showLabel={false} />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
+                    <span
+                      className="flex-shrink-0"
+                      title={providerLabel}
+                    >
+                      <CloudProviderIcon provider={provider} size={18} />
+                    </span>
                     <h3 className="font-semibold text-foreground truncate">
                       {cluster.context || cluster.name.split('/').pop()}
                     </h3>
@@ -140,7 +155,7 @@ export function ClusterGrid({
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-4 gap-4 text-center relative z-10">
               <div title={loading ? 'Checking...' : unreachable ? 'Unreachable - check network connection' : `${cluster.nodeCount || 0} worker nodes`}>
                 <div className="text-lg font-bold text-foreground">
                   {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : unreachable ? '-' : (cluster.nodeCount || 0)}
@@ -167,7 +182,7 @@ export function ClusterGrid({
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-border">
+            <div className="mt-4 pt-4 border-t border-border relative z-10">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Source: {cluster.source || 'kubeconfig'}</span>
                 <span title="View details"><ChevronRight className="w-4 h-4 text-primary" /></span>
