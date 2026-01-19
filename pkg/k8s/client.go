@@ -51,30 +51,50 @@ type ClusterInfo struct {
 
 // ClusterHealth represents cluster health status
 type ClusterHealth struct {
-	Cluster      string   `json:"cluster"`
-	Healthy      bool     `json:"healthy"`
-	Reachable    bool     `json:"reachable"`
-	LastSeen     string   `json:"lastSeen,omitempty"`
-	ErrorType    string   `json:"errorType,omitempty"` // timeout, auth, network, certificate, unknown
-	ErrorMessage string   `json:"errorMessage,omitempty"`
-	APIServer    string   `json:"apiServer,omitempty"`
-	NodeCount    int      `json:"nodeCount"`
-	ReadyNodes   int      `json:"readyNodes"`
-	PodCount     int      `json:"podCount,omitempty"`
-	Issues       []string `json:"issues,omitempty"`
-	CheckedAt    string   `json:"checkedAt,omitempty"`
+	Cluster       string   `json:"cluster"`
+	Healthy       bool     `json:"healthy"`
+	Reachable     bool     `json:"reachable"`
+	LastSeen      string   `json:"lastSeen,omitempty"`
+	ErrorType     string   `json:"errorType,omitempty"` // timeout, auth, network, certificate, unknown
+	ErrorMessage  string   `json:"errorMessage,omitempty"`
+	APIServer     string   `json:"apiServer,omitempty"`
+	NodeCount     int      `json:"nodeCount"`
+	ReadyNodes    int      `json:"readyNodes"`
+	PodCount      int      `json:"podCount,omitempty"`
+	CpuCores      int      `json:"cpuCores,omitempty"`
+	MemoryBytes   int64    `json:"memoryBytes,omitempty"`   // Total allocatable memory in bytes
+	MemoryGB      float64  `json:"memoryGB,omitempty"`      // Total allocatable memory in GB
+	StorageBytes  int64    `json:"storageBytes,omitempty"`  // Total ephemeral storage in bytes
+	StorageGB     float64  `json:"storageGB,omitempty"`     // Total ephemeral storage in GB
+	PVCCount      int      `json:"pvcCount,omitempty"`      // Total PVC count
+	PVCBoundCount int      `json:"pvcBoundCount,omitempty"` // Bound PVC count
+	Issues        []string `json:"issues,omitempty"`
+	CheckedAt     string   `json:"checkedAt,omitempty"`
 }
 
 // PodInfo represents pod information
 type PodInfo struct {
-	Name      string `json:"name"`
-	Namespace string `json:"namespace"`
-	Cluster   string `json:"cluster,omitempty"`
-	Status    string `json:"status"`
-	Ready     string `json:"ready"`
-	Restarts  int    `json:"restarts"`
-	Age       string `json:"age"`
-	Node      string `json:"node,omitempty"`
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Cluster     string            `json:"cluster,omitempty"`
+	Status      string            `json:"status"`
+	Ready       string            `json:"ready"`
+	Restarts    int               `json:"restarts"`
+	Age         string            `json:"age"`
+	Node        string            `json:"node,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	Containers  []ContainerInfo   `json:"containers,omitempty"`
+}
+
+// ContainerInfo represents container information
+type ContainerInfo struct {
+	Name    string `json:"name"`
+	Image   string `json:"image"`
+	Ready   bool   `json:"ready"`
+	State   string `json:"state"` // running, waiting, terminated
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 // PodIssue represents a pod with issues
@@ -98,6 +118,8 @@ type Event struct {
 	Cluster   string `json:"cluster,omitempty"`
 	Count     int32  `json:"count"`
 	Age       string `json:"age,omitempty"`
+	FirstSeen string `json:"firstSeen,omitempty"`
+	LastSeen  string `json:"lastSeen,omitempty"`
 }
 
 // DeploymentIssue represents a deployment with issues
@@ -120,19 +142,130 @@ type GPUNode struct {
 	GPUAllocated int    `json:"gpuAllocated"`
 }
 
+// NodeCondition represents a node condition status
+type NodeCondition struct {
+	Type    string `json:"type"`
+	Status  string `json:"status"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+}
+
+// NodeInfo represents detailed node information
+type NodeInfo struct {
+	Name              string            `json:"name"`
+	Cluster           string            `json:"cluster,omitempty"`
+	Status            string            `json:"status"` // Ready, NotReady, Unknown
+	Roles             []string          `json:"roles"`
+	InternalIP        string            `json:"internalIP,omitempty"`
+	ExternalIP        string            `json:"externalIP,omitempty"`
+	KubeletVersion    string            `json:"kubeletVersion"`
+	ContainerRuntime  string            `json:"containerRuntime,omitempty"`
+	OS                string            `json:"os,omitempty"`
+	Architecture      string            `json:"architecture,omitempty"`
+	CPUCapacity       string            `json:"cpuCapacity"`
+	MemoryCapacity    string            `json:"memoryCapacity"`
+	StorageCapacity   string            `json:"storageCapacity,omitempty"`
+	PodCapacity       string            `json:"podCapacity"`
+	Conditions        []NodeCondition   `json:"conditions"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	Taints            []string          `json:"taints,omitempty"`
+	Age               string            `json:"age,omitempty"`
+	Unschedulable     bool              `json:"unschedulable"`
+}
+
 // Deployment represents a Kubernetes deployment with rollout status
 type Deployment struct {
-	Name              string `json:"name"`
-	Namespace         string `json:"namespace"`
-	Cluster           string `json:"cluster,omitempty"`
-	Status            string `json:"status"` // running, deploying, failed
-	Replicas          int32  `json:"replicas"`
-	ReadyReplicas     int32  `json:"readyReplicas"`
-	UpdatedReplicas   int32  `json:"updatedReplicas"`
-	AvailableReplicas int32  `json:"availableReplicas"`
-	Progress          int    `json:"progress"` // 0-100
-	Image             string `json:"image,omitempty"`
-	Age               string `json:"age,omitempty"`
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	Cluster           string            `json:"cluster,omitempty"`
+	Status            string            `json:"status"` // running, deploying, failed
+	Replicas          int32             `json:"replicas"`
+	ReadyReplicas     int32             `json:"readyReplicas"`
+	UpdatedReplicas   int32             `json:"updatedReplicas"`
+	AvailableReplicas int32             `json:"availableReplicas"`
+	Progress          int               `json:"progress"` // 0-100
+	Image             string            `json:"image,omitempty"`
+	Age               string            `json:"age,omitempty"`
+	Labels            map[string]string `json:"labels,omitempty"`
+	Annotations       map[string]string `json:"annotations,omitempty"`
+}
+
+// Service represents a Kubernetes service
+type Service struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Cluster     string            `json:"cluster,omitempty"`
+	Type        string            `json:"type"` // ClusterIP, NodePort, LoadBalancer, ExternalName
+	ClusterIP   string            `json:"clusterIP,omitempty"`
+	ExternalIP  string            `json:"externalIP,omitempty"`
+	Ports       []string          `json:"ports,omitempty"`
+	Age         string            `json:"age,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Job represents a Kubernetes job
+type Job struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Cluster     string            `json:"cluster,omitempty"`
+	Status      string            `json:"status"` // Running, Complete, Failed
+	Completions string            `json:"completions"`
+	Duration    string            `json:"duration,omitempty"`
+	Age         string            `json:"age,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// HPA represents a Horizontal Pod Autoscaler
+type HPA struct {
+	Name            string            `json:"name"`
+	Namespace       string            `json:"namespace"`
+	Cluster         string            `json:"cluster,omitempty"`
+	Reference       string            `json:"reference"` // Target deployment/statefulset
+	MinReplicas     int32             `json:"minReplicas"`
+	MaxReplicas     int32             `json:"maxReplicas"`
+	CurrentReplicas int32             `json:"currentReplicas"`
+	TargetCPU       string            `json:"targetCPU,omitempty"`
+	CurrentCPU      string            `json:"currentCPU,omitempty"`
+	Age             string            `json:"age,omitempty"`
+	Labels          map[string]string `json:"labels,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty"`
+}
+
+// ConfigMap represents a Kubernetes ConfigMap
+type ConfigMap struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Cluster     string            `json:"cluster,omitempty"`
+	DataCount   int               `json:"dataCount"`
+	Age         string            `json:"age,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// Secret represents a Kubernetes Secret
+type Secret struct {
+	Name        string            `json:"name"`
+	Namespace   string            `json:"namespace"`
+	Cluster     string            `json:"cluster,omitempty"`
+	Type        string            `json:"type"`
+	DataCount   int               `json:"dataCount"`
+	Age         string            `json:"age,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+}
+
+// ServiceAccount represents a Kubernetes ServiceAccount
+type ServiceAccount struct {
+	Name             string            `json:"name"`
+	Namespace        string            `json:"namespace"`
+	Cluster          string            `json:"cluster,omitempty"`
+	Secrets          []string          `json:"secrets,omitempty"`
+	ImagePullSecrets []string          `json:"imagePullSecrets,omitempty"`
+	Age              string            `json:"age,omitempty"`
+	Labels           map[string]string `json:"labels,omitempty"`
+	Annotations      map[string]string `json:"annotations,omitempty"`
 }
 
 // SecurityIssue represents a security misconfiguration
@@ -502,14 +635,35 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 		health.Issues = append(health.Issues, fmt.Sprintf("Failed to list nodes: %v", err))
 	} else {
 		health.NodeCount = len(nodes.Items)
+		var totalCPU int64
+		var totalMemory int64
+		var totalStorage int64
 		for _, node := range nodes.Items {
+			// Count ready nodes
 			for _, condition := range node.Status.Conditions {
 				if condition.Type == corev1.NodeReady && condition.Status == corev1.ConditionTrue {
 					health.ReadyNodes++
 					break
 				}
 			}
+			// Sum CPU cores from allocatable resources
+			if cpu := node.Status.Allocatable.Cpu(); cpu != nil {
+				totalCPU += cpu.Value()
+			}
+			// Sum memory from allocatable resources
+			if mem := node.Status.Allocatable.Memory(); mem != nil {
+				totalMemory += mem.Value()
+			}
+			// Sum ephemeral storage from allocatable resources
+			if storage, ok := node.Status.Allocatable["ephemeral-storage"]; ok {
+				totalStorage += storage.Value()
+			}
 		}
+		health.CpuCores = int(totalCPU)
+		health.MemoryBytes = totalMemory
+		health.MemoryGB = float64(totalMemory) / (1024 * 1024 * 1024)
+		health.StorageBytes = totalStorage
+		health.StorageGB = float64(totalStorage) / (1024 * 1024 * 1024)
 		if health.ReadyNodes < health.NodeCount {
 			health.Issues = append(health.Issues, fmt.Sprintf("%d/%d nodes not ready", health.NodeCount-health.ReadyNodes, health.NodeCount))
 		}
@@ -519,6 +673,17 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 	pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
 	if err == nil {
 		health.PodCount = len(pods.Items)
+	}
+
+	// Get PVC count
+	pvcs, err := client.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
+	if err == nil {
+		health.PVCCount = len(pvcs.Items)
+		for _, pvc := range pvcs.Items {
+			if pvc.Status.Phase == corev1.ClaimBound {
+				health.PVCBoundCount++
+			}
+		}
 	}
 
 	// Cache the result
@@ -548,22 +713,52 @@ func (m *MultiClusterClient) GetPods(ctx context.Context, contextName, namespace
 		total := len(pod.Spec.Containers)
 		restarts := 0
 
+		// Build container status map
+		statusMap := make(map[string]corev1.ContainerStatus)
 		for _, cs := range pod.Status.ContainerStatuses {
+			statusMap[cs.Name] = cs
 			if cs.Ready {
 				ready++
 			}
 			restarts += int(cs.RestartCount)
 		}
 
+		// Build container info
+		var containers []ContainerInfo
+		for _, c := range pod.Spec.Containers {
+			ci := ContainerInfo{
+				Name:  c.Name,
+				Image: c.Image,
+			}
+			if cs, ok := statusMap[c.Name]; ok {
+				ci.Ready = cs.Ready
+				if cs.State.Running != nil {
+					ci.State = "running"
+				} else if cs.State.Waiting != nil {
+					ci.State = "waiting"
+					ci.Reason = cs.State.Waiting.Reason
+					ci.Message = cs.State.Waiting.Message
+				} else if cs.State.Terminated != nil {
+					ci.State = "terminated"
+					ci.Reason = cs.State.Terminated.Reason
+					ci.Message = cs.State.Terminated.Message
+				}
+			}
+			containers = append(containers, ci)
+		}
+
 		result = append(result, PodInfo{
-			Name:      pod.Name,
-			Namespace: pod.Namespace,
-			Cluster:   contextName,
-			Status:    string(pod.Status.Phase),
-			Ready:     fmt.Sprintf("%d/%d", ready, total),
-			Restarts:  restarts,
-			Age:       formatDuration(time.Since(pod.CreationTimestamp.Time)),
-			Node:      pod.Spec.NodeName,
+			Name:        pod.Name,
+			Namespace:   pod.Namespace,
+			Cluster:     contextName,
+			Status:      string(pod.Status.Phase),
+			Ready:       fmt.Sprintf("%d/%d", ready, total),
+			Restarts:    restarts,
+			Age:         formatDuration(time.Since(pod.CreationTimestamp.Time)),
+			Node:        pod.Spec.NodeName,
+			Labels:      pod.Labels,
+			Annotations: pod.Annotations,
+			Containers:  containers,
 		})
 	}
 
@@ -656,7 +851,7 @@ func (m *MultiClusterClient) GetEvents(ctx context.Context, contextName, namespa
 		if limit > 0 && i >= limit {
 			break
 		}
-		result = append(result, Event{
+		e := Event{
 			Type:      event.Type,
 			Reason:    event.Reason,
 			Message:   event.Message,
@@ -665,7 +860,14 @@ func (m *MultiClusterClient) GetEvents(ctx context.Context, contextName, namespa
 			Cluster:   contextName,
 			Count:     event.Count,
 			Age:       formatDuration(time.Since(event.LastTimestamp.Time)),
-		})
+		}
+		if !event.FirstTimestamp.IsZero() {
+			e.FirstSeen = event.FirstTimestamp.Time.Format(time.RFC3339)
+		}
+		if !event.LastTimestamp.IsZero() {
+			e.LastSeen = event.LastTimestamp.Time.Format(time.RFC3339)
+		}
+		result = append(result, e)
 	}
 
 	return result, nil
@@ -695,7 +897,7 @@ func (m *MultiClusterClient) GetWarningEvents(ctx context.Context, contextName, 
 		if limit > 0 && i >= limit {
 			break
 		}
-		result = append(result, Event{
+		e := Event{
 			Type:      event.Type,
 			Reason:    event.Reason,
 			Message:   event.Message,
@@ -704,7 +906,14 @@ func (m *MultiClusterClient) GetWarningEvents(ctx context.Context, contextName, 
 			Cluster:   contextName,
 			Count:     event.Count,
 			Age:       formatDuration(time.Since(event.LastTimestamp.Time)),
-		})
+		}
+		if !event.FirstTimestamp.IsZero() {
+			e.FirstSeen = event.FirstTimestamp.Time.Format(time.RFC3339)
+		}
+		if !event.LastTimestamp.IsZero() {
+			e.LastSeen = event.LastTimestamp.Time.Format(time.RFC3339)
+		}
+		result = append(result, e)
 	}
 
 	return result, nil
@@ -769,6 +978,123 @@ func (m *MultiClusterClient) GetGPUNodes(ctx context.Context, contextName string
 	}
 
 	return gpuNodes, nil
+}
+
+// GetNodes returns detailed information about all nodes in a cluster
+func (m *MultiClusterClient) GetNodes(ctx context.Context, contextName string) ([]NodeInfo, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var nodeInfos []NodeInfo
+	for _, node := range nodes.Items {
+		info := NodeInfo{
+			Name:           node.Name,
+			Cluster:        contextName,
+			KubeletVersion: node.Status.NodeInfo.KubeletVersion,
+			OS:             node.Status.NodeInfo.OperatingSystem,
+			Architecture:   node.Status.NodeInfo.Architecture,
+			Unschedulable:  node.Spec.Unschedulable,
+		}
+
+		// Get container runtime
+		info.ContainerRuntime = node.Status.NodeInfo.ContainerRuntimeVersion
+
+		// Get roles from labels
+		for label := range node.Labels {
+			if strings.HasPrefix(label, "node-role.kubernetes.io/") {
+				role := strings.TrimPrefix(label, "node-role.kubernetes.io/")
+				if role != "" {
+					info.Roles = append(info.Roles, role)
+				}
+			}
+		}
+		if len(info.Roles) == 0 {
+			info.Roles = []string{"worker"}
+		}
+
+		// Get IPs
+		for _, addr := range node.Status.Addresses {
+			switch addr.Type {
+			case "InternalIP":
+				info.InternalIP = addr.Address
+			case "ExternalIP":
+				info.ExternalIP = addr.Address
+			}
+		}
+
+		// Get capacity
+		if cpu, ok := node.Status.Capacity["cpu"]; ok {
+			info.CPUCapacity = cpu.String()
+		}
+		if mem, ok := node.Status.Capacity["memory"]; ok {
+			info.MemoryCapacity = mem.String()
+		}
+		if storage, ok := node.Status.Capacity["ephemeral-storage"]; ok {
+			info.StorageCapacity = storage.String()
+		}
+		if pods, ok := node.Status.Capacity["pods"]; ok {
+			info.PodCapacity = pods.String()
+		}
+
+		// Get conditions
+		info.Status = "Unknown"
+		for _, cond := range node.Status.Conditions {
+			info.Conditions = append(info.Conditions, NodeCondition{
+				Type:    string(cond.Type),
+				Status:  string(cond.Status),
+				Reason:  cond.Reason,
+				Message: cond.Message,
+			})
+			if cond.Type == "Ready" {
+				if cond.Status == "True" {
+					info.Status = "Ready"
+				} else {
+					info.Status = "NotReady"
+				}
+			}
+		}
+
+		// Get labels (filter out some verbose ones)
+		info.Labels = make(map[string]string)
+		for k, v := range node.Labels {
+			// Skip very long or system labels
+			if !strings.HasPrefix(k, "node.kubernetes.io/") &&
+				!strings.HasPrefix(k, "kubernetes.io/") &&
+				!strings.HasPrefix(k, "beta.kubernetes.io/") &&
+				len(v) < 100 {
+				info.Labels[k] = v
+			}
+		}
+
+		// Get taints
+		for _, taint := range node.Spec.Taints {
+			taintStr := fmt.Sprintf("%s=%s:%s", taint.Key, taint.Value, taint.Effect)
+			info.Taints = append(info.Taints, taintStr)
+		}
+
+		// Calculate age
+		age := time.Since(node.CreationTimestamp.Time)
+		if age.Hours() >= 24*365 {
+			info.Age = fmt.Sprintf("%.0fy", age.Hours()/(24*365))
+		} else if age.Hours() >= 24 {
+			info.Age = fmt.Sprintf("%.0fd", age.Hours()/24)
+		} else if age.Hours() >= 1 {
+			info.Age = fmt.Sprintf("%.0fh", age.Hours())
+		} else {
+			info.Age = fmt.Sprintf("%.0fm", age.Minutes())
+		}
+
+		nodeInfos = append(nodeInfos, info)
+	}
+
+	return nodeInfos, nil
 }
 
 // FindDeploymentIssues returns deployments with issues
@@ -895,10 +1221,342 @@ func (m *MultiClusterClient) GetDeployments(ctx context.Context, contextName, na
 			Progress:          progress,
 			Image:             image,
 			Age:               age,
+			Labels:            deploy.Labels,
+			Annotations:       deploy.Annotations,
 		})
 	}
 
 	return result, nil
+}
+
+// GetServices returns all services in a namespace or all namespaces if namespace is empty
+func (m *MultiClusterClient) GetServices(ctx context.Context, contextName, namespace string) ([]Service, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	services, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []Service
+	for _, svc := range services.Items {
+		// Build ports list
+		var ports []string
+		for _, p := range svc.Spec.Ports {
+			portStr := fmt.Sprintf("%d/%s", p.Port, p.Protocol)
+			if p.NodePort != 0 {
+				portStr = fmt.Sprintf("%d:%d/%s", p.Port, p.NodePort, p.Protocol)
+			}
+			ports = append(ports, portStr)
+		}
+
+		// Get external IP
+		externalIP := ""
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			if svc.Status.LoadBalancer.Ingress[0].IP != "" {
+				externalIP = svc.Status.LoadBalancer.Ingress[0].IP
+			} else if svc.Status.LoadBalancer.Ingress[0].Hostname != "" {
+				externalIP = svc.Status.LoadBalancer.Ingress[0].Hostname
+			}
+		}
+		if len(svc.Spec.ExternalIPs) > 0 {
+			externalIP = svc.Spec.ExternalIPs[0]
+		}
+
+		// Calculate age
+		age := formatAge(svc.CreationTimestamp.Time)
+
+		result = append(result, Service{
+			Name:        svc.Name,
+			Namespace:   svc.Namespace,
+			Cluster:     contextName,
+			Type:        string(svc.Spec.Type),
+			ClusterIP:   svc.Spec.ClusterIP,
+			ExternalIP:  externalIP,
+			Ports:       ports,
+			Age:         age,
+			Labels:      svc.Labels,
+			Annotations: svc.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetJobs returns all jobs in a namespace or all namespaces if namespace is empty
+func (m *MultiClusterClient) GetJobs(ctx context.Context, contextName, namespace string) ([]Job, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	jobs, err := client.BatchV1().Jobs(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []Job
+	for _, job := range jobs.Items {
+		// Determine status
+		status := "Running"
+		if job.Status.Succeeded > 0 {
+			status = "Complete"
+		} else if job.Status.Failed > 0 {
+			status = "Failed"
+		}
+
+		// Completions
+		completions := "0/1"
+		if job.Spec.Completions != nil {
+			completions = fmt.Sprintf("%d/%d", job.Status.Succeeded, *job.Spec.Completions)
+		}
+
+		// Duration
+		duration := ""
+		if job.Status.StartTime != nil {
+			endTime := time.Now()
+			if job.Status.CompletionTime != nil {
+				endTime = job.Status.CompletionTime.Time
+			}
+			dur := endTime.Sub(job.Status.StartTime.Time)
+			if dur.Hours() > 1 {
+				duration = fmt.Sprintf("%dh%dm", int(dur.Hours()), int(dur.Minutes())%60)
+			} else if dur.Minutes() > 1 {
+				duration = fmt.Sprintf("%dm%ds", int(dur.Minutes()), int(dur.Seconds())%60)
+			} else {
+				duration = fmt.Sprintf("%ds", int(dur.Seconds()))
+			}
+		}
+
+		// Calculate age
+		age := formatAge(job.CreationTimestamp.Time)
+
+		result = append(result, Job{
+			Name:        job.Name,
+			Namespace:   job.Namespace,
+			Cluster:     contextName,
+			Status:      status,
+			Completions: completions,
+			Duration:    duration,
+			Age:         age,
+			Labels:      job.Labels,
+			Annotations: job.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetHPAs returns all HPAs in a namespace or all namespaces if namespace is empty
+func (m *MultiClusterClient) GetHPAs(ctx context.Context, contextName, namespace string) ([]HPA, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	hpas, err := client.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []HPA
+	for _, hpa := range hpas.Items {
+		// Get target reference
+		reference := fmt.Sprintf("%s/%s", hpa.Spec.ScaleTargetRef.Kind, hpa.Spec.ScaleTargetRef.Name)
+
+		// Get min/max replicas
+		minReplicas := int32(1)
+		if hpa.Spec.MinReplicas != nil {
+			minReplicas = *hpa.Spec.MinReplicas
+		}
+
+		// Get target/current CPU
+		targetCPU := ""
+		currentCPU := ""
+		for _, metric := range hpa.Spec.Metrics {
+			if metric.Type == "Resource" && metric.Resource != nil && metric.Resource.Name == "cpu" {
+				if metric.Resource.Target.AverageUtilization != nil {
+					targetCPU = fmt.Sprintf("%d%%", *metric.Resource.Target.AverageUtilization)
+				}
+			}
+		}
+		for _, condition := range hpa.Status.CurrentMetrics {
+			if condition.Type == "Resource" && condition.Resource != nil && condition.Resource.Name == "cpu" {
+				if condition.Resource.Current.AverageUtilization != nil {
+					currentCPU = fmt.Sprintf("%d%%", *condition.Resource.Current.AverageUtilization)
+				}
+			}
+		}
+
+		// Calculate age
+		age := formatAge(hpa.CreationTimestamp.Time)
+
+		result = append(result, HPA{
+			Name:            hpa.Name,
+			Namespace:       hpa.Namespace,
+			Cluster:         contextName,
+			Reference:       reference,
+			MinReplicas:     minReplicas,
+			MaxReplicas:     hpa.Spec.MaxReplicas,
+			CurrentReplicas: hpa.Status.CurrentReplicas,
+			TargetCPU:       targetCPU,
+			CurrentCPU:      currentCPU,
+			Age:             age,
+			Labels:          hpa.Labels,
+			Annotations:     hpa.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetConfigMaps returns all ConfigMaps in a namespace or all namespaces if namespace is empty
+func (m *MultiClusterClient) GetConfigMaps(ctx context.Context, contextName, namespace string) ([]ConfigMap, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	configmaps, err := client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []ConfigMap
+	for _, cm := range configmaps.Items {
+		// Calculate age
+		age := formatAge(cm.CreationTimestamp.Time)
+
+		result = append(result, ConfigMap{
+			Name:        cm.Name,
+			Namespace:   cm.Namespace,
+			Cluster:     contextName,
+			DataCount:   len(cm.Data) + len(cm.BinaryData),
+			Age:         age,
+			Labels:      cm.Labels,
+			Annotations: cm.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetSecrets returns all Secrets in a namespace or all namespaces if namespace is empty
+func (m *MultiClusterClient) GetSecrets(ctx context.Context, contextName, namespace string) ([]Secret, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	secrets, err := client.CoreV1().Secrets(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []Secret
+	for _, secret := range secrets.Items {
+		// Calculate age
+		age := formatAge(secret.CreationTimestamp.Time)
+
+		result = append(result, Secret{
+			Name:        secret.Name,
+			Namespace:   secret.Namespace,
+			Cluster:     contextName,
+			Type:        string(secret.Type),
+			DataCount:   len(secret.Data),
+			Age:         age,
+			Labels:      secret.Labels,
+			Annotations: secret.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetServiceAccounts returns ServiceAccounts from a cluster
+func (m *MultiClusterClient) GetServiceAccounts(ctx context.Context, contextName, namespace string) ([]ServiceAccount, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceAccounts, err := client.CoreV1().ServiceAccounts(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var result []ServiceAccount
+	for _, sa := range serviceAccounts.Items {
+		// Calculate age
+		age := formatAge(sa.CreationTimestamp.Time)
+
+		// Get secret names
+		var secrets []string
+		for _, s := range sa.Secrets {
+			secrets = append(secrets, s.Name)
+		}
+
+		// Get image pull secret names
+		var imagePullSecrets []string
+		for _, s := range sa.ImagePullSecrets {
+			imagePullSecrets = append(imagePullSecrets, s.Name)
+		}
+
+		result = append(result, ServiceAccount{
+			Name:             sa.Name,
+			Namespace:        sa.Namespace,
+			Cluster:          contextName,
+			Secrets:          secrets,
+			ImagePullSecrets: imagePullSecrets,
+			Age:              age,
+			Labels:           sa.Labels,
+			Annotations:      sa.Annotations,
+		})
+	}
+
+	return result, nil
+}
+
+// GetPodLogs returns logs from a pod
+func (m *MultiClusterClient) GetPodLogs(ctx context.Context, contextName, namespace, podName, container string, tailLines int64) (string, error) {
+	client, err := m.GetClient(contextName)
+	if err != nil {
+		return "", err
+	}
+
+	opts := &corev1.PodLogOptions{}
+	if tailLines > 0 {
+		opts.TailLines = &tailLines
+	}
+	if container != "" {
+		opts.Container = container
+	}
+
+	req := client.CoreV1().Pods(namespace).GetLogs(podName, opts)
+	logs, err := req.DoRaw(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	return string(logs), nil
+}
+
+// formatAge formats a time.Time as a human-readable age string
+func formatAge(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	duration := time.Since(t)
+	if duration.Hours() > 24 {
+		return fmt.Sprintf("%dd", int(duration.Hours()/24))
+	} else if duration.Hours() > 1 {
+		return fmt.Sprintf("%dh", int(duration.Hours()))
+	} else {
+		return fmt.Sprintf("%dm", int(duration.Minutes()))
+	}
 }
 
 // GetAllClusterHealth returns health status for all clusters

@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"log"
+	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/kubestellar/console/pkg/k8s"
@@ -180,19 +183,35 @@ func (h *MCPHandlers) FindPodIssues(c *fiber.Ctx) error {
 
 	// Fall back to direct k8s client
 	if h.k8sClient != nil {
-		// If no cluster specified, query all clusters
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
 			var allIssues []k8s.PodIssue
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				issues, err := h.k8sClient.FindPodIssues(c.Context(), cl.Name, namespace)
-				if err == nil {
-					allIssues = append(allIssues, issues...)
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					issues, err := h.k8sClient.FindPodIssues(ctx, clusterName, namespace)
+					if err == nil && len(issues) > 0 {
+						mu.Lock()
+						allIssues = append(allIssues, issues...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
+
+			wg.Wait()
 			return c.JSON(fiber.Map{"issues": allIssues, "source": "k8s"})
 		}
 
@@ -211,23 +230,86 @@ func (h *MCPHandlers) GetGPUNodes(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
 
 	if h.k8sClient != nil {
-		// If no cluster specified, query all clusters
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
 			var allNodes []k8s.GPUNode
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				nodes, err := h.k8sClient.GetGPUNodes(c.Context(), cl.Name)
-				if err == nil {
-					allNodes = append(allNodes, nodes...)
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					nodes, err := h.k8sClient.GetGPUNodes(ctx, clusterName)
+					if err == nil && len(nodes) > 0 {
+						mu.Lock()
+						allNodes = append(allNodes, nodes...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
+
+			wg.Wait()
 			return c.JSON(fiber.Map{"nodes": allNodes, "source": "k8s"})
 		}
 
 		nodes, err := h.k8sClient.GetGPUNodes(c.Context(), cluster)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"nodes": nodes, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetNodes returns detailed node information
+func (h *MCPHandlers) GetNodes(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+
+	if h.k8sClient != nil {
+		// If no cluster specified, query all clusters in parallel
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allNodes []k8s.NodeInfo
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					nodes, err := h.k8sClient.GetNodes(ctx, clusterName)
+					if err == nil && len(nodes) > 0 {
+						mu.Lock()
+						allNodes = append(allNodes, nodes...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"nodes": allNodes, "source": "k8s"})
+		}
+
+		nodes, err := h.k8sClient.GetNodes(c.Context(), cluster)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 		}
@@ -244,19 +326,35 @@ func (h *MCPHandlers) FindDeploymentIssues(c *fiber.Ctx) error {
 
 	// Fall back to direct k8s client
 	if h.k8sClient != nil {
-		// If no cluster specified, query all clusters
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
 			var allIssues []k8s.DeploymentIssue
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				issues, err := h.k8sClient.FindDeploymentIssues(c.Context(), cl.Name, namespace)
-				if err == nil {
-					allIssues = append(allIssues, issues...)
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					issues, err := h.k8sClient.FindDeploymentIssues(ctx, clusterName, namespace)
+					if err == nil && len(issues) > 0 {
+						mu.Lock()
+						allIssues = append(allIssues, issues...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
+
+			wg.Wait()
 			return c.JSON(fiber.Map{"issues": allIssues, "source": "k8s"})
 		}
 
@@ -276,19 +374,35 @@ func (h *MCPHandlers) GetDeployments(c *fiber.Ctx) error {
 	namespace := c.Query("namespace")
 
 	if h.k8sClient != nil {
-		// If no cluster specified, query all clusters
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
 			var allDeployments []k8s.Deployment
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				deployments, err := h.k8sClient.GetDeployments(c.Context(), cl.Name, namespace)
-				if err == nil {
-					allDeployments = append(allDeployments, deployments...)
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					deployments, err := h.k8sClient.GetDeployments(ctx, clusterName, namespace)
+					if err == nil && len(deployments) > 0 {
+						mu.Lock()
+						allDeployments = append(allDeployments, deployments...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
+
+			wg.Wait()
 			return c.JSON(fiber.Map{"deployments": allDeployments, "source": "k8s"})
 		}
 
@@ -302,7 +416,312 @@ func (h *MCPHandlers) GetDeployments(c *fiber.Ctx) error {
 	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
 }
 
-// GetEvents returns events from a cluster
+// GetServices returns services from clusters
+func (h *MCPHandlers) GetServices(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allServices []k8s.Service
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					services, err := h.k8sClient.GetServices(ctx, clusterName, namespace)
+					if err == nil && len(services) > 0 {
+						mu.Lock()
+						allServices = append(allServices, services...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"services": allServices, "source": "k8s"})
+		}
+
+		services, err := h.k8sClient.GetServices(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"services": services, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetJobs returns jobs from clusters
+func (h *MCPHandlers) GetJobs(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allJobs []k8s.Job
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					jobs, err := h.k8sClient.GetJobs(ctx, clusterName, namespace)
+					if err == nil && len(jobs) > 0 {
+						mu.Lock()
+						allJobs = append(allJobs, jobs...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"jobs": allJobs, "source": "k8s"})
+		}
+
+		jobs, err := h.k8sClient.GetJobs(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"jobs": jobs, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetHPAs returns HPAs from clusters
+func (h *MCPHandlers) GetHPAs(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allHPAs []k8s.HPA
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					hpas, err := h.k8sClient.GetHPAs(ctx, clusterName, namespace)
+					if err == nil && len(hpas) > 0 {
+						mu.Lock()
+						allHPAs = append(allHPAs, hpas...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"hpas": allHPAs, "source": "k8s"})
+		}
+
+		hpas, err := h.k8sClient.GetHPAs(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"hpas": hpas, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetConfigMaps returns ConfigMaps from clusters
+func (h *MCPHandlers) GetConfigMaps(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allConfigMaps []k8s.ConfigMap
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					configmaps, err := h.k8sClient.GetConfigMaps(ctx, clusterName, namespace)
+					if err == nil && len(configmaps) > 0 {
+						mu.Lock()
+						allConfigMaps = append(allConfigMaps, configmaps...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"configmaps": allConfigMaps, "source": "k8s"})
+		}
+
+		configmaps, err := h.k8sClient.GetConfigMaps(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"configmaps": configmaps, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetSecrets returns Secrets from clusters
+func (h *MCPHandlers) GetSecrets(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allSecrets []k8s.Secret
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					secrets, err := h.k8sClient.GetSecrets(ctx, clusterName, namespace)
+					if err == nil && len(secrets) > 0 {
+						mu.Lock()
+						allSecrets = append(allSecrets, secrets...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"secrets": allSecrets, "source": "k8s"})
+		}
+
+		secrets, err := h.k8sClient.GetSecrets(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"secrets": secrets, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetServiceAccounts returns ServiceAccounts from clusters
+func (h *MCPHandlers) GetServiceAccounts(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+
+	if h.k8sClient != nil {
+		if cluster == "" {
+			clusters, err := h.k8sClient.ListClusters(c.Context())
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allServiceAccounts []k8s.ServiceAccount
+			clusterTimeout := 5 * time.Second
+
+			for _, cl := range clusters {
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					serviceAccounts, err := h.k8sClient.GetServiceAccounts(ctx, clusterName, namespace)
+					if err == nil && len(serviceAccounts) > 0 {
+						mu.Lock()
+						allServiceAccounts = append(allServiceAccounts, serviceAccounts...)
+						mu.Unlock()
+					}
+				}(cl.Name)
+			}
+
+			wg.Wait()
+			return c.JSON(fiber.Map{"serviceAccounts": allServiceAccounts, "source": "k8s"})
+		}
+
+		serviceAccounts, err := h.k8sClient.GetServiceAccounts(c.Context(), cluster, namespace)
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"serviceAccounts": serviceAccounts, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetPodLogs returns logs from a pod
+func (h *MCPHandlers) GetPodLogs(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	namespace := c.Query("namespace")
+	pod := c.Query("pod")
+	container := c.Query("container")
+	tailLines := c.QueryInt("tail", 100)
+
+	if cluster == "" || namespace == "" || pod == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "cluster, namespace, and pod are required"})
+	}
+
+	if h.k8sClient != nil {
+		logs, err := h.k8sClient.GetPodLogs(c.Context(), cluster, namespace, pod, container, int64(tailLines))
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"logs": logs, "source": "k8s"})
+	}
+
+	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
+}
+
+// GetEvents returns events from clusters
 func (h *MCPHandlers) GetEvents(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
 	namespace := c.Query("namespace")
@@ -319,22 +738,47 @@ func (h *MCPHandlers) GetEvents(c *fiber.Ctx) error {
 
 	// Fall back to direct k8s client
 	if h.k8sClient != nil {
-		// If no cluster specified, query first available cluster
+		// If no cluster specified, query all clusters in parallel with timeout
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
-			if err != nil || len(clusters) == 0 {
-				return c.JSON(fiber.Map{"events": []k8s.Event{}, "source": "k8s"})
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
-			// Get events from current context cluster
+
+			perClusterLimit := limit / len(clusters)
+			if perClusterLimit < 10 {
+				perClusterLimit = 10
+			}
+
+			// Query clusters in parallel with 5 second timeout per cluster
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allEvents []k8s.Event
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				if cl.IsCurrent {
-					cluster = cl.Name
-					break
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					events, err := h.k8sClient.GetEvents(ctx, clusterName, namespace, perClusterLimit)
+					if err == nil && len(events) > 0 {
+						mu.Lock()
+						allEvents = append(allEvents, events...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
-			if cluster == "" {
-				cluster = clusters[0].Name
+
+			wg.Wait()
+
+			// Sort by timestamp (most recent first) and limit total
+			if len(allEvents) > limit {
+				allEvents = allEvents[:limit]
 			}
+			return c.JSON(fiber.Map{"events": allEvents, "source": "k8s"})
 		}
 
 		events, err := h.k8sClient.GetEvents(c.Context(), cluster, namespace, limit)
@@ -347,7 +791,7 @@ func (h *MCPHandlers) GetEvents(c *fiber.Ctx) error {
 	return c.Status(503).JSON(fiber.Map{"error": "No cluster access available"})
 }
 
-// GetWarningEvents returns warning events from a cluster
+// GetWarningEvents returns warning events from clusters
 func (h *MCPHandlers) GetWarningEvents(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
 	namespace := c.Query("namespace")
@@ -364,21 +808,46 @@ func (h *MCPHandlers) GetWarningEvents(c *fiber.Ctx) error {
 
 	// Fall back to direct k8s client
 	if h.k8sClient != nil {
-		// If no cluster specified, query first available cluster
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
-			if err != nil || len(clusters) == 0 {
-				return c.JSON(fiber.Map{"events": []k8s.Event{}, "source": "k8s"})
+			if err != nil {
+				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			perClusterLimit := limit / len(clusters)
+			if perClusterLimit < 10 {
+				perClusterLimit = 10
+			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
+			var allEvents []k8s.Event
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				if cl.IsCurrent {
-					cluster = cl.Name
-					break
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					events, err := h.k8sClient.GetWarningEvents(ctx, clusterName, namespace, perClusterLimit)
+					if err == nil && len(events) > 0 {
+						mu.Lock()
+						allEvents = append(allEvents, events...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
-			if cluster == "" {
-				cluster = clusters[0].Name
+
+			wg.Wait()
+
+			// Limit total
+			if len(allEvents) > limit {
+				allEvents = allEvents[:limit]
 			}
+			return c.JSON(fiber.Map{"events": allEvents, "source": "k8s"})
 		}
 
 		events, err := h.k8sClient.GetWarningEvents(c.Context(), cluster, namespace, limit)
@@ -398,19 +867,35 @@ func (h *MCPHandlers) CheckSecurityIssues(c *fiber.Ctx) error {
 
 	// Fall back to direct k8s client
 	if h.k8sClient != nil {
-		// If no cluster specified, query all clusters
+		// If no cluster specified, query all clusters in parallel
 		if cluster == "" {
 			clusters, err := h.k8sClient.ListClusters(c.Context())
 			if err != nil {
 				return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 			}
+
+			var wg sync.WaitGroup
+			var mu sync.Mutex
 			var allIssues []k8s.SecurityIssue
+			clusterTimeout := 5 * time.Second
+
 			for _, cl := range clusters {
-				issues, err := h.k8sClient.CheckSecurityIssues(c.Context(), cl.Name, namespace)
-				if err == nil {
-					allIssues = append(allIssues, issues...)
-				}
+				wg.Add(1)
+				go func(clusterName string) {
+					defer wg.Done()
+					ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+					defer cancel()
+
+					issues, err := h.k8sClient.CheckSecurityIssues(ctx, clusterName, namespace)
+					if err == nil && len(issues) > 0 {
+						mu.Lock()
+						allIssues = append(allIssues, issues...)
+						mu.Unlock()
+					}
+				}(cl.Name)
 			}
+
+			wg.Wait()
 			return c.JSON(fiber.Map{"issues": allIssues, "source": "k8s"})
 		}
 

@@ -5,8 +5,15 @@ export type DrillDownViewType =
   | 'cluster'
   | 'namespace'
   | 'deployment'
+  | 'replicaset'
   | 'pod'
   | 'service'
+  | 'configmap'
+  | 'secret'
+  | 'serviceaccount'
+  | 'pvc'
+  | 'job'
+  | 'hpa'
   | 'node'
   | 'events'
   | 'logs'
@@ -127,18 +134,68 @@ export function useDrillDown() {
   return context
 }
 
+// Helper to generate a unique key for a view to detect duplicates
+function getViewKey(view: DrillDownView): string {
+  const { type, data } = view
+  switch (type) {
+    case 'cluster':
+      return `cluster:${data.cluster}`
+    case 'namespace':
+      return `namespace:${data.cluster}:${data.namespace}`
+    case 'deployment':
+      return `deployment:${data.cluster}:${data.namespace}:${data.deployment}`
+    case 'replicaset':
+      return `replicaset:${data.cluster}:${data.namespace}:${data.replicaset}`
+    case 'pod':
+      return `pod:${data.cluster}:${data.namespace}:${data.pod}`
+    case 'configmap':
+      return `configmap:${data.cluster}:${data.namespace}:${data.configmap}`
+    case 'secret':
+      return `secret:${data.cluster}:${data.namespace}:${data.secret}`
+    case 'serviceaccount':
+      return `serviceaccount:${data.cluster}:${data.namespace}:${data.serviceaccount}`
+    case 'pvc':
+      return `pvc:${data.cluster}:${data.namespace}:${data.pvc}`
+    case 'job':
+      return `job:${data.cluster}:${data.namespace}:${data.job}`
+    case 'hpa':
+      return `hpa:${data.cluster}:${data.namespace}:${data.hpa}`
+    case 'service':
+      return `service:${data.cluster}:${data.namespace}:${data.service}`
+    case 'node':
+    case 'gpu-node':
+      return `node:${data.cluster}:${data.node}`
+    case 'logs':
+      return `logs:${data.cluster}:${data.namespace}:${data.pod}:${data.container || ''}`
+    case 'events':
+      return `events:${data.cluster}:${data.namespace || ''}:${data.objectName || ''}`
+    default:
+      return `${type}:${JSON.stringify(data)}`
+  }
+}
+
 // Helper hook to create drill-down actions
 export function useDrillDownActions() {
-  const { state, open, push } = useDrillDown()
+  const { state, open, push, goTo } = useDrillDown()
 
-  // Helper to either open a new drill-down or push onto existing stack
+  // Helper to navigate - checks if view already exists in stack
   const openOrPush = useCallback((view: DrillDownView) => {
-    if (state.isOpen) {
-      push(view)
-    } else {
+    if (!state.isOpen) {
       open(view)
+      return
     }
-  }, [state.isOpen, open, push])
+
+    // Check if this view already exists in the stack
+    const viewKey = getViewKey(view)
+    const existingIndex = state.stack.findIndex(v => getViewKey(v) === viewKey)
+
+    if (existingIndex >= 0) {
+      // Navigate to existing view instead of pushing duplicate
+      goTo(existingIndex)
+    } else {
+      push(view)
+    }
+  }, [state.isOpen, state.stack, open, push, goTo])
 
   const drillToCluster = useCallback((cluster: string, clusterData?: Record<string, unknown>) => {
     openOrPush({
@@ -171,7 +228,6 @@ export function useDrillDownActions() {
     openOrPush({
       type: 'pod',
       title: pod,
-      subtitle: `Pod in ${namespace}`,
       data: { cluster, namespace, pod, ...podData },
     })
   }, [openOrPush])
@@ -236,10 +292,79 @@ export function useDrillDownActions() {
     })
   }, [openOrPush])
 
+  const drillToReplicaSet = useCallback((cluster: string, namespace: string, replicaset: string, replicasetData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'replicaset',
+      title: replicaset,
+      data: { cluster, namespace, replicaset, ...replicasetData },
+    })
+  }, [openOrPush])
+
+  const drillToConfigMap = useCallback((cluster: string, namespace: string, configmap: string, configmapData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'configmap',
+      title: configmap,
+      data: { cluster, namespace, configmap, ...configmapData },
+    })
+  }, [openOrPush])
+
+  const drillToSecret = useCallback((cluster: string, namespace: string, secret: string, secretData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'secret',
+      title: secret,
+      data: { cluster, namespace, secret, ...secretData },
+    })
+  }, [openOrPush])
+
+  const drillToServiceAccount = useCallback((cluster: string, namespace: string, serviceaccount: string, serviceaccountData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'serviceaccount',
+      title: serviceaccount,
+      data: { cluster, namespace, serviceaccount, ...serviceaccountData },
+    })
+  }, [openOrPush])
+
+  const drillToPVC = useCallback((cluster: string, namespace: string, pvc: string, pvcData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'pvc',
+      title: pvc,
+      subtitle: `PVC in ${namespace}`,
+      data: { cluster, namespace, pvc, ...pvcData },
+    })
+  }, [openOrPush])
+
+  const drillToJob = useCallback((cluster: string, namespace: string, job: string, jobData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'job',
+      title: job,
+      subtitle: `Job in ${namespace}`,
+      data: { cluster, namespace, job, ...jobData },
+    })
+  }, [openOrPush])
+
+  const drillToHPA = useCallback((cluster: string, namespace: string, hpa: string, hpaData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'hpa',
+      title: hpa,
+      subtitle: `HPA in ${namespace}`,
+      data: { cluster, namespace, hpa, ...hpaData },
+    })
+  }, [openOrPush])
+
+  const drillToService = useCallback((cluster: string, namespace: string, service: string, serviceData?: Record<string, unknown>) => {
+    openOrPush({
+      type: 'service',
+      title: service,
+      subtitle: `Service in ${namespace}`,
+      data: { cluster, namespace, service, ...serviceData },
+    })
+  }, [openOrPush])
+
   return {
     drillToCluster,
     drillToNamespace,
     drillToDeployment,
+    drillToReplicaSet,
     drillToPod,
     drillToLogs,
     drillToEvents,
@@ -247,5 +372,12 @@ export function useDrillDownActions() {
     drillToGPUNode,
     drillToYAML,
     drillToResources,
+    drillToConfigMap,
+    drillToSecret,
+    drillToServiceAccount,
+    drillToPVC,
+    drillToJob,
+    drillToHPA,
+    drillToService,
   }
 }

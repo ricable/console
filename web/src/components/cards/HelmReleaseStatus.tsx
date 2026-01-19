@@ -31,6 +31,7 @@ export function HelmReleaseStatus({ config }: HelmReleaseStatusProps) {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
     customFilter,
+    filterByStatus,
   } = useGlobalFilters()
 
   // Apply global filters
@@ -68,11 +69,31 @@ export function HelmReleaseStatus({ config }: HelmReleaseStatusProps) {
     return Array.from(nsSet).sort()
   }, [allReleases])
 
-  // Filter releases
+  // Filter releases by namespace, status, and custom text
   const releases = useMemo(() => {
-    if (!selectedNamespace) return allReleases
-    return allReleases.filter(r => r.namespace === selectedNamespace)
-  }, [allReleases, selectedNamespace])
+    let result = allReleases
+
+    // Filter by namespace
+    if (selectedNamespace) {
+      result = result.filter(r => r.namespace === selectedNamespace)
+    }
+
+    // Apply status filter
+    result = filterByStatus(result)
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      result = result.filter(r =>
+        r.name.toLowerCase().includes(query) ||
+        r.namespace.toLowerCase().includes(query) ||
+        r.chart.toLowerCase().includes(query) ||
+        r.version.toLowerCase().includes(query)
+      )
+    }
+
+    return result
+  }, [allReleases, selectedNamespace, filterByStatus, customFilter])
 
   const getStatusIcon = (status: HelmRelease['status']) => {
     switch (status) {

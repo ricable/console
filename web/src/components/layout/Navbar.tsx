@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Bell, Search, Server, Box, Activity, Command, Sun, Moon, Monitor, Coins, Globe, Filter, Check, AlertTriangle, Plus, Folder, X, Trash2 } from 'lucide-react'
+import { Bell, Search, Server, Box, Activity, Command, Sun, Moon, Monitor, Coins, Globe, Filter, Check, AlertTriangle, Plus, Folder, X, Trash2, Wifi, WifiOff } from 'lucide-react'
 import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../hooks/useTheme'
 import { useTokenUsage } from '../../hooks/useTokenUsage'
+import { useLocalAgent } from '../../hooks/useLocalAgent'
 import { useGlobalFilters, SEVERITY_LEVELS, SEVERITY_CONFIG, STATUS_LEVELS, STATUS_CONFIG } from '../../hooks/useGlobalFilters'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { languages } from '../../lib/i18n'
@@ -24,7 +25,7 @@ interface SearchResult {
 const searchableItems: SearchResult[] = [
   { type: 'page', name: 'Dashboard', description: 'Main dashboard', href: '/', icon: Command },
   { type: 'page', name: 'Clusters', description: 'Manage clusters', href: '/clusters', icon: Server },
-  { type: 'page', name: 'Applications', description: 'View applications', href: '/apps', icon: Box },
+  { type: 'page', name: 'Workloads', description: 'View workloads', href: '/workloads', icon: Box },
   { type: 'page', name: 'Events', description: 'Cluster events', href: '/events', icon: Activity },
   { type: 'page', name: 'Security', description: 'RBAC & policies', href: '/security', icon: Command },
   { type: 'page', name: 'GitOps', description: 'Drift detection', href: '/gitops', icon: Command },
@@ -41,6 +42,7 @@ export function Navbar() {
   const { t, i18n } = useTranslation()
   const { theme, toggleTheme } = useTheme()
   const { usage, alertLevel, percentage, remaining } = useTokenUsage()
+  const { status: agentStatus, connectionEvents, isConnected } = useLocalAgent()
   const {
     selectedClusters,
     toggleCluster,
@@ -97,11 +99,13 @@ export function Navbar() {
   const [showTokenDetails, setShowTokenDetails] = useState(false)
   const [showLanguageMenu, setShowLanguageMenu] = useState(false)
   const [showClusterFilter, setShowClusterFilter] = useState(false)
+  const [showAgentStatus, setShowAgentStatus] = useState(false)
   const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const tokenRef = useRef<HTMLDivElement>(null)
   const languageRef = useRef<HTMLDivElement>(null)
   const clusterRef = useRef<HTMLDivElement>(null)
+  const agentRef = useRef<HTMLDivElement>(null)
 
   const currentLanguage = languages.find(l => l.code === i18n.language) || languages[0]
 
@@ -133,6 +137,9 @@ export function Navbar() {
       }
       if (clusterRef.current && !clusterRef.current.contains(event.target as Node)) {
         setShowClusterFilter(false)
+      }
+      if (agentRef.current && !agentRef.current.contains(event.target as Node)) {
+        setShowAgentStatus(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -475,6 +482,12 @@ export function Navbar() {
                       const info = clusterInfoMap[cluster]
                       const isHealthy = info?.healthy ?? true
                       const statusTooltip = getClusterStatusTooltip(cluster)
+                      // Determine if cluster is unreachable vs unhealthy
+                      const isUnreachable = info
+                        ? (info.reachable === false ||
+                           (!info.nodeCount || info.nodeCount === 0) ||
+                           (info.errorType && ['timeout', 'network', 'certificate'].includes(info.errorType)))
+                        : false
                       return (
                         <button
                           key={cluster}
@@ -495,13 +508,15 @@ export function Navbar() {
                           )}>
                             {isSelected && <Check className="w-3 h-3 text-white" />}
                           </div>
-                          {/* Status indicator */}
-                          {isHealthy ? (
+                          {/* Status indicator - yellow wifi for unreachable, red alert for unhealthy, green check for healthy */}
+                          {isUnreachable ? (
+                            <WifiOff className="w-3 h-3 text-yellow-400 flex-shrink-0" />
+                          ) : isHealthy ? (
                             <CheckCircle2 className="w-3 h-3 text-green-400 flex-shrink-0" />
                           ) : (
-                            <AlertCircle className="w-3 h-3 text-red-400 flex-shrink-0" />
+                            <AlertCircle className="w-3 h-3 text-orange-400 flex-shrink-0" />
                           )}
-                          <span className={cn('text-sm truncate', !isHealthy && 'text-red-400')}>{cluster}</span>
+                          <span className={cn('text-sm truncate', isUnreachable ? 'text-yellow-400' : !isHealthy && 'text-orange-400')}>{cluster}</span>
                         </button>
                       )
                     })
@@ -587,6 +602,84 @@ export function Navbar() {
                     <Plus className="w-3 h-3" />
                     {t('common:filters.createGroup', 'Create Cluster Group')}
                   </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Agent Status Indicator */}
+        <div className="relative" ref={agentRef}>
+          <button
+            onClick={() => setShowAgentStatus(!showAgentStatus)}
+            className={cn(
+              'flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors',
+              isConnected
+                ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
+                : agentStatus === 'connecting'
+                ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
+                : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
+            )}
+            title={isConnected ? 'KKC Agent connected' : agentStatus === 'connecting' ? 'Connecting to agent...' : 'KKC Agent disconnected'}
+          >
+            {isConnected ? (
+              <Wifi className="w-4 h-4" />
+            ) : (
+              <WifiOff className="w-4 h-4" />
+            )}
+            <span className={cn(
+              'w-2 h-2 rounded-full',
+              isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+            )} />
+          </button>
+
+          {/* Agent status dropdown */}
+          {showAgentStatus && (
+            <div className="absolute top-full right-0 mt-2 w-72 bg-card border border-border rounded-lg shadow-xl z-50">
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    'w-3 h-3 rounded-full',
+                    isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
+                  )} />
+                  <span className="text-sm font-medium text-foreground">
+                    KKC Agent: {isConnected ? 'Connected' : agentStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isConnected
+                    ? 'Connected to local agent at 127.0.0.1:8585'
+                    : 'Unable to connect to local agent'
+                  }
+                </p>
+              </div>
+              <div className="p-2 max-h-64 overflow-y-auto">
+                <div className="text-xs text-muted-foreground px-2 py-1 font-medium">Connection Log</div>
+                {connectionEvents.length === 0 ? (
+                  <div className="text-xs text-muted-foreground text-center py-4">No events yet</div>
+                ) : (
+                  <div className="space-y-1">
+                    {connectionEvents.slice(0, 20).map((event, i) => (
+                      <div
+                        key={i}
+                        className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-secondary/30"
+                      >
+                        <div className={cn(
+                          'w-2 h-2 rounded-full mt-1 flex-shrink-0',
+                          event.type === 'connected' ? 'bg-green-400' :
+                          event.type === 'disconnected' ? 'bg-red-400' :
+                          event.type === 'error' ? 'bg-red-400' :
+                          'bg-yellow-400'
+                        )} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-foreground">{event.message}</p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {event.timestamp.toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>

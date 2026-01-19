@@ -1,8 +1,10 @@
 import { useEffect } from 'react'
+import { Box, Server, Layers, Rocket, FileText, Zap, Cpu, Lock, User } from 'lucide-react'
 import { useDrillDown } from '../../hooks/useDrillDown'
 import { ClusterDrillDown } from './views/ClusterDrillDown'
 import { NamespaceDrillDown } from './views/NamespaceDrillDown'
 import { DeploymentDrillDown } from './views/DeploymentDrillDown'
+import { ReplicaSetDrillDown } from './views/ReplicaSetDrillDown'
 import { PodDrillDown } from './views/PodDrillDown'
 import { LogsDrillDown } from './views/LogsDrillDown'
 import { EventsDrillDown } from './views/EventsDrillDown'
@@ -10,9 +12,53 @@ import { NodeDrillDown } from './views/NodeDrillDown'
 import { GPUNodeDrillDown } from './views/GPUNodeDrillDown'
 import { YAMLDrillDown } from './views/YAMLDrillDown'
 import { ResourcesDrillDown } from './views/ResourcesDrillDown'
+import { ConfigMapDrillDown } from './views/ConfigMapDrillDown'
+import { SecretDrillDown } from './views/SecretDrillDown'
+import { ServiceAccountDrillDown } from './views/ServiceAccountDrillDown'
+
+// Helper to get status badge color for pods
+const getPodStatusColor = (status: string) => {
+  const lower = status?.toLowerCase() || ''
+  if (lower === 'running') return 'bg-green-500/20 text-green-400'
+  if (lower === 'succeeded' || lower === 'completed') return 'bg-blue-500/20 text-blue-400'
+  if (lower === 'pending') return 'bg-yellow-500/20 text-yellow-400'
+  if (lower === 'failed' || lower === 'error' || lower === 'crashloopbackoff' || lower === 'evicted') return 'bg-red-500/20 text-red-400'
+  return 'bg-orange-500/20 text-orange-400'
+}
+
+// Helper to get icon for view type
+const getViewIcon = (type: string) => {
+  switch (type) {
+    case 'pod': return <Box className="w-4 h-4 text-cyan-400" />
+    case 'cluster': return <Server className="w-4 h-4 text-blue-400" />
+    case 'namespace': return <Layers className="w-4 h-4 text-purple-400" />
+    case 'deployment': return <Rocket className="w-4 h-4 text-green-400" />
+    case 'replicaset': return <Layers className="w-4 h-4 text-blue-400" />
+    case 'configmap': return <FileText className="w-4 h-4 text-yellow-400" />
+    case 'secret': return <Lock className="w-4 h-4 text-red-400" />
+    case 'serviceaccount': return <User className="w-4 h-4 text-purple-400" />
+    case 'node': return <Cpu className="w-4 h-4 text-orange-400" />
+    case 'gpu-node': return <Cpu className="w-4 h-4 text-purple-400" />
+    case 'logs': return <FileText className="w-4 h-4 text-yellow-400" />
+    case 'events': return <Zap className="w-4 h-4 text-amber-400" />
+    default: return null
+  }
+}
 
 export function DrillDownModal() {
   const { state, pop, goTo, close } = useDrillDown()
+
+  // Disable body scroll when modal is open
+  useEffect(() => {
+    if (state.isOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [state.isOpen])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -59,6 +105,8 @@ export function DrillDownModal() {
         return <NamespaceDrillDown data={data} />
       case 'deployment':
         return <DeploymentDrillDown data={data} />
+      case 'replicaset':
+        return <ReplicaSetDrillDown data={data} />
       case 'pod':
         return <PodDrillDown data={data} />
       case 'logs':
@@ -73,6 +121,12 @@ export function DrillDownModal() {
         return <YAMLDrillDown data={data} />
       case 'resources':
         return <ResourcesDrillDown data={data} />
+      case 'configmap':
+        return <ConfigMapDrillDown data={data} />
+      case 'secret':
+        return <SecretDrillDown data={data} />
+      case 'serviceaccount':
+        return <ServiceAccountDrillDown data={data} />
       case 'custom':
         return state.currentView?.customComponent || <div>Custom view</div>
       default:
@@ -83,7 +137,7 @@ export function DrillDownModal() {
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50" onClick={close}>
       <div
-        className="glass w-[90vw] max-w-[1200px] h-[85vh] rounded-xl flex flex-col overflow-hidden"
+        className="glass w-[90vw] max-w-[1200px] h-[80vh] rounded-xl flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Header with breadcrumbs */}
@@ -104,34 +158,40 @@ export function DrillDownModal() {
 
             {/* Breadcrumbs */}
             <nav className="flex items-center gap-1 min-w-0 overflow-x-auto">
-              {state.stack.map((view, index) => (
-                <div key={index} className="flex items-center gap-1 shrink-0">
-                  {index > 0 && (
-                    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                  <button
-                    onClick={() => goTo(index)}
-                    className={`px-2 py-1 rounded text-sm transition-colors ${
-                      index === state.stack.length - 1
-                        ? 'text-foreground font-medium'
-                        : 'text-muted-foreground hover:text-foreground'
-                    }`}
-                  >
-                    {view.title}
-                  </button>
-                </div>
-              ))}
+              {state.stack.map((view, index) => {
+                const isLast = index === state.stack.length - 1
+                const isPod = view.type === 'pod'
+                const podStatus = isPod && view.data?.status ? String(view.data.status) : null
+
+                return (
+                  <div key={index} className="flex items-center gap-1 shrink-0">
+                    {index > 0 && (
+                      <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    )}
+                    <button
+                      onClick={() => goTo(index)}
+                      className={`px-2 py-1 rounded text-sm transition-colors flex items-center gap-1.5 ${
+                        isLast
+                          ? 'text-foreground font-medium'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {getViewIcon(view.type)}
+                      {view.title}
+                    </button>
+                    {/* Pod status badge - small, inline */}
+                    {isLast && podStatus && (
+                      <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${getPodStatusColor(podStatus)}`}>
+                        {podStatus}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </nav>
           </div>
-
-          {/* Current view subtitle */}
-          {state.currentView.subtitle && (
-            <span className="text-sm text-muted-foreground mx-4 hidden md:block">
-              {state.currentView.subtitle}
-            </span>
-          )}
 
           {/* Close button */}
           <button
@@ -150,14 +210,17 @@ export function DrillDownModal() {
         </div>
 
         {/* Footer with keyboard hints */}
-        <div className="px-4 py-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
-          <span>Depth: {state.stack.length}</span>
+        <div className="px-4 py-2 border-t border-border flex items-center justify-end text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <kbd className="px-2 py-0.5 rounded bg-card border border-border">Esc</kbd>
             <span>close</span>
-            <span className="mx-1">•</span>
-            <kbd className="px-2 py-0.5 rounded bg-card border border-border">Space</kbd>
-            <span>back</span>
+            {state.stack.length > 1 && (
+              <>
+                <span className="mx-1">•</span>
+                <kbd className="px-2 py-0.5 rounded bg-card border border-border">Space</kbd>
+                <span>back</span>
+              </>
+            )}
           </div>
         </div>
       </div>

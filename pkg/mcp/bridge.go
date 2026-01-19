@@ -29,6 +29,7 @@ type ClusterInfo struct {
 	Name       string `json:"name"`
 	Context    string `json:"context"`
 	Server     string `json:"server,omitempty"`
+	User       string `json:"user,omitempty"`
 	Healthy    bool   `json:"healthy"`
 	Source     string `json:"source,omitempty"`
 	NodeCount  int    `json:"nodeCount,omitempty"`
@@ -37,13 +38,25 @@ type ClusterInfo struct {
 
 // ClusterHealth represents cluster health status
 type ClusterHealth struct {
-	Cluster     string `json:"cluster"`
-	Healthy     bool   `json:"healthy"`
-	APIServer   string `json:"apiServer,omitempty"`
-	NodeCount   int    `json:"nodeCount"`
-	ReadyNodes  int    `json:"readyNodes"`
-	PodCount    int    `json:"podCount,omitempty"`
-	Issues      []string `json:"issues,omitempty"`
+	Cluster       string   `json:"cluster"`
+	Healthy       bool     `json:"healthy"`
+	Reachable     bool     `json:"reachable"`
+	LastSeen      string   `json:"lastSeen,omitempty"`
+	ErrorType     string   `json:"errorType,omitempty"`
+	ErrorMessage  string   `json:"errorMessage,omitempty"`
+	APIServer     string   `json:"apiServer,omitempty"`
+	NodeCount     int      `json:"nodeCount"`
+	ReadyNodes    int      `json:"readyNodes"`
+	PodCount      int      `json:"podCount,omitempty"`
+	CpuCores      int      `json:"cpuCores,omitempty"`
+	MemoryBytes   int64    `json:"memoryBytes,omitempty"`
+	MemoryGB      float64  `json:"memoryGB,omitempty"`
+	StorageBytes  int64    `json:"storageBytes,omitempty"`
+	StorageGB     float64  `json:"storageGB,omitempty"`
+	PVCCount      int      `json:"pvcCount,omitempty"`
+	PVCBoundCount int      `json:"pvcBoundCount,omitempty"`
+	Issues        []string `json:"issues,omitempty"`
+	CheckedAt     string   `json:"checkedAt,omitempty"`
 }
 
 // PodInfo represents pod information

@@ -1,0 +1,336 @@
+import { useState, useRef, useEffect } from 'react'
+import {
+  X,
+  Send,
+  ChevronRight,
+  ChevronLeft,
+  Loader2,
+  CheckCircle,
+  AlertCircle,
+  Clock,
+  MessageSquare,
+  Trash2,
+  Bot,
+  User,
+  ArrowUpCircle,
+  Search,
+  Wrench,
+  Rocket,
+  Sparkles,
+  Hammer,
+} from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import { useMissions, Mission, MissionStatus } from '../../hooks/useMissions'
+import { cn } from '../../lib/cn'
+
+const STATUS_CONFIG: Record<MissionStatus, { icon: typeof Loader2; color: string; label: string }> = {
+  pending: { icon: Clock, color: 'text-yellow-400', label: 'Starting...' },
+  running: { icon: Loader2, color: 'text-blue-400', label: 'Running' },
+  waiting_input: { icon: MessageSquare, color: 'text-purple-400', label: 'Waiting for input' },
+  completed: { icon: CheckCircle, color: 'text-green-400', label: 'Completed' },
+  failed: { icon: AlertCircle, color: 'text-red-400', label: 'Failed' },
+}
+
+const TYPE_ICONS: Record<Mission['type'], typeof ArrowUpCircle> = {
+  upgrade: ArrowUpCircle,
+  troubleshoot: Wrench,
+  analyze: Search,
+  deploy: Rocket,
+  repair: Hammer,
+  custom: Sparkles,
+}
+
+function MissionListItem({ mission, isActive, onClick }: {
+  mission: Mission
+  isActive: boolean
+  onClick: () => void
+}) {
+  const config = STATUS_CONFIG[mission.status]
+  const StatusIcon = config.icon
+  const TypeIcon = TYPE_ICONS[mission.type]
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full text-left p-3 rounded-lg transition-colors',
+        isActive
+          ? 'bg-primary/20 border border-primary/50'
+          : 'hover:bg-secondary/50 border border-transparent'
+      )}
+    >
+      <div className="flex items-start gap-2">
+        <div className={cn('mt-0.5', config.color)}>
+          <StatusIcon className={cn('w-4 h-4', mission.status === 'running' && 'animate-spin')} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <TypeIcon className="w-3 h-3 text-muted-foreground" />
+            <span className="text-sm font-medium text-foreground truncate">{mission.title}</span>
+          </div>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">{mission.description}</p>
+          {mission.cluster && (
+            <span className="text-xs text-purple-400 mt-1 inline-block">@{mission.cluster}</span>
+          )}
+        </div>
+      </div>
+    </button>
+  )
+}
+
+function MissionChat({ mission }: { mission: Mission }) {
+  const { sendMessage, cancelMission, dismissMission } = useMissions()
+  const [input, setInput] = useState('')
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [mission.messages])
+
+  // Focus input when mission becomes active
+  useEffect(() => {
+    if (mission.status === 'waiting_input') {
+      inputRef.current?.focus()
+    }
+  }, [mission.status])
+
+  const handleSend = () => {
+    if (!input.trim() || mission.status === 'running') return
+    sendMessage(mission.id, input.trim())
+    setInput('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  const config = STATUS_CONFIG[mission.status]
+  const StatusIcon = config.icon
+  const TypeIcon = TYPE_ICONS[mission.type]
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {/* Header */}
+      <div className="p-4 border-b border-border flex-shrink-0">
+        <div className="flex items-center gap-2 mb-2">
+          <TypeIcon className="w-5 h-5 text-primary" />
+          <h3 className="font-semibold text-foreground flex-1 truncate">{mission.title}</h3>
+          <div className={cn('flex items-center gap-1', config.color)}>
+            <StatusIcon className={cn('w-4 h-4', mission.status === 'running' && 'animate-spin')} />
+            <span className="text-xs">{config.label}</span>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">{mission.description}</p>
+        {mission.cluster && (
+          <span className="text-xs text-purple-400 mt-1 inline-block">Cluster: {mission.cluster}</span>
+        )}
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+        {mission.messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={cn(
+              'flex gap-3',
+              msg.role === 'user' && 'flex-row-reverse'
+            )}
+          >
+            <div className={cn(
+              'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+              msg.role === 'user' ? 'bg-primary/20' :
+              msg.role === 'assistant' ? 'bg-purple-500/20' :
+              'bg-yellow-500/20'
+            )}>
+              {msg.role === 'user' ? (
+                <User className="w-4 h-4 text-primary" />
+              ) : msg.role === 'assistant' ? (
+                <Bot className="w-4 h-4 text-purple-400" />
+              ) : (
+                <AlertCircle className="w-4 h-4 text-yellow-400" />
+              )}
+            </div>
+            <div className={cn(
+              'flex-1 rounded-lg p-3 max-w-[85%]',
+              msg.role === 'user' ? 'bg-primary/10 ml-auto' :
+              msg.role === 'assistant' ? 'bg-secondary/50' :
+              'bg-yellow-500/10'
+            )}>
+              {msg.role === 'assistant' ? (
+                <div className="text-sm text-foreground prose prose-sm prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-pre:bg-black/30 prose-pre:text-xs prose-code:text-purple-300 prose-code:bg-black/20 prose-code:px-1 prose-code:rounded">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
+              )}
+              <span className="text-[10px] text-muted-foreground mt-1 block">
+                {msg.timestamp.toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input / Actions */}
+      <div className="p-4 border-t border-border flex-shrink-0 bg-card">
+        {mission.status === 'running' ? (
+          <div className="flex items-center justify-center gap-2 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Agent is working...</span>
+            <button
+              onClick={() => cancelMission(mission.id)}
+              className="text-xs text-red-400 hover:text-red-300 ml-2"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : mission.status === 'completed' || mission.status === 'failed' ? (
+          <div className="flex items-center justify-between">
+            <span className={cn('text-sm', config.color)}>{config.label}</span>
+            <button
+              onClick={() => dismissMission(mission.id)}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Trash2 className="w-3 h-3" />
+              Dismiss
+            </button>
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message..."
+              className="flex-1 px-3 py-2 text-sm bg-secondary/50 border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!input.trim()}
+              className="px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Send className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export function MissionSidebar() {
+  const { missions, activeMission, isSidebarOpen, setActiveMission, closeSidebar } = useMissions()
+
+  // Count missions needing attention
+  const needsAttention = missions.filter(m =>
+    m.status === 'waiting_input' || m.status === 'failed'
+  ).length
+
+  if (!isSidebarOpen) {
+    return null
+  }
+
+  return (
+    <div className="fixed top-16 right-0 bottom-0 w-96 bg-card/95 backdrop-blur-sm border-l border-border z-40 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between p-4 border-b border-border">
+        <div className="flex items-center gap-2">
+          <Bot className="w-5 h-5 text-primary" />
+          <h2 className="font-semibold text-foreground">AI Missions</h2>
+          {needsAttention > 0 && (
+            <span className="px-1.5 py-0.5 text-xs bg-purple-500/20 text-purple-400 rounded-full">
+              {needsAttention}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={closeSidebar}
+          className="p-1 hover:bg-secondary rounded transition-colors"
+        >
+          <X className="w-5 h-5 text-muted-foreground" />
+        </button>
+      </div>
+
+      {missions.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <Bot className="w-12 h-12 text-muted-foreground/50 mb-4" />
+          <p className="text-muted-foreground">No active missions</p>
+          <p className="text-xs text-muted-foreground/70 mt-1">
+            Start a mission from any card's AI action
+          </p>
+        </div>
+      ) : activeMission ? (
+        <div className="flex-1 flex flex-col min-h-0">
+          {/* Back to list if multiple missions */}
+          {missions.length > 1 && (
+            <button
+              onClick={() => setActiveMission(null)}
+              className="flex items-center gap-1 px-4 py-2 text-xs text-muted-foreground hover:text-foreground border-b border-border flex-shrink-0"
+            >
+              <ChevronLeft className="w-3 h-3" />
+              Back to missions ({missions.length})
+            </button>
+          )}
+          <MissionChat mission={activeMission} />
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          {missions.map((mission) => (
+            <MissionListItem
+              key={mission.id}
+              mission={mission}
+              isActive={false}
+              onClick={() => setActiveMission(mission.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Toggle button for the sidebar (shown when sidebar is closed)
+export function MissionSidebarToggle() {
+  const { missions, isSidebarOpen, openSidebar } = useMissions()
+
+  const needsAttention = missions.filter(m =>
+    m.status === 'waiting_input' || m.status === 'failed'
+  ).length
+
+  const runningCount = missions.filter(m => m.status === 'running').length
+
+  if (isSidebarOpen || missions.length === 0) {
+    return null
+  }
+
+  return (
+    <button
+      onClick={openSidebar}
+      className={cn(
+        'fixed right-4 bottom-4 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all z-50',
+        needsAttention > 0
+          ? 'bg-purple-500 text-white animate-pulse'
+          : 'bg-card border border-border text-foreground hover:bg-secondary'
+      )}
+    >
+      <Bot className="w-5 h-5" />
+      {runningCount > 0 && (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      )}
+      {needsAttention > 0 ? (
+        <span className="text-sm font-medium">{needsAttention} needs attention</span>
+      ) : (
+        <span className="text-sm">{missions.length} mission{missions.length !== 1 ? 's' : ''}</span>
+      )}
+      <ChevronRight className="w-4 h-4" />
+    </button>
+  )
+}

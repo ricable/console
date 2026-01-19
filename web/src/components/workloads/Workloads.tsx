@@ -4,6 +4,7 @@ import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { StatusIndicator } from '../charts/StatusIndicator'
 import { ClusterBadge } from '../ui/ClusterBadge'
+import { Skeleton } from '../ui/Skeleton'
 
 interface AppSummary {
   namespace: string
@@ -14,11 +15,13 @@ interface AppSummary {
   status: 'healthy' | 'warning' | 'error'
 }
 
-export function Applications() {
-  const { issues: podIssues } = usePodIssues()
-  const { issues: deploymentIssues } = useDeploymentIssues()
-  const { clusters } = useClusters()
+export function Workloads() {
+  const { issues: podIssues, isLoading: podIssuesLoading } = usePodIssues()
+  const { issues: deploymentIssues, isLoading: deploymentIssuesLoading } = useDeploymentIssues()
+  const { clusters, isLoading: clustersLoading } = useClusters()
   const { drillToNamespace } = useDrillDownActions()
+
+  const isLoading = podIssuesLoading || deploymentIssuesLoading || clustersLoading
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -117,10 +120,49 @@ export function Applications() {
     totalDeploymentIssues: deploymentIssues.length,
   }), [apps, podIssues, deploymentIssues])
 
+  if (isLoading) {
+    return (
+      <div className="pt-16">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-foreground">Workloads</h1>
+          <p className="text-muted-foreground">View and manage deployed applications across clusters</p>
+        </div>
+
+        {/* Stats Overview Skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="glass p-4 rounded-lg">
+              <Skeleton variant="text" width={60} height={36} className="mb-1" />
+              <Skeleton variant="text" width={100} height={16} />
+            </div>
+          ))}
+        </div>
+
+        {/* Workloads List Skeleton */}
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="glass p-4 rounded-lg border-l-4 border-l-gray-500/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Skeleton variant="circular" width={24} height={24} />
+                  <div>
+                    <Skeleton variant="text" width={150} height={20} className="mb-1" />
+                    <Skeleton variant="rounded" width={80} height={18} />
+                  </div>
+                </div>
+                <Skeleton variant="text" width={100} height={20} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="pt-16">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Applications</h1>
+        <h1 className="text-2xl font-bold text-foreground">Workloads</h1>
         <p className="text-muted-foreground">View and manage deployed applications across clusters</p>
       </div>
 
@@ -144,7 +186,7 @@ export function Applications() {
         </div>
       </div>
 
-      {/* Applications List */}
+      {/* Workloads List */}
       {apps.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">✨</div>
@@ -210,7 +252,7 @@ export function Applications() {
                 </span>
               </div>
               <div className="text-xs text-muted-foreground">
-                {cluster.podCount || 0} pods • {cluster.nodeCount || 0} nodes
+                {cluster.healthy ? (cluster.podCount || 0) : '-'} pods • {cluster.healthy ? (cluster.nodeCount || 0) : '-'} nodes
               </div>
             </div>
           ))}

@@ -1,7 +1,8 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { StatusIndicator } from '../charts/StatusIndicator'
 import { useToast } from '../ui/Toast'
+import { ClusterBadge } from '../ui/ClusterBadge'
 import { RefreshCw, Box, Loader2, Package, Ship, Layers, Cog, ChevronDown, ExternalLink } from 'lucide-react'
 import { cn } from '../../lib/cn'
 
@@ -94,78 +95,85 @@ export function GitOps() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+  const fetchVersionRef = useRef(0) // Track fetch version to prevent duplicate results
 
-  // Fetch GitOps releases
+  // Fetch GitOps releases with gradual loading
   const fetchReleases = useCallback(async () => {
+    // Increment version to invalidate any in-progress fetches
+    const currentVersion = ++fetchVersionRef.current
+
     setIsLoading(true)
     setError(null)
-    try {
-      const token = localStorage.getItem('token')
+    setReleases([]) // Clear existing releases
 
-      // Fetch all release types in parallel (fetch all, filter client-side with global filter)
-      const [helmRes, kustomizeRes, operatorRes] = await Promise.allSettled([
-        fetch('/api/gitops/helm-releases', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        }),
-        fetch('/api/gitops/kustomizations', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        }),
-        fetch('/api/gitops/operators', {
-          headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-        }),
-      ])
+    const token = localStorage.getItem('token')
+    const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
+    let hasReceivedData = false
 
-      const allReleases: Release[] = []
+    // Fetch each type and update state as data arrives (gradual loading)
+    const fetchAndAddReleases = async (
+      url: string,
+      processData: (data: unknown) => Release[]
+    ) => {
+      try {
+        const response = await fetch(url, { headers })
+        // Check if this fetch is still valid
+        if (fetchVersionRef.current !== currentVersion) return
 
-      // Process Helm releases
-      if (helmRes.status === 'fulfilled' && helmRes.value.ok) {
-        const result = await safeJsonParse(helmRes.value)
-        if (result.ok && result.data) {
-          const data = result.data as { releases?: Omit<HelmRelease, 'type'>[] }
-          const helmReleases = (data.releases || []).map((r) => ({
-            ...r,
-            type: 'helm' as const,
-          }))
-          allReleases.push(...helmReleases)
+        if (response.ok) {
+          const result = await safeJsonParse(response)
+          // Check again after parsing
+          if (fetchVersionRef.current !== currentVersion) return
+
+          if (result.ok && result.data) {
+            const newReleases = processData(result.data)
+            if (newReleases.length > 0) {
+              setReleases(prev => [...prev, ...newReleases])
+              if (!hasReceivedData) {
+                hasReceivedData = true
+                setIsLoading(false)
+              }
+            }
+          }
         }
+      } catch {
+        // Silently ignore individual fetch failures
       }
+    }
 
-      // Process Kustomizations
-      if (kustomizeRes.status === 'fulfilled' && kustomizeRes.value.ok) {
-        const result = await safeJsonParse(kustomizeRes.value)
-        if (result.ok && result.data) {
-          const data = result.data as { kustomizations?: Omit<Kustomization, 'type'>[] }
-          const kustomizations = (data.kustomizations || []).map((k) => ({
-            ...k,
-            type: 'kustomize' as const,
-          }))
-          allReleases.push(...kustomizations)
-        }
-      }
+    // Start all fetches in parallel - don't wait for slow endpoints
+    // Each fetch will update state independently when it completes
+    const helmPromise = fetchAndAddReleases('/api/gitops/helm-releases', (data) => {
+      const d = data as { releases?: Omit<HelmRelease, 'type'>[] }
+      return (d.releases || []).map((r) => ({ ...r, type: 'helm' as const }))
+    })
+    const kustomizePromise = fetchAndAddReleases('/api/gitops/kustomizations', (data) => {
+      const d = data as { kustomizations?: Omit<Kustomization, 'type'>[] }
+      return (d.kustomizations || []).map((k) => ({ ...k, type: 'kustomize' as const }))
+    })
+    // Operators endpoint can be slow - add timeout
+    const operatorsPromise = Promise.race([
+      fetchAndAddReleases('/api/gitops/operators', (data) => {
+        const d = data as { operators?: Omit<Operator, 'type'>[] }
+        return (d.operators || []).map((o) => ({ ...o, type: 'operator' as const }))
+      }),
+      new Promise<void>(resolve => setTimeout(resolve, 10000)) // 10s timeout
+    ])
 
-      // Process Operators
-      if (operatorRes.status === 'fulfilled' && operatorRes.value.ok) {
-        const result = await safeJsonParse(operatorRes.value)
-        if (result.ok && result.data) {
-          const data = result.data as { operators?: Omit<Operator, 'type'>[] }
-          const operators = (data.operators || []).map((o) => ({
-            ...o,
-            type: 'operator' as const,
-          }))
-          allReleases.push(...operators)
-        }
-      }
+    // Wait for fast endpoints, don't block on operators
+    await Promise.all([helmPromise, kustomizePromise])
 
-      setReleases(allReleases)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch GitOps releases')
-      setReleases([])
-    } finally {
+    // If we still have no data after fast endpoints, mark loading complete
+    if (!hasReceivedData && fetchVersionRef.current === currentVersion) {
       setIsLoading(false)
     }
+
+    // Let operators finish in background (already started, will update state when done)
+    operatorsPromise.catch(() => {}) // Suppress unhandled rejection
   }, [])
 
-  // Fetch releases on mount and when cluster changes
+  // Fetch releases on mount and when global cluster selection changes
+  // Fetch releases only on mount - filtering is done client-side
   useEffect(() => {
     fetchReleases()
   }, [fetchReleases])
@@ -179,10 +187,10 @@ export function GitOps() {
   const filteredReleases = useMemo(() => {
     let result = releases
 
-    // Apply global cluster filter
+    // Apply global cluster filter (keep items without cluster specified - they're from current context)
     if (!isAllClustersSelected) {
       result = result.filter(release =>
-        release.cluster && globalSelectedClusters.includes(release.cluster)
+        !release.cluster || globalSelectedClusters.includes(release.cluster)
       )
     }
 
@@ -212,8 +220,8 @@ export function GitOps() {
       result = result.filter(release => release.status === 'failed' || release.status === 'Failed')
     } else if (statusFilter === 'pending') {
       result = result.filter(release =>
-        release.status.toLowerCase().includes('pending') ||
-        release.status.toLowerCase().includes('progressing')
+        (release.status?.toLowerCase().includes('pending')) ||
+        (release.status?.toLowerCase().includes('progressing'))
       )
     }
 
@@ -224,10 +232,10 @@ export function GitOps() {
   const globalFilteredReleases = useMemo(() => {
     let result = releases
 
-    // Apply global cluster filter
+    // Apply global cluster filter (keep items without cluster specified - they're from current context)
     if (!isAllClustersSelected) {
       result = result.filter(release =>
-        release.cluster && globalSelectedClusters.includes(release.cluster)
+        !release.cluster || globalSelectedClusters.includes(release.cluster)
       )
     }
 
@@ -264,7 +272,7 @@ export function GitOps() {
   }, [globalFilteredReleases])
 
   const getStatusColor = (status: string) => {
-    const s = status.toLowerCase()
+    const s = (status || '').toLowerCase()
     if (['deployed', 'ready', 'succeeded', 'running'].includes(s)) return 'text-green-400 bg-green-500/20'
     if (['failed', 'error'].includes(s)) return 'text-red-400 bg-red-500/20'
     if (['pending', 'progressing', 'installing'].includes(s)) return 'text-blue-400 bg-blue-500/20'
@@ -273,7 +281,7 @@ export function GitOps() {
   }
 
   const getHealthStatus = (status: string): 'healthy' | 'warning' | 'error' => {
-    const s = status.toLowerCase()
+    const s = (status || '').toLowerCase()
     if (['deployed', 'ready', 'succeeded', 'running'].includes(s)) return 'healthy'
     if (['failed', 'error'].includes(s)) return 'error'
     return 'warning'
@@ -327,12 +335,7 @@ export function GitOps() {
                     <span>{(release as HelmRelease).revision}</span>
                   </span>
                 )}
-                {release.cluster && (
-                  <span className="flex items-center gap-1" title="Cluster">
-                    <span className="text-muted-foreground/50">@</span>
-                    <span>{release.cluster}</span>
-                  </span>
-                )}
+                {release.cluster && <ClusterBadge cluster={release.cluster} size="sm" />}
               </div>
               {release.type === 'helm' && (
                 <div className="flex items-center gap-1 text-xs text-muted-foreground mt-1" title="Helm Chart">

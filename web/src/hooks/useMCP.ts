@@ -12,6 +12,15 @@ export interface ClusterInfo {
   nodeCount?: number
   podCount?: number
   cpuCores?: number
+  // Memory metrics
+  memoryBytes?: number
+  memoryGB?: number
+  // Storage metrics
+  storageBytes?: number
+  storageGB?: number
+  // PVC metrics
+  pvcCount?: number
+  pvcBoundCount?: number
   isCurrent?: boolean
   // Reachability fields (from health check)
   reachable?: boolean
@@ -28,8 +37,17 @@ export interface ClusterHealth {
   readyNodes: number
   podCount?: number
   cpuCores?: number
+  // Memory metrics
+  memoryBytes?: number
+  memoryGB?: number
+  // Storage metrics
+  storageBytes?: number
+  storageGB?: number
+  // PVC metrics
+  pvcCount?: number
+  pvcBoundCount?: number
   issues?: string[]
-  // New fields for reachability
+  // Fields for reachability
   reachable?: boolean
   lastSeen?: string
   errorType?: 'timeout' | 'auth' | 'network' | 'certificate' | 'unknown'
@@ -135,6 +153,7 @@ export interface NodeInfo {
   architecture?: string
   cpuCapacity: string
   memoryCapacity: string
+  storageCapacity?: string
   podCapacity: string
   conditions: NodeCondition[]
   labels?: Record<string, string>
@@ -210,6 +229,20 @@ export interface ServiceAccount {
   cluster?: string
   secrets?: string[]
   imagePullSecrets?: string[]
+  age?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
+}
+
+export interface PVC {
+  name: string
+  namespace: string
+  cluster?: string
+  status: string
+  storageClass?: string
+  capacity?: string
+  accessModes?: string[]
+  volumeName?: string
   age?: string
   labels?: Record<string, string>
   annotations?: Record<string, string>
@@ -386,6 +419,13 @@ async function checkHealthProgressively(clusterList: ClusterInfo[]) {
         nodeCount: health.nodeCount,
         podCount: health.podCount,
         cpuCores: health.cpuCores,
+        // Memory/storage metrics
+        memoryBytes: health.memoryBytes,
+        memoryGB: health.memoryGB,
+        storageBytes: health.storageBytes,
+        storageGB: health.storageGB,
+        pvcCount: health.pvcCount,
+        pvcBoundCount: health.pvcBoundCount,
         errorType: health.errorType,
         errorMessage: health.errorMessage,
       })
@@ -484,6 +524,13 @@ export async function refreshSingleCluster(clusterName: string): Promise<void> {
       nodeCount: health.nodeCount,
       podCount: health.podCount,
       cpuCores: health.cpuCores,
+      // Memory/storage metrics
+      memoryBytes: health.memoryBytes,
+      memoryGB: health.memoryGB,
+      storageBytes: health.storageBytes,
+      storageGB: health.storageGB,
+      pvcCount: health.pvcCount,
+      pvcBoundCount: health.pvcBoundCount,
       errorType: health.errorType,
       errorMessage: health.errorMessage,
     })
@@ -1002,6 +1049,36 @@ export function useServiceAccounts(cluster?: string, namespace?: string) {
   }, [refetch])
 
   return { serviceAccounts, isLoading, error, refetch }
+}
+
+// Hook to get PVCs
+export function usePVCs(cluster?: string, namespace?: string) {
+  const [pvcs, setPVCs] = useState<PVC[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (cluster) params.append('cluster', cluster)
+      if (namespace) params.append('namespace', namespace)
+      const { data } = await api.get<{ pvcs: PVC[] }>(`/api/mcp/pvcs?${params}`)
+      setPVCs(data.pvcs || [])
+      setError(null)
+    } catch (err) {
+      setError('Failed to fetch PVCs')
+      setPVCs([])
+    } finally {
+      setIsLoading(false)
+    }
+  }, [cluster, namespace])
+
+  useEffect(() => {
+    refetch()
+  }, [refetch])
+
+  return { pvcs, isLoading, error, refetch }
 }
 
 // Hook to get pod logs

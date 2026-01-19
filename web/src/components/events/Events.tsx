@@ -414,6 +414,11 @@ export function Events() {
       ) : filteredEvents.length === 0 ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground">No events found</p>
+          {!isAllClustersSelected && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Showing events from: {globalSelectedClusters.join(', ')}
+            </p>
+          )}
           {hasActiveFilters && (
             <button
               onClick={clearFilters}

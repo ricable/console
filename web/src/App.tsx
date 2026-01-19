@@ -6,7 +6,10 @@ import { Dashboard } from './components/dashboard/Dashboard'
 import { Settings } from './components/settings/Settings'
 import { Clusters } from './components/clusters/Clusters'
 import { Events } from './components/events/Events'
-import { Applications } from './components/applications/Applications'
+import { Workloads } from './components/workloads/Workloads'
+import { Storage } from './components/storage/Storage'
+import { Compute } from './components/compute/Compute'
+import { Network } from './components/network/Network'
 import { Security } from './components/security/Security'
 import { GitOps } from './components/gitops/GitOps'
 import { CardHistory } from './components/history/CardHistory'
@@ -19,6 +22,7 @@ import { AuthProvider, useAuth } from './lib/auth'
 import { DrillDownProvider } from './hooks/useDrillDown'
 import { DashboardProvider, useDashboardContext } from './hooks/useDashboardContext'
 import { GlobalFiltersProvider } from './hooks/useGlobalFilters'
+import { MissionProvider } from './hooks/useMissions'
 import { ToastProvider } from './components/ui/Toast'
 
 // Wrapper for CardHistory that provides the restore functionality
@@ -74,6 +78,7 @@ function App() {
     <AuthProvider>
       <ToastProvider>
       <GlobalFiltersProvider>
+      <MissionProvider>
       <DashboardProvider>
       <DrillDownProvider>
       <DrillDownModal />
@@ -113,12 +118,48 @@ function App() {
           }
         />
         <Route
-          path="/apps"
+          path="/workloads"
           element={
             <ProtectedRoute>
               <OnboardedRoute>
                 <Layout>
-                  <Applications />
+                  <Workloads />
+                </Layout>
+              </OnboardedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/compute"
+          element={
+            <ProtectedRoute>
+              <OnboardedRoute>
+                <Layout>
+                  <Compute />
+                </Layout>
+              </OnboardedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/storage"
+          element={
+            <ProtectedRoute>
+              <OnboardedRoute>
+                <Layout>
+                  <Storage />
+                </Layout>
+              </OnboardedRoute>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/network"
+          element={
+            <ProtectedRoute>
+              <OnboardedRoute>
+                <Layout>
+                  <Network />
                 </Layout>
               </OnboardedRoute>
             </ProtectedRoute>
@@ -212,6 +253,7 @@ function App() {
       </Routes>
       </DrillDownProvider>
       </DashboardProvider>
+      </MissionProvider>
       </GlobalFiltersProvider>
       </ToastProvider>
     </AuthProvider>

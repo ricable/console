@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { X, CheckCircle, AlertTriangle, WifiOff, Pencil, ChevronRight, ChevronDown, Layers, Server, Network, HardDrive, Box, FolderOpen, Loader2 } from 'lucide-react'
+import { X, CheckCircle, AlertTriangle, WifiOff, Pencil, ChevronRight, ChevronDown, Layers, Server, Network, HardDrive, Box, FolderOpen, Loader2, Cpu, MemoryStick, Database } from 'lucide-react'
 import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes, useNodes, useNamespaceStats, useDeployments } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { Gauge } from '../charts/Gauge'
 import { NodeListItem } from './NodeListItem'
 import { NodeDetailPanel } from './NodeDetailPanel'
+import { NamespaceResources } from './components'
 
 interface ClusterDetailModalProps {
   clusterName: string
@@ -64,8 +65,8 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
 
   if (isLoading) {
     return createPortal(
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-        <div className="glass p-8 rounded-lg">
+      <div className="fixed inset-0 bg-black/50 z-50">
+        <div className="fixed top-[5vh] left-1/2 -translate-x-1/2 glass p-8 rounded-lg">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
         </div>
       </div>,
@@ -74,8 +75,8 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
   }
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="glass p-6 rounded-lg w-[800px] max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
+      <div className="fixed top-[5vh] left-1/2 -translate-x-1/2 glass p-6 rounded-lg w-[800px] h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         {/* Header with status icons */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -171,6 +172,38 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
           </div>
         </div>
 
+        {/* Resource Metrics */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="p-4 rounded-lg bg-card/50 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Cpu className="w-4 h-4 text-blue-400" />
+              <span className="text-sm text-muted-foreground">CPU</span>
+            </div>
+            <div className="text-2xl font-bold text-foreground">{!isUnreachable ? (health?.cpuCores || 0) : '-'}</div>
+            <div className="text-xs text-muted-foreground">cores allocatable</div>
+          </div>
+          <div className="p-4 rounded-lg bg-card/50 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <MemoryStick className="w-4 h-4 text-green-400" />
+              <span className="text-sm text-muted-foreground">Memory</span>
+            </div>
+            <div className="text-2xl font-bold text-foreground">
+              {!isUnreachable ? (health?.memoryGB ? (health.memoryGB >= 1024 ? `${(health.memoryGB / 1024).toFixed(1)} TB` : `${Math.round(health.memoryGB)} GB`) : '0 GB') : '-'}
+            </div>
+            <div className="text-xs text-muted-foreground">allocatable</div>
+          </div>
+          <div className="p-4 rounded-lg bg-card/50 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Database className="w-4 h-4 text-purple-400" />
+              <span className="text-sm text-muted-foreground">Storage</span>
+            </div>
+            <div className="text-2xl font-bold text-foreground">
+              {!isUnreachable ? (health?.storageGB ? (health.storageGB >= 1024 ? `${(health.storageGB / 1024).toFixed(1)} TB` : `${Math.round(health.storageGB)} GB`) : '0 GB') : '-'}
+            </div>
+            <div className="text-xs text-muted-foreground">ephemeral</div>
+          </div>
+        </div>
+
         {/* Pods by Namespace - Expandable with drill-down */}
         {!isUnreachable && showPodsByNamespace && namespaceStats.length > 0 && (
           <div className="mb-6">
@@ -206,6 +239,16 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
                           )}
                         </div>
                       </button>
+                      {/* Expanded namespace content - shows all resources with tree/list view */}
+                      {isExpanded && (
+                        <div className="bg-card/20 border-t border-border/20 px-4 py-2">
+                          <NamespaceResources
+                            clusterName={clusterName}
+                            namespace={ns.name}
+                            onClose={onClose}
+                          />
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -352,37 +395,37 @@ export function ClusterDetailModal({ clusterName, onClose, onRename }: ClusterDe
               <Server className="w-4 h-4 text-cyan-400" />
               Nodes ({clusterNodes.length})
             </h3>
-            <div className="divide-y divide-border/30 rounded-lg border border-border/30 overflow-hidden">
-              {clusterNodes.map((node) => (
-                <NodeListItem
-                  key={node.name}
-                  node={node}
-                  isSelected={expandedNodes.has(node.name)}
-                  onClick={() => {
-                    setExpandedNodes(prev => {
-                      const next = new Set(prev)
-                      if (next.has(node.name)) next.delete(node.name)
-                      else next.add(node.name)
-                      return next
-                    })
-                  }}
-                />
-              ))}
+            <div className="space-y-2">
+              {clusterNodes.map((node) => {
+                const isExpanded = expandedNodes.has(node.name)
+                return (
+                  <div key={node.name}>
+                    <div className={`rounded-lg border overflow-hidden ${isExpanded ? 'border-cyan-500/30' : 'border-border/30'}`}>
+                      <NodeListItem
+                        node={node}
+                        isSelected={isExpanded}
+                        onClick={() => {
+                          setExpandedNodes(prev => {
+                            const next = new Set(prev)
+                            if (next.has(node.name)) next.delete(node.name)
+                            else next.add(node.name)
+                            return next
+                          })
+                        }}
+                      />
+                    </div>
+                    {/* Inline expanded details */}
+                    {isExpanded && (
+                      <NodeDetailPanel
+                        node={node}
+                        clusterName={clusterName}
+                        onClose={() => setExpandedNodes(prev => { const next = new Set(prev); next.delete(node.name); return next })}
+                      />
+                    )}
+                  </div>
+                )
+              })}
             </div>
-
-            {/* Expanded Node Details */}
-            {Array.from(expandedNodes).map(nodeName => {
-              const node = clusterNodes.find(n => n.name === nodeName)
-              if (!node) return null
-              return (
-                <NodeDetailPanel
-                  key={node.name}
-                  node={node}
-                  clusterName={clusterName}
-                  onClose={() => setExpandedNodes(prev => { const next = new Set(prev); next.delete(node.name); return next })}
-                />
-              )
-            })}
             {nodesLoading && (
               <div className="mt-2 text-xs text-muted-foreground flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />

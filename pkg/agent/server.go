@@ -286,8 +286,41 @@ func (s *Server) handleKubectlMessage(msg protocol.Message) protocol.Message {
 }
 
 func (s *Server) handleClaudeMessage(msg protocol.Message) protocol.Message {
-	// TODO: Implement Claude Code integration
-	return s.errorResponse(msg.ID, "not_implemented", "Claude Code integration not yet implemented")
+	// Check if Claude Code CLI is installed (required for KubeStellar Klaude)
+	if !s.claude.IsInstalled() {
+		return s.errorResponse(msg.ID, "not_available", "Claude Code CLI is required for KubeStellar Klaude. Install from: https://claude.ai/download")
+	}
+
+	// Parse payload
+	payloadBytes, err := json.Marshal(msg.Payload)
+	if err != nil {
+		return s.errorResponse(msg.ID, "invalid_payload", "Failed to parse Claude request")
+	}
+
+	var req protocol.ClaudeRequest
+	if err := json.Unmarshal(payloadBytes, &req); err != nil {
+		return s.errorResponse(msg.ID, "invalid_payload", "Invalid Claude request format")
+	}
+
+	if req.Prompt == "" {
+		return s.errorResponse(msg.ID, "empty_prompt", "Prompt cannot be empty")
+	}
+
+	// Execute Claude
+	output, err := s.claude.Execute(req.Prompt)
+	if err != nil {
+		return s.errorResponse(msg.ID, "execution_error", "Failed to execute Claude: "+err.Error())
+	}
+
+	return protocol.Message{
+		ID:   msg.ID,
+		Type: protocol.TypeResult,
+		Payload: protocol.ClaudeResponse{
+			Content:   output,
+			SessionID: req.SessionID,
+			Done:      true,
+		},
+	}
 }
 
 func (s *Server) errorResponse(id, code, message string) protocol.Message {

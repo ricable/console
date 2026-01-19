@@ -18,6 +18,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
     customFilter,
+    filterByStatus,
   } = useGlobalFilters()
 
   // Apply global filters
@@ -40,7 +41,27 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
   // Fetch operators for selected cluster
-  const { operators, isLoading: operatorsLoading, refetch } = useOperators(selectedCluster || undefined)
+  const { operators: rawOperators, isLoading: operatorsLoading, refetch } = useOperators(selectedCluster || undefined)
+
+  // Apply filters to operators
+  const operators = useMemo(() => {
+    let result = rawOperators
+
+    // Apply status filter
+    result = filterByStatus(result)
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      result = result.filter(op =>
+        op.name.toLowerCase().includes(query) ||
+        op.namespace.toLowerCase().includes(query) ||
+        op.version.toLowerCase().includes(query)
+      )
+    }
+
+    return result
+  }, [rawOperators, filterByStatus, customFilter])
 
   const isLoading = clustersLoading || operatorsLoading
 

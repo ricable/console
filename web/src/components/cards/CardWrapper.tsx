@@ -35,6 +35,8 @@ interface CardWrapperProps {
   isRefreshing?: boolean
   /** Last time the card data was updated */
   lastUpdated?: Date | null
+  /** Whether this card uses demo/mock data instead of real data */
+  isDemoData?: boolean
   onSwap?: (newType: string) => void
   onSwapCancel?: () => void
   onConfigure?: () => void
@@ -108,7 +110,7 @@ const CARD_TITLES: Record<string, string> = {
   policy_violations: 'Policy Violations',
 
   // Other
-  upgrade_status: 'Upgrade Status',
+  upgrade_status: 'Cluster Upgrade Status',
   user_management: 'User Management',
 }
 
@@ -122,6 +124,7 @@ export function CardWrapper({
   dragHandle,
   isRefreshing,
   lastUpdated,
+  isDemoData,
   onSwap,
   onSwapCancel,
   onConfigure,
@@ -215,6 +218,15 @@ export function CardWrapper({
           <div className="flex items-center gap-2">
             {dragHandle}
             <h3 className="text-sm font-medium text-foreground">{title}</h3>
+            {/* Demo data indicator */}
+            {isDemoData && (
+              <span
+                className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400"
+                title="This card displays demo data"
+              >
+                Demo
+              </span>
+            )}
             {/* Refresh indicator */}
             {isRefreshing && (
               <RefreshCw className="w-3 h-3 text-purple-400 animate-spin" />

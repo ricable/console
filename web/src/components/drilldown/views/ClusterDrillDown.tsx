@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes } from '../../../hooks/useMCP'
 import { useDrillDownActions } from '../../../hooks/useDrillDown'
 import { StatusIndicator } from '../../charts/StatusIndicator'
@@ -10,7 +11,7 @@ interface Props {
 
 export function ClusterDrillDown({ data }: Props) {
   const clusterName = (data.cluster as string) || ''
-  const { drillToNamespace, drillToNode: _drillToNode, drillToGPUNode, drillToEvents } = useDrillDownActions()
+  const { drillToNamespace, drillToPod, drillToGPUNode, drillToEvents } = useDrillDownActions()
 
   const { health, isLoading } = useClusterHealth(clusterName)
   const { issues: podIssues } = usePodIssues(clusterName)
@@ -146,19 +147,24 @@ export function ClusterDrillDown({ data }: Props) {
                 {podIssues.map((issue, i) => (
                   <div
                     key={i}
-                    onClick={() => drillToNamespace(clusterName, issue.namespace)}
+                    onClick={() => drillToPod(clusterName, issue.namespace, issue.name, { ...issue })}
                     className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-foreground">{issue.name}</span>
-                      <span className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400">{issue.status}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-foreground">{issue.name}</span>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          {issue.namespace} • {issue.restarts} restarts
+                        </div>
+                        {issue.issues.length > 0 && (
+                          <div className="text-xs text-red-400 mt-1">{issue.issues.join(', ')}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400">{issue.status}</span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      {issue.namespace} • {issue.restarts} restarts
-                    </div>
-                    {issue.issues.length > 0 && (
-                      <div className="text-xs text-red-400 mt-1">{issue.issues.join(', ')}</div>
-                    )}
                   </div>
                 ))}
               </div>
@@ -177,15 +183,20 @@ export function ClusterDrillDown({ data }: Props) {
                     className="p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 cursor-pointer hover:bg-orange-500/20 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-foreground">{issue.name}</span>
-                      <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
-                        {issue.readyReplicas}/{issue.replicas} ready
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-medium text-foreground">{issue.name}</span>
+                        <div className="text-xs text-muted-foreground mt-1">{issue.namespace}</div>
+                        {issue.message && (
+                          <div className="text-xs text-orange-400 mt-1">{issue.message}</div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
+                          {issue.readyReplicas}/{issue.replicas} ready
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                      </div>
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">{issue.namespace}</div>
-                    {issue.message && (
-                      <div className="text-xs text-orange-400 mt-1">{issue.message}</div>
-                    )}
                   </div>
                 ))}
               </div>

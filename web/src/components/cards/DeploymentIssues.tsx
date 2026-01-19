@@ -6,6 +6,7 @@ import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { CardControls, SortDirection } from '../ui/CardControls'
 import { Skeleton } from '../ui/Skeleton'
+import { LimitedAccessWarning } from '../ui/LimitedAccessWarning'
 
 type SortByOption = 'status' | 'name' | 'cluster'
 
@@ -188,12 +189,7 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
         })}
       </div>
 
-      {error && (
-        <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1" title="Unable to fetch live deployment data - displaying sample data">
-          <AlertTriangle className="w-3 h-3" />
-          Using demo data
-        </div>
-      )}
+      <LimitedAccessWarning hasError={!!error} className="mt-2" />
     </div>
   )
 }

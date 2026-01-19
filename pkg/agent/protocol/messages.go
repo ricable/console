@@ -65,6 +65,7 @@ type ClusterInfo struct {
 	Name      string `json:"name"`
 	Context   string `json:"context"`
 	Server    string `json:"server"`
+	User      string `json:"user,omitempty"`
 	Namespace string `json:"namespace,omitempty"`
 	IsCurrent bool   `json:"isCurrent"`
 }

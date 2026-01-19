@@ -23,10 +23,13 @@ export interface SidebarConfig {
 const DEFAULT_PRIMARY_NAV: SidebarItem[] = [
   { id: 'dashboard', name: 'Dashboard', icon: 'LayoutDashboard', href: '/', type: 'link', order: 0 },
   { id: 'clusters', name: 'Clusters', icon: 'Server', href: '/clusters', type: 'link', order: 1 },
-  { id: 'applications', name: 'Applications', icon: 'Box', href: '/apps', type: 'link', order: 2 },
-  { id: 'events', name: 'Events', icon: 'Activity', href: '/events', type: 'link', order: 3 },
-  { id: 'security', name: 'Security', icon: 'Shield', href: '/security', type: 'link', order: 4 },
-  { id: 'gitops', name: 'GitOps', icon: 'GitBranch', href: '/gitops', type: 'link', order: 5 },
+  { id: 'workloads', name: 'Workloads', icon: 'Box', href: '/workloads', type: 'link', order: 2 },
+  { id: 'compute', name: 'Compute', icon: 'Cpu', href: '/compute', type: 'link', order: 3 },
+  { id: 'storage', name: 'Storage', icon: 'HardDrive', href: '/storage', type: 'link', order: 4 },
+  { id: 'network', name: 'Network', icon: 'Globe', href: '/network', type: 'link', order: 5 },
+  { id: 'events', name: 'Events', icon: 'Activity', href: '/events', type: 'link', order: 6 },
+  { id: 'security', name: 'Security', icon: 'Shield', href: '/security', type: 'link', order: 7 },
+  { id: 'gitops', name: 'GitOps', icon: 'GitBranch', href: '/gitops', type: 'link', order: 8 },
 ]
 
 const DEFAULT_SECONDARY_NAV: SidebarItem[] = [
@@ -44,7 +47,7 @@ const DEFAULT_CONFIG: SidebarConfig = {
   collapsed: false,
 }
 
-const STORAGE_KEY = 'kubestellar-sidebar-config'
+const STORAGE_KEY = 'kubestellar-sidebar-config-v2'
 
 export function useSidebarConfig() {
   const [config, setConfig] = useState<SidebarConfig>(() => {

@@ -33,7 +33,10 @@ type TokenCount struct {
 
 // ClaudeDetector detects and monitors the local Claude Code installation
 type ClaudeDetector struct {
-	claudeDir string
+	claudeDir   string
+	cachedInfo  *ClaudeInfo
+	cacheTime   time.Time
+	cacheTTL    time.Duration
 }
 
 // NewClaudeDetector creates a new Claude detector
@@ -41,11 +44,17 @@ func NewClaudeDetector() *ClaudeDetector {
 	home, _ := os.UserHomeDir()
 	return &ClaudeDetector{
 		claudeDir: filepath.Join(home, ".claude"),
+		cacheTTL:  30 * time.Second, // Cache detection results for 30 seconds
 	}
 }
 
-// Detect checks if Claude Code is installed and returns info
+// Detect checks if Claude Code is installed and returns info (with caching)
 func (c *ClaudeDetector) Detect() ClaudeInfo {
+	// Return cached info if still valid
+	if c.cachedInfo != nil && time.Since(c.cacheTime) < c.cacheTTL {
+		return *c.cachedInfo
+	}
+
 	info := ClaudeInfo{
 		Installed: false,
 		TokenUsage: TokenUsage{
@@ -58,6 +67,8 @@ func (c *ClaudeDetector) Detect() ClaudeInfo {
 	// Check for claude CLI in PATH
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
+		c.cachedInfo = &info
+		c.cacheTime = time.Now()
 		return info
 	}
 
@@ -73,6 +84,10 @@ func (c *ClaudeDetector) Detect() ClaudeInfo {
 
 	// Read token usage from Claude's local files
 	info.TokenUsage = c.readTokenUsage()
+
+	// Cache the result
+	c.cachedInfo = &info
+	c.cacheTime = time.Now()
 
 	return info
 }
@@ -252,8 +267,33 @@ func (c *ClaudeDetector) sumUsageFromTranscript(filePath, dateFilter string, cou
 	}
 }
 
-// IsInstalled returns true if Claude Code is installed
+// IsInstalled returns true if Claude Code is installed (uses cached detection)
 func (c *ClaudeDetector) IsInstalled() bool {
-	_, err := exec.LookPath("claude")
-	return err == nil
+	// Use cached result if available
+	if c.cachedInfo != nil && time.Since(c.cacheTime) < c.cacheTTL {
+		return c.cachedInfo.Installed
+	}
+	// Trigger detection which will cache the result
+	info := c.Detect()
+	return info.Installed
+}
+
+// Execute runs a Claude Code prompt and returns the response
+func (c *ClaudeDetector) Execute(prompt string) (string, error) {
+	claudePath, err := exec.LookPath("claude")
+	if err != nil {
+		return "", err
+	}
+
+	// Use --print flag for non-interactive output
+	cmd := exec.Command(claudePath, "--print", prompt)
+	output, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return string(exitErr.Stderr), err
+		}
+		return "", err
+	}
+
+	return string(output), nil
 }

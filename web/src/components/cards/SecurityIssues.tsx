@@ -6,6 +6,7 @@ import { PaginatedList } from '../ui/PaginatedList'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { CardControls } from '../ui/CardControls'
 import { RefreshIndicator } from '../ui/RefreshIndicator'
+import { LimitedAccessWarning } from '../ui/LimitedAccessWarning'
 
 type SortByOption = 'severity' | 'name' | 'cluster'
 
@@ -180,12 +181,7 @@ export function SecurityIssues({ config }: SecurityIssuesProps) {
         />
       </div>
 
-      {error && (
-        <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1" title="Unable to fetch live security data - displaying sample data">
-          <AlertTriangle className="w-3 h-3" />
-          Using demo data
-        </div>
-      )}
+      <LimitedAccessWarning hasError={!!error} className="mt-2" />
     </div>
   )
 }

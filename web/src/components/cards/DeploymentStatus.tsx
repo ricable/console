@@ -74,18 +74,37 @@ const statusConfig = {
 
 export function DeploymentStatus() {
   const { drillToDeployment } = useDrillDownActions()
-  const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
+  const { selectedClusters, isAllClustersSelected, filterByStatus, customFilter } = useGlobalFilters()
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
 
   const statusOrder: Record<string, number> = { failed: 0, deploying: 1, running: 2 }
 
-  // Filter by global cluster selection
+  // Filter by global filters
   const rawDeployments = useMemo(() => {
-    if (isAllClustersSelected) return allDeployments
-    return allDeployments.filter(d => selectedClusters.includes(d.cluster))
-  }, [selectedClusters, isAllClustersSelected])
+    let result = allDeployments
+
+    // Filter by cluster selection
+    if (!isAllClustersSelected) {
+      result = result.filter(d => selectedClusters.includes(d.cluster))
+    }
+
+    // Apply status filter
+    result = filterByStatus(result)
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      result = result.filter(d =>
+        d.name.toLowerCase().includes(query) ||
+        d.cluster.toLowerCase().includes(query) ||
+        d.version.toLowerCase().includes(query)
+      )
+    }
+
+    return result
+  }, [selectedClusters, isAllClustersSelected, filterByStatus, customFilter])
 
   const deployments = useMemo(() => {
     const sorted = [...rawDeployments].sort((a, b) => {

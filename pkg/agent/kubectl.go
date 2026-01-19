@@ -46,7 +46,7 @@ func (k *KubectlProxy) ListContexts() ([]protocol.ClusterInfo, string) {
 		}
 		clusters = append(clusters, protocol.ClusterInfo{
 			Name: name, Context: name, Server: server,
-			Namespace: ctx.Namespace, IsCurrent: name == current,
+			User: ctx.AuthInfo, Namespace: ctx.Namespace, IsCurrent: name == current,
 		})
 	}
 	return clusters, current

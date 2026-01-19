@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
-import { AlertTriangle, RefreshCw, MemoryStick, ImageOff, Clock, ChevronRight } from 'lucide-react'
+import { RefreshCw, MemoryStick, ImageOff, Clock, ChevronRight } from 'lucide-react'
 import { usePodIssues, PodIssue } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { CardControls, SortDirection } from '../ui/CardControls'
+import { LimitedAccessWarning } from '../ui/LimitedAccessWarning'
 
 type SortByOption = 'status' | 'name' | 'restarts' | 'cluster'
 
@@ -40,14 +41,27 @@ const getStatusColors = (status: string) => {
 export function PodIssues() {
   const { issues: rawIssues, isLoading, error, refetch } = usePodIssues()
   const { drillToPod } = useDrillDownActions()
-  const { filterByCluster } = useGlobalFilters()
+  const { filterByCluster, filterByStatus, customFilter } = useGlobalFilters()
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
 
   const issues = useMemo(() => {
-    // Apply global cluster filter first
-    const filtered = filterByCluster(rawIssues)
+    // Apply global filters
+    let filtered = filterByCluster(rawIssues)
+    filtered = filterByStatus(filtered)
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      filtered = filtered.filter(issue =>
+        issue.name.toLowerCase().includes(query) ||
+        issue.namespace.toLowerCase().includes(query) ||
+        (issue.cluster || '').toLowerCase().includes(query) ||
+        issue.status.toLowerCase().includes(query)
+      )
+    }
+
     const sorted = [...filtered].sort((a, b) => {
       let result = 0
       if (sortBy === 'status') result = a.status.localeCompare(b.status)
@@ -58,7 +72,7 @@ export function PodIssues() {
     })
     if (limit === 'unlimited') return sorted
     return sorted.slice(0, limit)
-  }, [rawIssues, sortBy, sortDirection, limit, filterByCluster])
+  }, [rawIssues, sortBy, sortDirection, limit, filterByCluster, filterByStatus, customFilter])
 
   if (isLoading) {
     return (
@@ -177,19 +191,14 @@ export function PodIssues() {
                     </p>
                   )}
                 </div>
-                <span title="Click to view details"><ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" /></span>
+                <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 self-center" />
               </div>
             </div>
           )
         })}
       </div>
 
-      {error && (
-        <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1" title="Unable to fetch live data - displaying sample data">
-          <AlertTriangle className="w-3 h-3" />
-          Using demo data
-        </div>
-      )}
+      <LimitedAccessWarning hasError={!!error} className="mt-2" />
     </div>
   )
 }

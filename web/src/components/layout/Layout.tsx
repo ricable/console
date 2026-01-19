@@ -1,8 +1,10 @@
 import { ReactNode } from 'react'
 import { Navbar } from './Navbar'
 import { Sidebar } from './Sidebar'
+import { MissionSidebar, MissionSidebarToggle } from './MissionSidebar'
 import { useSidebarConfig } from '../../hooks/useSidebarConfig'
 import { useNavigationHistory } from '../../hooks/useNavigationHistory'
+import { useMissions } from '../../hooks/useMissions'
 import { cn } from '../../lib/cn'
 import { TourOverlay, TourPrompt } from '../onboarding/Tour'
 import { TourProvider } from '../../hooks/useTour'
@@ -13,6 +15,7 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const { config } = useSidebarConfig()
+  const { isSidebarOpen: isMissionSidebarOpen } = useMissions()
 
   // Track navigation for behavior analysis
   useNavigationHistory()
@@ -46,11 +49,16 @@ export function Layout({ children }: LayoutProps) {
         <Sidebar />
         <main className={cn(
           'flex-1 p-6 transition-all duration-300',
-          config.collapsed ? 'ml-20' : 'ml-64'
+          config.collapsed ? 'ml-20' : 'ml-64',
+          isMissionSidebarOpen && 'mr-96'
         )}>
           {children}
         </main>
       </div>
+
+      {/* AI Mission sidebar */}
+      <MissionSidebar />
+      <MissionSidebarToggle />
     </div>
     </TourProvider>
   )

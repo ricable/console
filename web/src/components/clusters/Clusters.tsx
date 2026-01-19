@@ -27,6 +27,7 @@ import {
   ClusterGrid,
 } from './components'
 import { isClusterUnreachable, isClusterLoading } from './utils'
+import { formatK8sMemory } from '../../lib/formatters'
 
 // Card components mapping for clusters page
 const CLUSTER_CARD_COMPONENTS: Record<string, React.ComponentType<{ config?: Record<string, unknown> }>> = {
@@ -1256,7 +1257,7 @@ export function _ClusterDetail({ clusterName, onClose, onRename }: _ClusterDetai
                     </div>
                     <div className="flex items-center gap-4 text-xs text-muted-foreground flex-shrink-0">
                       <span>{node.cpuCapacity} CPU</span>
-                      <span>{node.memoryCapacity}</span>
+                      <span>{formatK8sMemory(node.memoryCapacity)}</span>
                       {node.internalIP && <span className="font-mono">{node.internalIP}</span>}
                       <ChevronRight className={`w-4 h-4 transition-transform ${isSelected ? 'rotate-90' : ''}`} />
                     </div>
@@ -1302,7 +1303,7 @@ export function _ClusterDetail({ clusterName, onClose, onRename }: _ClusterDetai
                       <div><span className="text-muted-foreground">OS/Arch:</span><span className="ml-2 text-foreground">{node.os}/{node.architecture}</span></div>
                       <div><span className="text-muted-foreground">Age:</span><span className="ml-2 text-foreground">{node.age}</span></div>
                     </div>
-                    <div><span className="text-muted-foreground">Capacity:</span><span className="ml-2 text-foreground">{node.cpuCapacity} CPU, {node.memoryCapacity} RAM, {node.podCapacity} pods</span></div>
+                    <div><span className="text-muted-foreground">Capacity:</span><span className="ml-2 text-foreground">{node.cpuCapacity} CPU, {formatK8sMemory(node.memoryCapacity)} RAM, {node.podCapacity} pods</span></div>
                     {/* Conditions */}
                     <div>
                       <span className="text-muted-foreground">Conditions:</span>
@@ -1577,6 +1578,8 @@ export function Clusters() {
       unreachable,
       totalNodes: globalFilteredClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0),
       totalCPUs: globalFilteredClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0),
+      totalMemoryGB: globalFilteredClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0),
+      totalStorageGB: globalFilteredClusters.reduce((sum, c) => sum + (c.storageGB || 0), 0),
       totalPods: globalFilteredClusters.reduce((sum, c) => sum + (c.podCount || 0), 0),
       totalGPUs,
       allocatedGPUs,

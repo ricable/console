@@ -85,6 +85,12 @@ const CARD_BEHAVIORS: Record<string, Array<{ key: string; label: string; descrip
     { key: 'alertOnNew', label: 'Alert on new issues', description: 'Notify when new deployment issues appear', default: false },
     { key: 'paginate', label: 'Enable pagination', description: 'Paginate results instead of showing all', default: false },
   ],
+  upgrade_status: [
+    { key: 'autoRefresh', label: 'Auto-refresh', description: 'Check for version updates periodically', default: true },
+    { key: 'showOnlyUpgradeable', label: 'Show upgradeable only', description: 'Only show clusters with available upgrades', default: false },
+    { key: 'hideUnreachable', label: 'Hide unreachable', description: 'Hide clusters that cannot be contacted', default: false },
+    { key: 'alertOnNewUpgrade', label: 'Alert on new upgrade', description: 'Notify when a new upgrade becomes available', default: false },
+  ],
   default: [
     { key: 'autoRefresh', label: 'Auto-refresh', description: 'Automatically refresh this card', default: true },
   ],
@@ -124,6 +130,9 @@ const CARD_CONFIG_FIELDS: Record<string, Array<{ key: string; label: string; typ
     { key: 'cluster', label: 'Cluster', type: 'cluster' },
     { key: 'namespace', label: 'Namespace', type: 'text' },
     { key: 'limit', label: 'Items per page', type: 'number' },
+  ],
+  upgrade_status: [
+    { key: 'cluster', label: 'Cluster', type: 'cluster' },
   ],
 }
 

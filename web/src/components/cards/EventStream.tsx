@@ -5,6 +5,7 @@ import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { CardControls, SortDirection } from '../ui/CardControls'
+import { LimitedAccessWarning } from '../ui/LimitedAccessWarning'
 
 type SortByOption = 'time' | 'count' | 'type'
 
@@ -139,12 +140,7 @@ export function EventStream() {
         )}
       </div>
 
-      {error && (
-        <div className="mt-2 text-xs text-yellow-400 flex items-center gap-1" title="Unable to fetch live event data - displaying sample data">
-          <AlertTriangle className="w-3 h-3" />
-          Using demo data
-        </div>
-      )}
+      <LimitedAccessWarning hasError={!!error} className="mt-2" />
     </div>
   )
 }

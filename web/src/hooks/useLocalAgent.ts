@@ -19,6 +19,12 @@ export interface AgentHealth {
 
 export type AgentConnectionStatus = 'connected' | 'disconnected' | 'connecting'
 
+export interface ConnectionEvent {
+  timestamp: Date
+  type: 'connected' | 'disconnected' | 'error' | 'connecting'
+  message: string
+}
+
 const LOCAL_AGENT_URL = 'http://127.0.0.1:8585'
 const POLL_INTERVAL = 10000 // Check every 10 seconds
 const FAILURE_THRESHOLD = 3 // Require 3 consecutive failures before disconnecting
@@ -47,6 +53,7 @@ interface AgentState {
   status: AgentConnectionStatus
   health: AgentHealth | null
   error: string | null
+  connectionEvents: ConnectionEvent[]
 }
 
 type Listener = (state: AgentState) => void
@@ -56,17 +63,20 @@ class AgentManager {
     status: 'connecting',
     health: null,
     error: null,
+    connectionEvents: [],
   }
   private listeners: Set<Listener> = new Set()
   private pollInterval: ReturnType<typeof setInterval> | null = null
   private failureCount = 0
   private isChecking = false
   private isStarted = false
+  private maxEvents = 50
 
   start() {
     if (this.isStarted) return
     this.isStarted = true
     console.log('[AgentManager] Starting singleton polling')
+    this.addEvent('connecting', 'Attempting to connect to local agent...')
     this.checkAgent()
     this.pollInterval = setInterval(() => this.checkAgent(), POLL_INTERVAL)
   }
@@ -107,6 +117,19 @@ class AgentManager {
     this.notify()
   }
 
+  private addEvent(type: ConnectionEvent['type'], message: string) {
+    const event: ConnectionEvent = {
+      timestamp: new Date(),
+      type,
+      message,
+    }
+    // Keep only the most recent events
+    this.state.connectionEvents = [
+      event,
+      ...this.state.connectionEvents.slice(0, this.maxEvents - 1),
+    ]
+  }
+
   async checkAgent() {
     // Skip if already checking (prevent overlapping requests)
     if (this.isChecking) {
@@ -123,7 +146,11 @@ class AgentManager {
 
       if (response.ok) {
         const data = await response.json()
+        const wasDisconnected = this.state.status !== 'connected'
         this.failureCount = 0 // Reset failure count on success
+        if (wasDisconnected) {
+          this.addEvent('connected', `Connected to local agent v${data.version || 'unknown'}`)
+        }
         this.setState({
           health: data,
           status: 'connected',
@@ -141,10 +168,14 @@ class AgentManager {
       )
       // Only mark as disconnected after multiple consecutive failures
       if (this.failureCount >= FAILURE_THRESHOLD) {
-        if (this.state.status !== 'disconnected') {
+        const wasConnected = this.state.status === 'connected'
+        if (wasConnected) {
+          this.addEvent('disconnected', 'Lost connection to local agent')
           console.log(
             `[AgentManager] Transitioning to disconnected after ${this.failureCount} failures`
           )
+        } else if (this.state.status === 'connecting') {
+          this.addEvent('error', 'Failed to connect - local agent not available')
         }
         this.setState({
           status: 'disconnected',
@@ -208,6 +239,7 @@ export function useLocalAgent() {
     status: state.status,
     health: state.health,
     error: state.error,
+    connectionEvents: state.connectionEvents,
     isConnected: state.status === 'connected',
     isDemoMode: state.status === 'disconnected',
     installInstructions,

@@ -8,6 +8,7 @@ import (
 	"log"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -99,6 +100,32 @@ type HelmRelease struct {
 	Status     string `json:"status"`
 	Chart      string `json:"chart"`
 	AppVersion string `json:"app_version"`
+	Cluster    string `json:"cluster,omitempty"`
+}
+
+// Kustomization represents a Flux Kustomization resource
+type Kustomization struct {
+	Name       string `json:"name"`
+	Namespace  string `json:"namespace"`
+	Path       string `json:"path"`
+	SourceRef  string `json:"sourceRef"`
+	Ready      bool   `json:"ready"`
+	Status     string `json:"status"`
+	Message    string `json:"message,omitempty"`
+	LastApplied string `json:"lastApplied,omitempty"`
+	Cluster    string `json:"cluster,omitempty"`
+}
+
+// Operator represents an OLM ClusterServiceVersion (installed operator)
+type Operator struct {
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName"`
+	Namespace   string `json:"namespace"`
+	Version     string `json:"version"`
+	Phase       string `json:"phase"` // Succeeded, Failed, Installing, etc.
+	Channel     string `json:"channel,omitempty"`
+	Source      string `json:"source,omitempty"`
+	Cluster     string `json:"cluster,omitempty"`
 }
 
 // ListDrifts returns a list of detected drifts (for GET endpoint)
@@ -118,39 +145,307 @@ func (h *GitOpsHandlers) ListDrifts(c *fiber.Ctx) error {
 func (h *GitOpsHandlers) ListHelmReleases(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
 
-	// Build helm ls command
+	// If specific cluster requested, query only that cluster
+	if cluster != "" {
+		return h.listHelmReleasesForCluster(c, cluster)
+	}
+
+	// Query all clusters in parallel with timeout
+	if h.k8sClient != nil {
+		clusters, err := h.k8sClient.ListClusters(c.Context())
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "releases": []HelmRelease{}})
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var allReleases []HelmRelease
+		clusterTimeout := 5 * time.Second
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				defer cancel()
+
+				releases := h.getHelmReleasesForCluster(ctx, clusterName)
+				if len(releases) > 0 {
+					mu.Lock()
+					allReleases = append(allReleases, releases...)
+					mu.Unlock()
+				}
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		return c.JSON(fiber.Map{"releases": allReleases})
+	}
+
+	// Fallback to default context
+	return h.listHelmReleasesForCluster(c, "")
+}
+
+// listHelmReleasesForCluster lists helm releases for a specific cluster
+func (h *GitOpsHandlers) listHelmReleasesForCluster(c *fiber.Ctx, cluster string) error {
+	releases := h.getHelmReleasesForCluster(c.Context(), cluster)
+	return c.JSON(fiber.Map{"releases": releases})
+}
+
+// getHelmReleasesForCluster gets helm releases for a specific cluster
+func (h *GitOpsHandlers) getHelmReleasesForCluster(ctx context.Context, cluster string) []HelmRelease {
 	args := []string{"ls", "-A", "--output", "json"}
 	if cluster != "" {
 		args = append(args, "--kube-context", cluster)
 	}
 
-	cmd := exec.CommandContext(c.Context(), "helm", args...)
+	cmd := exec.CommandContext(ctx, "helm", args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		log.Printf("helm ls failed: %v, stderr: %s", err, stderr.String())
-		return c.Status(500).JSON(fiber.Map{
-			"error":    "failed to list helm releases",
-			"details":  stderr.String(),
-			"releases": []HelmRelease{},
-		})
+		log.Printf("helm ls failed for cluster %s: %v, stderr: %s", cluster, err, stderr.String())
+		return []HelmRelease{}
 	}
 
-	// Parse JSON output
 	var releases []HelmRelease
 	if err := json.Unmarshal(stdout.Bytes(), &releases); err != nil {
-		log.Printf("failed to parse helm ls output: %v, stdout: %s", err, stdout.String())
-		return c.Status(500).JSON(fiber.Map{
-			"error":    "failed to parse helm releases",
-			"releases": []HelmRelease{},
-		})
+		log.Printf("failed to parse helm ls output for cluster %s: %v", cluster, err)
+		return []HelmRelease{}
 	}
 
-	return c.JSON(fiber.Map{
-		"releases": releases,
-	})
+	// Add cluster info to each release
+	for i := range releases {
+		releases[i].Cluster = cluster
+	}
+
+	return releases
+}
+
+// ListKustomizations returns Flux Kustomization resources
+func (h *GitOpsHandlers) ListKustomizations(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+
+	// If specific cluster requested, query only that cluster
+	if cluster != "" {
+		kustomizations := h.getKustomizationsForCluster(c.Context(), cluster)
+		return c.JSON(fiber.Map{"kustomizations": kustomizations})
+	}
+
+	// Query all clusters in parallel with timeout
+	if h.k8sClient != nil {
+		clusters, err := h.k8sClient.ListClusters(c.Context())
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "kustomizations": []Kustomization{}})
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var allKustomizations []Kustomization
+		clusterTimeout := 5 * time.Second
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				defer cancel()
+
+				kustomizations := h.getKustomizationsForCluster(ctx, clusterName)
+				if len(kustomizations) > 0 {
+					mu.Lock()
+					allKustomizations = append(allKustomizations, kustomizations...)
+					mu.Unlock()
+				}
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		return c.JSON(fiber.Map{"kustomizations": allKustomizations})
+	}
+
+	// Fallback to default context
+	kustomizations := h.getKustomizationsForCluster(c.Context(), "")
+	return c.JSON(fiber.Map{"kustomizations": kustomizations})
+}
+
+// getKustomizationsForCluster gets kustomizations for a specific cluster
+func (h *GitOpsHandlers) getKustomizationsForCluster(ctx context.Context, cluster string) []Kustomization {
+	args := []string{"get", "kustomizations.kustomize.toolkit.fluxcd.io", "-A", "-o", "json"}
+	if cluster != "" {
+		args = append([]string{"--context", cluster}, args...)
+	}
+
+	cmd := exec.CommandContext(ctx, "kubectl", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("kubectl get kustomizations failed for cluster %s: %v, stderr: %s", cluster, err, stderr.String())
+		return []Kustomization{}
+	}
+
+	var result struct {
+		Items []struct {
+			Metadata struct {
+				Name      string `json:"name"`
+				Namespace string `json:"namespace"`
+			} `json:"metadata"`
+			Spec struct {
+				Path      string `json:"path"`
+				SourceRef struct {
+					Kind string `json:"kind"`
+					Name string `json:"name"`
+				} `json:"sourceRef"`
+			} `json:"spec"`
+			Status struct {
+				Conditions []struct {
+					Type    string `json:"type"`
+					Status  string `json:"status"`
+					Message string `json:"message"`
+				} `json:"conditions"`
+				LastAppliedRevision string `json:"lastAppliedRevision"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		log.Printf("failed to parse kustomizations for cluster %s: %v", cluster, err)
+		return []Kustomization{}
+	}
+
+	kustomizations := make([]Kustomization, 0, len(result.Items))
+	for _, item := range result.Items {
+		k := Kustomization{
+			Name:      item.Metadata.Name,
+			Namespace: item.Metadata.Namespace,
+			Path:      item.Spec.Path,
+			SourceRef: fmt.Sprintf("%s/%s", item.Spec.SourceRef.Kind, item.Spec.SourceRef.Name),
+			Cluster:   cluster,
+		}
+
+		for _, cond := range item.Status.Conditions {
+			if cond.Type == "Ready" {
+				k.Ready = cond.Status == "True"
+				k.Status = "Ready"
+				if !k.Ready {
+					k.Status = "NotReady"
+				}
+				k.Message = cond.Message
+				break
+			}
+		}
+		k.LastApplied = item.Status.LastAppliedRevision
+		kustomizations = append(kustomizations, k)
+	}
+
+	return kustomizations
+}
+
+// ListOperators returns OLM-managed operators (ClusterServiceVersions)
+func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+
+	// If specific cluster requested, query only that cluster
+	if cluster != "" {
+		operators := h.getOperatorsForCluster(c.Context(), cluster)
+		return c.JSON(fiber.Map{"operators": operators})
+	}
+
+	// Query all clusters in parallel with timeout
+	if h.k8sClient != nil {
+		clusters, err := h.k8sClient.ListClusters(c.Context())
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "operators": []Operator{}})
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var allOperators []Operator
+		clusterTimeout := 5 * time.Second
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				defer cancel()
+
+				operators := h.getOperatorsForCluster(ctx, clusterName)
+				if len(operators) > 0 {
+					mu.Lock()
+					allOperators = append(allOperators, operators...)
+					mu.Unlock()
+				}
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		return c.JSON(fiber.Map{"operators": allOperators})
+	}
+
+	// Fallback to default context
+	operators := h.getOperatorsForCluster(c.Context(), "")
+	return c.JSON(fiber.Map{"operators": operators})
+}
+
+// getOperatorsForCluster gets operators for a specific cluster
+func (h *GitOpsHandlers) getOperatorsForCluster(ctx context.Context, cluster string) []Operator {
+	args := []string{"get", "csv", "-A", "-o", "json"}
+	if cluster != "" {
+		args = append([]string{"--context", cluster}, args...)
+	}
+
+	cmd := exec.CommandContext(ctx, "kubectl", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("kubectl get csv failed for cluster %s: %v, stderr: %s", cluster, err, stderr.String())
+		return []Operator{}
+	}
+
+	var result struct {
+		Items []struct {
+			Metadata struct {
+				Name      string `json:"name"`
+				Namespace string `json:"namespace"`
+			} `json:"metadata"`
+			Spec struct {
+				DisplayName string `json:"displayName"`
+				Version     string `json:"version"`
+			} `json:"spec"`
+			Status struct {
+				Phase string `json:"phase"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		log.Printf("failed to parse operators for cluster %s: %v", cluster, err)
+		return []Operator{}
+	}
+
+	operators := make([]Operator, 0, len(result.Items))
+	for _, item := range result.Items {
+		op := Operator{
+			Name:        item.Metadata.Name,
+			DisplayName: item.Spec.DisplayName,
+			Namespace:   item.Metadata.Namespace,
+			Version:     item.Spec.Version,
+			Phase:       item.Status.Phase,
+			Cluster:     cluster,
+		}
+		if op.DisplayName == "" {
+			op.DisplayName = item.Metadata.Name
+		}
+		operators = append(operators, op)
+	}
+
+	return operators
 }
 
 // DetectDrift detects drift between git and cluster state

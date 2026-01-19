@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { RefreshCw, Loader2, AlertTriangle } from 'lucide-react'
 import { usePods } from '../../hooks/useMCP'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { CardControls } from '../ui/CardControls'
+import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 
 type SortByOption = 'restarts' | 'name'
 
@@ -26,8 +27,39 @@ export function TopPods({ config }: TopPodsProps) {
   const [sortBy, setSortBy] = useState<SortByOption>(config?.sortBy || 'restarts')
   const [limit, setLimit] = useState<number | 'unlimited'>(config?.limit || 5)
 
-  const effectiveLimit = limit === 'unlimited' ? 1000 : limit
-  const { pods, isLoading, error, refetch } = usePods(cluster, namespace, sortBy, effectiveLimit)
+  const {
+    selectedClusters: globalSelectedClusters,
+    isAllClustersSelected,
+    customFilter,
+  } = useGlobalFilters()
+
+  // Fetch more pods to allow client-side filtering
+  const fetchLimit = limit === 'unlimited' ? 1000 : Math.max(limit * 3, 50)
+  const { pods: rawPods, isLoading, error, refetch } = usePods(cluster, namespace, sortBy, fetchLimit)
+
+  // Apply global filters
+  const pods = useMemo(() => {
+    let filtered = rawPods
+
+    // Filter by global cluster selection (if card doesn't have a specific cluster configured)
+    if (!cluster && !isAllClustersSelected) {
+      filtered = filtered.filter(pod => globalSelectedClusters.includes(pod.cluster || ''))
+    }
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      filtered = filtered.filter(pod =>
+        pod.name.toLowerCase().includes(query) ||
+        pod.namespace.toLowerCase().includes(query) ||
+        (pod.cluster || '').toLowerCase().includes(query)
+      )
+    }
+
+    // Apply limit
+    const effectiveLimit = limit === 'unlimited' ? 1000 : limit
+    return filtered.slice(0, effectiveLimit)
+  }, [rawPods, cluster, globalSelectedClusters, isAllClustersSelected, customFilter, limit])
 
   if (isLoading && pods.length === 0) {
     return (

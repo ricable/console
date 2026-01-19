@@ -144,6 +144,18 @@ const CARD_COMPONENTS: Record<string, React.ComponentType<{ config?: Record<stri
   user_management: UserManagement,
 }
 
+// Cards that use demo/mock data instead of real data
+const DEMO_DATA_CARDS = new Set([
+  'app_status',
+  'cluster_metrics',
+  'deployment_status',
+  'argocd_applications',
+  'argocd_health',
+  'argocd_sync_status',
+  'overlay_comparison',
+  'helm_values_diff',
+])
+
 export function Dashboard() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -276,8 +288,8 @@ export function Dashboard() {
         dashboard?.id,
         dashboard?.name
       )
-      // Add the card
-      setLocalCards((prev) => [...prev, newCard])
+      // Add the card at the TOP
+      setLocalCards((prev) => [newCard, ...prev])
       // Clear the pending card
       clearPendingRestoreCard()
       // Show success toast
@@ -304,7 +316,7 @@ export function Dashboard() {
     }
   }
 
-  const handleAddCards = (suggestions: Array<{
+  const handleAddCards = async (suggestions: Array<{
     type: string
     title: string
     visualization: string
@@ -321,10 +333,22 @@ export function Dashboard() {
     newCards.forEach((card) => {
       recordCardAdded(card.id, card.card_type, card.title, card.config, dashboard?.id, dashboard?.name)
     })
-    setLocalCards((prev) => [...prev, ...newCards])
+    // Add new cards at the TOP of the dashboard (prepend)
+    setLocalCards((prev) => [...newCards, ...prev])
+
+    // Persist to backend if dashboard exists
+    if (dashboard?.id) {
+      for (const card of newCards) {
+        try {
+          await api.post(`/api/dashboards/${dashboard.id}/cards`, card)
+        } catch (error) {
+          console.error('Failed to persist card:', error)
+        }
+      }
+    }
   }
 
-  const handleRemoveCard = useCallback((cardId: string) => {
+  const handleRemoveCard = useCallback(async (cardId: string) => {
     // Find the card to get its details before removing
     const cardToRemove = localCards.find((c) => c.id === cardId)
     if (cardToRemove) {
@@ -338,7 +362,15 @@ export function Dashboard() {
       )
     }
     setLocalCards((prev) => prev.filter((c) => c.id !== cardId))
-    // TODO: Persist to backend if dashboard exists
+
+    // Persist deletion to backend
+    if (dashboard?.id && !cardId.startsWith('demo-') && !cardId.startsWith('new-') && !cardId.startsWith('rec-') && !cardId.startsWith('template-') && !cardId.startsWith('restored-') && !cardId.startsWith('ai-')) {
+      try {
+        await api.delete(`/api/cards/${cardId}`)
+      } catch (error) {
+        console.error('Failed to delete card from backend:', error)
+      }
+    }
   }, [localCards, dashboard, recordCardRemoved])
 
   const handleConfigureCard = useCallback((card: Card) => {
@@ -376,7 +408,7 @@ export function Dashboard() {
     setSelectedCard(null)
   }, [localCards, dashboard, recordCardReplaced])
 
-  const handleCardConfigured = useCallback((cardId: string, newConfig: Record<string, unknown>, newTitle?: string) => {
+  const handleCardConfigured = useCallback(async (cardId: string, newConfig: Record<string, unknown>, newTitle?: string) => {
     const card = localCards.find((c) => c.id === cardId)
     if (card) {
       recordCardConfigured(
@@ -397,6 +429,15 @@ export function Dashboard() {
     )
     setIsConfigureCardOpen(false)
     setSelectedCard(null)
+
+    // Persist configuration to backend
+    if (dashboard?.id && !cardId.startsWith('demo-') && !cardId.startsWith('new-') && !cardId.startsWith('rec-') && !cardId.startsWith('template-') && !cardId.startsWith('restored-') && !cardId.startsWith('ai-')) {
+      try {
+        await api.put(`/api/cards/${cardId}`, { config: newConfig, title: newTitle })
+      } catch (error) {
+        console.error('Failed to update card configuration:', error)
+      }
+    }
   }, [localCards, dashboard, recordCardConfigured])
 
   const handleAddRecommendedCard = useCallback((cardType: string, config?: Record<string, unknown>, title?: string) => {
@@ -617,6 +658,7 @@ function SortableCard({ card, onConfigure, onReplace, onRemove, isDragging }: So
         cardType={card.card_type}
         lastSummary={card.last_summary}
         title={card.title}
+        isDemoData={DEMO_DATA_CARDS.has(card.card_type)}
         onConfigure={onConfigure}
         onReplace={onReplace}
         onRemove={onRemove}

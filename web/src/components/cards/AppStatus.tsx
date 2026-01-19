@@ -3,6 +3,7 @@ import { Box, CheckCircle, AlertTriangle, Clock, ChevronRight } from 'lucide-rea
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { CardControls, SortDirection } from '../ui/CardControls'
+import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 
 type SortByOption = 'status' | 'name' | 'clusters'
 
@@ -37,12 +38,37 @@ const rawApps = [
 
 export function AppStatus(_props: AppStatusProps) {
   const { drillToDeployment } = useDrillDownActions()
+  const {
+    selectedClusters: globalSelectedClusters,
+    isAllClustersSelected,
+    customFilter,
+  } = useGlobalFilters()
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
 
   const apps = useMemo(() => {
-    const sorted = [...rawApps].sort((a, b) => {
+    // Apply global filters first
+    let filtered = rawApps
+
+    // Filter by selected clusters
+    if (!isAllClustersSelected) {
+      filtered = filtered.map(app => ({
+        ...app,
+        clusters: app.clusters.filter(c => globalSelectedClusters.includes(c))
+      })).filter(app => app.clusters.length > 0)
+    }
+
+    // Apply custom text filter
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      filtered = filtered.filter(app =>
+        app.name.toLowerCase().includes(query) ||
+        app.clusters.some(c => c.toLowerCase().includes(query))
+      )
+    }
+
+    const sorted = [...filtered].sort((a, b) => {
       let result = 0
       if (sortBy === 'status') {
         // Sort by warning count (most warnings first)
@@ -55,7 +81,7 @@ export function AppStatus(_props: AppStatusProps) {
     })
     if (limit === 'unlimited') return sorted
     return sorted.slice(0, limit)
-  }, [sortBy, sortDirection, limit])
+  }, [sortBy, sortDirection, limit, globalSelectedClusters, isAllClustersSelected, customFilter])
 
   const handleAppClick = (appName: string, cluster: string) => {
     // Drill down to the deployment in the first cluster

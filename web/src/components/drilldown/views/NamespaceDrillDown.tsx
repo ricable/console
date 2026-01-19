@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { ChevronRight } from 'lucide-react'
 import { usePodIssues, useDeploymentIssues, useEvents } from '../../../hooks/useMCP'
 import { useDrillDownActions } from '../../../hooks/useDrillDown'
 import { StatusIndicator } from '../../charts/StatusIndicator'
@@ -71,19 +72,23 @@ export function NamespaceDrillDown({ data }: Props) {
                 onClick={() => drillToDeployment(cluster, namespace, issue.name, { ...issue })}
                 className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20 cursor-pointer hover:bg-orange-500/20 transition-colors"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground">{issue.name}</span>
-                  <span className="text-xs px-2 py-1 rounded bg-orange-500/20 text-orange-400">
-                    {issue.readyReplicas}/{issue.replicas} ready
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-foreground">{issue.name}</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                        {issue.readyReplicas}/{issue.replicas} ready
+                      </span>
+                    </div>
+                    {issue.reason && (
+                      <div className="text-sm text-muted-foreground">Reason: {issue.reason}</div>
+                    )}
+                    {issue.message && (
+                      <div className="text-xs text-orange-400 mt-1">{issue.message}</div>
+                    )}
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
                 </div>
-                {issue.reason && (
-                  <div className="text-sm text-muted-foreground">Reason: {issue.reason}</div>
-                )}
-                {issue.message && (
-                  <div className="text-xs text-orange-400 mt-1">{issue.message}</div>
-                )}
-                <div className="text-xs text-primary mt-2">Click to drill down →</div>
               </div>
             ))}
           </div>
@@ -101,26 +106,30 @@ export function NamespaceDrillDown({ data }: Props) {
                 onClick={() => drillToPod(cluster, namespace, issue.name, { ...issue })}
                 className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 cursor-pointer hover:bg-red-500/20 transition-colors"
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-foreground">{issue.name}</span>
-                  <span className="text-xs px-2 py-1 rounded bg-red-500/20 text-red-400">
-                    {issue.status}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <span>{issue.restarts} restarts</span>
-                  {issue.reason && <span>• {issue.reason}</span>}
-                </div>
-                {issue.issues.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {issue.issues.map((iss, j) => (
-                      <span key={j} className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
-                        {iss}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-foreground">{issue.name}</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
+                        {issue.status}
                       </span>
-                    ))}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>{issue.restarts} restarts</span>
+                      {issue.reason && <span>• {issue.reason}</span>}
+                    </div>
+                    {issue.issues.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {issue.issues.map((iss, j) => (
+                          <span key={j} className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
+                            {iss}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                )}
-                <div className="text-xs text-primary mt-2">Click to drill down →</div>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0 ml-4" />
+                </div>
               </div>
             ))}
           </div>

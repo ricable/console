@@ -1,0 +1,494 @@
+/**
+ * Kubectl Proxy - Execute kubectl commands through the KKC agent's WebSocket
+ *
+ * This provides direct access to Kubernetes clusters via the local KKC agent,
+ * which has access to the user's kubeconfig.
+ */
+
+const KKC_AGENT_WS_URL = 'ws://127.0.0.1:8585/ws'
+
+type MessageType = 'kubectl' | 'health' | 'clusters' | 'result' | 'error'
+
+interface Message {
+  id: string
+  type: MessageType
+  payload?: unknown
+}
+
+interface KubectlRequest {
+  context?: string
+  namespace?: string
+  args: string[]
+}
+
+interface KubectlResponse {
+  output: string
+  exitCode: number
+  error?: string
+}
+
+interface PendingRequest {
+  resolve: (response: KubectlResponse) => void
+  reject: (error: Error) => void
+  timeout: ReturnType<typeof setTimeout>
+}
+
+class KubectlProxy {
+  private ws: WebSocket | null = null
+  private pendingRequests: Map<string, PendingRequest> = new Map()
+  private connectPromise: Promise<void> | null = null
+  private messageId = 0
+  private isConnecting = false
+
+  /**
+   * Ensure WebSocket is connected
+   */
+  private async ensureConnected(): Promise<void> {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      return
+    }
+
+    if (this.connectPromise) {
+      return this.connectPromise
+    }
+
+    if (this.isConnecting) {
+      // Wait for existing connection attempt
+      await new Promise(resolve => setTimeout(resolve, 100))
+      return this.ensureConnected()
+    }
+
+    this.isConnecting = true
+    this.connectPromise = new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(KKC_AGENT_WS_URL)
+
+        this.ws.onopen = () => {
+          console.log('[KubectlProxy] Connected to KKC agent')
+          this.isConnecting = false
+          resolve()
+        }
+
+        this.ws.onmessage = (event) => {
+          try {
+            const message: Message = JSON.parse(event.data)
+            const pending = this.pendingRequests.get(message.id)
+            if (pending) {
+              clearTimeout(pending.timeout)
+              this.pendingRequests.delete(message.id)
+
+              if (message.type === 'error') {
+                const errorPayload = message.payload as { code: string; message: string }
+                pending.reject(new Error(errorPayload.message || 'Unknown error'))
+              } else {
+                pending.resolve(message.payload as KubectlResponse)
+              }
+            }
+          } catch (e) {
+            console.error('[KubectlProxy] Failed to parse message:', e)
+          }
+        }
+
+        this.ws.onclose = () => {
+          console.log('[KubectlProxy] Connection closed')
+          this.ws = null
+          this.connectPromise = null
+          this.isConnecting = false
+
+          // Reject all pending requests
+          this.pendingRequests.forEach((pending, id) => {
+            clearTimeout(pending.timeout)
+            pending.reject(new Error('Connection closed'))
+            this.pendingRequests.delete(id)
+          })
+        }
+
+        this.ws.onerror = (err) => {
+          console.error('[KubectlProxy] WebSocket error:', err)
+          this.isConnecting = false
+          this.connectPromise = null
+          reject(new Error('Failed to connect to KKC agent'))
+        }
+      } catch (err) {
+        this.isConnecting = false
+        this.connectPromise = null
+        reject(err)
+      }
+    })
+
+    return this.connectPromise
+  }
+
+  /**
+   * Generate a unique message ID
+   */
+  private generateId(): string {
+    return `kubectl-${++this.messageId}-${Date.now()}`
+  }
+
+  /**
+   * Execute a kubectl command
+   */
+  async exec(
+    args: string[],
+    options: { context?: string; namespace?: string; timeout?: number } = {}
+  ): Promise<KubectlResponse> {
+    await this.ensureConnected()
+
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      throw new Error('Not connected to KKC agent')
+    }
+
+    const id = this.generateId()
+    const timeout = options.timeout || 30000
+
+    return new Promise((resolve, reject) => {
+      const timeoutHandle = setTimeout(() => {
+        this.pendingRequests.delete(id)
+        reject(new Error(`Kubectl command timed out after ${timeout}ms`))
+      }, timeout)
+
+      this.pendingRequests.set(id, { resolve, reject, timeout: timeoutHandle })
+
+      const message: Message = {
+        id,
+        type: 'kubectl',
+        payload: {
+          context: options.context,
+          namespace: options.namespace,
+          args,
+        } as KubectlRequest,
+      }
+
+      this.ws!.send(JSON.stringify(message))
+    })
+  }
+
+  /**
+   * Get nodes for a cluster (used for health checks)
+   */
+  async getNodes(context: string): Promise<NodeInfo[]> {
+    const response = await this.exec(['get', 'nodes', '-o', 'json'], { context, timeout: 10000 })
+    if (response.exitCode !== 0) {
+      throw new Error(response.error || 'Failed to get nodes')
+    }
+    const data = JSON.parse(response.output)
+    return (data.items || []).map((node: KubeNode) => ({
+      name: node.metadata.name,
+      ready: node.status.conditions?.find((c: NodeCondition) => c.type === 'Ready')?.status === 'True',
+      roles: Object.keys(node.metadata.labels || {})
+        .filter(k => k.startsWith('node-role.kubernetes.io/'))
+        .map(k => k.replace('node-role.kubernetes.io/', '')),
+    }))
+  }
+
+  /**
+   * Get pod count for a cluster
+   */
+  async getPodCount(context: string): Promise<number> {
+    const response = await this.exec(['get', 'pods', '-A', '-o', 'json'], { context, timeout: 10000 })
+    if (response.exitCode !== 0) {
+      throw new Error(response.error || 'Failed to get pods')
+    }
+    const data = JSON.parse(response.output)
+    return data.items?.length || 0
+  }
+
+  /**
+   * Get cluster health summary
+   */
+  async getClusterHealth(context: string): Promise<ClusterHealth> {
+    try {
+      const [nodes, podCount] = await Promise.all([
+        this.getNodes(context),
+        this.getPodCount(context),
+      ])
+
+      const readyNodes = nodes.filter(n => n.ready).length
+      return {
+        cluster: context,
+        healthy: readyNodes === nodes.length && nodes.length > 0,
+        reachable: true,
+        nodeCount: nodes.length,
+        readyNodes,
+        podCount,
+        lastSeen: new Date().toISOString(),
+      }
+    } catch (err) {
+      return {
+        cluster: context,
+        healthy: false,
+        reachable: false,
+        nodeCount: 0,
+        readyNodes: 0,
+        podCount: 0,
+        errorMessage: err instanceof Error ? err.message : 'Unknown error',
+      }
+    }
+  }
+
+  /**
+   * Get pods with issues (CrashLoopBackOff, ImagePullBackOff, etc.)
+   */
+  async getPodIssues(context: string, namespace?: string): Promise<PodIssue[]> {
+    const nsArg = namespace ? ['-n', namespace] : ['-A']
+    const response = await this.exec(['get', 'pods', ...nsArg, '-o', 'json'], { context, timeout: 15000 })
+
+    if (response.exitCode !== 0) {
+      throw new Error(response.error || 'Failed to get pods')
+    }
+
+    const data = JSON.parse(response.output)
+    const issues: PodIssue[] = []
+
+    for (const pod of data.items || []) {
+      const status = pod.status
+      const phase = status.phase
+      const containerStatuses = status.containerStatuses || []
+
+      // Check for problematic states
+      const problems: string[] = []
+      let restarts = 0
+      let reason = ''
+
+      for (const cs of containerStatuses) {
+        restarts += cs.restartCount || 0
+
+        if (cs.state?.waiting) {
+          const waitReason = cs.state.waiting.reason
+          if (['CrashLoopBackOff', 'ImagePullBackOff', 'ErrImagePull', 'CreateContainerError'].includes(waitReason)) {
+            problems.push(waitReason)
+            reason = waitReason
+          }
+        }
+
+        if (cs.lastState?.terminated?.reason === 'OOMKilled') {
+          problems.push('OOMKilled')
+        }
+      }
+
+      if (phase === 'Pending' && status.conditions) {
+        const unschedulable = status.conditions.find((c: { type: string; status: string; reason?: string }) =>
+          c.type === 'PodScheduled' && c.status === 'False'
+        )
+        if (unschedulable) {
+          problems.push('Unschedulable')
+          reason = unschedulable.reason || 'Pending'
+        }
+      }
+
+      if (phase === 'Failed') {
+        problems.push('Failed')
+        reason = status.reason || 'Failed'
+      }
+
+      if (problems.length > 0 || restarts > 5) {
+        issues.push({
+          name: pod.metadata.name,
+          namespace: pod.metadata.namespace,
+          cluster: context,
+          status: reason || phase,
+          reason,
+          issues: problems,
+          restarts,
+        })
+      }
+    }
+
+    return issues
+  }
+
+  /**
+   * Get events from a cluster
+   */
+  async getEvents(context: string, namespace?: string, limit = 50): Promise<ClusterEvent[]> {
+    const nsArg = namespace ? ['-n', namespace] : ['-A']
+    const response = await this.exec(
+      ['get', 'events', ...nsArg, '--sort-by=.lastTimestamp', '-o', 'json'],
+      { context, timeout: 15000 }
+    )
+
+    if (response.exitCode !== 0) {
+      throw new Error(response.error || 'Failed to get events')
+    }
+
+    const data = JSON.parse(response.output)
+    const events: ClusterEvent[] = (data.items || []).slice(-limit).reverse().map((e: KubeEvent) => ({
+      type: e.type,
+      reason: e.reason,
+      message: e.message,
+      object: `${e.involvedObject.kind}/${e.involvedObject.name}`,
+      namespace: e.metadata.namespace,
+      cluster: context,
+      count: e.count || 1,
+      firstSeen: e.firstTimestamp,
+      lastSeen: e.lastTimestamp,
+    }))
+
+    return events
+  }
+
+  /**
+   * Get deployments from a cluster
+   */
+  async getDeployments(context: string, namespace?: string): Promise<Deployment[]> {
+    const nsArg = namespace ? ['-n', namespace] : ['-A']
+    const response = await this.exec(['get', 'deployments', ...nsArg, '-o', 'json'], { context, timeout: 15000 })
+
+    if (response.exitCode !== 0) {
+      throw new Error(response.error || 'Failed to get deployments')
+    }
+
+    const data = JSON.parse(response.output)
+    return (data.items || []).map((d: KubeDeployment) => {
+      const status = d.status
+      const spec = d.spec
+      const replicas = spec.replicas || 1
+      const ready = status.readyReplicas || 0
+      const updated = status.updatedReplicas || 0
+      const available = status.availableReplicas || 0
+
+      let deployStatus: 'running' | 'deploying' | 'failed' = 'running'
+      if (ready < replicas) {
+        deployStatus = updated > 0 ? 'deploying' : 'failed'
+      }
+
+      return {
+        name: d.metadata.name,
+        namespace: d.metadata.namespace,
+        cluster: context,
+        status: deployStatus,
+        replicas,
+        readyReplicas: ready,
+        updatedReplicas: updated,
+        availableReplicas: available,
+        progress: Math.round((ready / replicas) * 100),
+        image: spec.template?.spec?.containers?.[0]?.image,
+        labels: d.metadata.labels,
+        annotations: d.metadata.annotations,
+      }
+    })
+  }
+
+  /**
+   * Close the WebSocket connection
+   */
+  close(): void {
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+    this.connectPromise = null
+  }
+
+  /**
+   * Check if connected to the agent
+   */
+  isConnected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN
+  }
+}
+
+// Type definitions for kubectl JSON output
+interface KubeNode {
+  metadata: { name: string; labels?: Record<string, string> }
+  status: { conditions?: NodeCondition[] }
+}
+
+interface NodeCondition {
+  type: string
+  status: string
+  reason?: string
+}
+
+interface KubeEvent {
+  type: string
+  reason: string
+  message: string
+  involvedObject: { kind: string; name: string }
+  metadata: { namespace: string }
+  count?: number
+  firstTimestamp?: string
+  lastTimestamp?: string
+}
+
+interface KubeDeployment {
+  metadata: { name: string; namespace: string; labels?: Record<string, string>; annotations?: Record<string, string> }
+  spec: {
+    replicas?: number
+    template?: { spec?: { containers?: Array<{ image?: string }> } }
+  }
+  status: {
+    readyReplicas?: number
+    updatedReplicas?: number
+    availableReplicas?: number
+  }
+}
+
+// Export types used by hooks
+export interface NodeInfo {
+  name: string
+  ready: boolean
+  roles: string[]
+}
+
+export interface ClusterHealth {
+  cluster: string
+  healthy: boolean
+  reachable: boolean
+  nodeCount: number
+  readyNodes: number
+  podCount: number
+  cpuCores?: number
+  // Memory metrics
+  memoryBytes?: number
+  memoryGB?: number
+  // Storage metrics
+  storageBytes?: number
+  storageGB?: number
+  // PVC metrics
+  pvcCount?: number
+  pvcBoundCount?: number
+  lastSeen?: string
+  errorMessage?: string
+}
+
+export interface PodIssue {
+  name: string
+  namespace: string
+  cluster: string
+  status: string
+  reason?: string
+  issues: string[]
+  restarts: number
+}
+
+export interface ClusterEvent {
+  type: string
+  reason: string
+  message: string
+  object: string
+  namespace: string
+  cluster: string
+  count: number
+  firstSeen?: string
+  lastSeen?: string
+}
+
+export interface Deployment {
+  name: string
+  namespace: string
+  cluster: string
+  status: 'running' | 'deploying' | 'failed'
+  replicas: number
+  readyReplicas: number
+  updatedReplicas: number
+  availableReplicas: number
+  progress: number
+  image?: string
+  labels?: Record<string, string>
+  annotations?: Record<string, string>
+}
+
+// Singleton instance
+export const kubectlProxy = new KubectlProxy()
