@@ -195,9 +195,9 @@ export function ClusterGrid({
                 </div>
                 <div className="text-xs text-muted-foreground">Pods</div>
               </div>
-              <div title={initialLoading ? 'Checking...' : refreshing ? 'GPUs (updating...)' : unreachable ? 'Unreachable - showing cached data' : gpuInfo ? `${gpuInfo.allocated} allocated / ${gpuInfo.total} total GPUs` : 'No GPUs'}>
+              <div title={initialLoading ? 'Checking...' : refreshing ? 'GPUs (updating...)' : unreachable ? 'Unreachable - no GPU data available' : gpuInfo ? `${gpuInfo.allocated} allocated / ${gpuInfo.total} total GPUs` : 'No GPUs detected'}>
                 <div className={`text-lg font-bold ${refreshing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (gpuInfo ? `${gpuInfo.allocated}/${gpuInfo.total}` : (unreachable && hasCachedData ? '?' : '0'))}
+                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (gpuInfo ? `${gpuInfo.allocated}/${gpuInfo.total}` : (unreachable ? '-' : '0'))}
                 </div>
                 <div className="text-xs text-muted-foreground">GPUs</div>
               </div>

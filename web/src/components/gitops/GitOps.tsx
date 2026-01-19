@@ -39,6 +39,9 @@ function saveGitOpsCards(cards: GitOpsCard[]) {
   localStorage.setItem(GITOPS_CARDS_KEY, JSON.stringify(cards))
 }
 
+// Module-level cache for releases (persists across navigation)
+let releasesCache: Release[] = []
+
 // Release types
 type ReleaseType = 'helm' | 'kustomize' | 'operator'
 
@@ -141,18 +144,30 @@ export function GitOps() {
   const [activeTab, setActiveTab] = useState<ViewTab>('overview')
   const [typeFilter, setTypeFilter] = useState<ReleaseType | 'all'>('all')
   const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [releases, setReleases] = useState<Release[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  // Initialize from cache if available
+  const [releases, setReleases] = useState<Release[]>(() => releasesCache)
+  const [isLoading, setIsLoading] = useState(() => releasesCache.length === 0)
   const [error, setError] = useState<string | null>(null)
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const fetchVersionRef = useRef(0) // Track fetch version to prevent duplicate results
+
+  // Update module-level cache when releases change
+  useEffect(() => {
+    if (releases.length > 0) {
+      releasesCache = releases
+    }
+  }, [releases])
 
   // Fetch GitOps releases with gradual loading
   const fetchReleases = useCallback(async (isRefresh = false) => {
     // Increment version to invalidate any in-progress fetches
     const currentVersion = ++fetchVersionRef.current
 
-    if (!isRefresh) {
+    // If we have cached data, treat this as a refresh (don't clear releases)
+    const hasCachedData = releasesCache.length > 0
+    const effectiveRefresh = isRefresh || hasCachedData
+
+    if (!effectiveRefresh) {
       setIsLoading(true)
       setReleases([])
     }
@@ -184,7 +199,7 @@ export function GitOps() {
           if (result.ok && result.data) {
             const newReleases = processData(result.data)
             if (newReleases.length > 0) {
-              if (isRefresh) {
+              if (effectiveRefresh) {
                 // Collect releases for batch update on refresh
                 collectedReleases.push(...newReleases)
               } else {
@@ -193,7 +208,7 @@ export function GitOps() {
               }
               if (!hasReceivedData) {
                 hasReceivedData = true
-                if (!isRefresh) {
+                if (!effectiveRefresh) {
                   setIsLoading(false)
                   setLastUpdated(new Date())
                 }
@@ -229,7 +244,7 @@ export function GitOps() {
     await Promise.all([helmPromise, kustomizePromise])
 
     // For refresh, replace all releases at once after fast endpoints complete
-    if (isRefresh && fetchVersionRef.current === currentVersion) {
+    if (effectiveRefresh && fetchVersionRef.current === currentVersion) {
       // Wait a bit for operators to potentially complete
       await Promise.race([operatorsPromise, new Promise(resolve => setTimeout(resolve, 2000))])
 
@@ -596,24 +611,23 @@ export function GitOps() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <label htmlFor="gitops-auto-refresh" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
+            <label htmlFor="gitops-auto-refresh" className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
               <input
                 type="checkbox"
                 id="gitops-auto-refresh"
                 checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
-                className="rounded border-border"
+                className="rounded border-border w-3.5 h-3.5"
               />
-              Auto-refresh
+              Auto
             </label>
             <button
               onClick={handleRefresh}
               disabled={isRefreshing || isLoading}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary/50 text-foreground hover:bg-secondary transition-colors text-sm disabled:opacity-50"
+              className="p-2 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
               title="Refresh data"
             >
               <RefreshCw className={`w-4 h-4 ${isRefreshing || isLoading ? 'animate-spin' : ''}`} />
-              Refresh
             </button>
           </div>
         </div>
