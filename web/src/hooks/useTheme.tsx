@@ -18,17 +18,23 @@ const STORAGE_KEY = 'kubestellar-theme-id'
  * Apply theme CSS variables to the document
  */
 function applyTheme(theme: Theme) {
-  const root = document.documentElement
-  const colors = theme.colors
-
-  // Apply dark/light class
-  if (theme.dark) {
-    root.classList.add('dark')
-    root.classList.remove('light')
-  } else {
-    root.classList.add('light')
-    root.classList.remove('dark')
+  if (!theme || !theme.colors) {
+    console.error('Invalid theme object:', theme)
+    return
   }
+
+  try {
+    const root = document.documentElement
+    const colors = theme.colors
+
+    // Apply dark/light class
+    if (theme.dark) {
+      root.classList.add('dark')
+      root.classList.remove('light')
+    } else {
+      root.classList.add('light')
+      root.classList.remove('dark')
+    }
 
   // Apply theme ID as data attribute for special styling
   root.setAttribute('data-theme', theme.id)
@@ -109,6 +115,9 @@ function applyTheme(theme: Theme) {
     root.classList.add('theme-gradient-accents')
   } else {
     root.classList.remove('theme-gradient-accents')
+  }
+  } catch (error) {
+    console.error('Error applying theme:', error)
   }
 }
 
