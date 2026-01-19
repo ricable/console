@@ -23,6 +23,7 @@ interface ClusterCard {
   card_type: string
   config: Record<string, unknown>
   title?: string
+  position?: { w: number; h: number }
 }
 
 // Storage key for cluster page cards
@@ -1396,6 +1397,15 @@ export function Clusters() {
     saveClusterCards(cards)
   }, [cards])
 
+  // Handle addCard URL param - open modal and clear param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      searchParams.delete('addCard')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
   // Trigger refresh on mount (ensures data is fresh when navigating to this page)
   useEffect(() => {
     refetch()
@@ -1418,6 +1428,7 @@ export function Clusters() {
       card_type: card.type,
       config: card.config,
       title: card.title,
+      position: { w: 4, h: 2 },
     }))
     setCards(prev => [...prev, ...cardsToAdd])
     expandCards()
@@ -1440,12 +1451,19 @@ export function Clusters() {
     setConfiguringCard(null)
   }, [])
 
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
+  }, [])
+
   const applyTemplate = useCallback((template: DashboardTemplate) => {
     const newCards: ClusterCard[] = template.cards.map(card => ({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       card_type: card.card_type,
       config: card.config || {},
       title: card.title,
+      position: { w: card.position?.w || 4, h: card.position?.h || 2 },
     }))
     setCards(newCards)
     expandCards()
@@ -1582,6 +1600,11 @@ export function Clusters() {
     const healthy = globalFilteredClusters.filter(c => !isClusterLoading(c) && !isClusterUnreachable(c) && c.healthy).length
     const unhealthy = globalFilteredClusters.filter(c => !isClusterLoading(c) && !isClusterUnreachable(c) && !c.healthy).length
 
+    // Check if we have any reachable clusters with resource data
+    const hasResourceData = globalFilteredClusters.some(c =>
+      !isClusterLoading(c) && !isClusterUnreachable(c) && c.nodeCount !== undefined && c.nodeCount > 0
+    )
+
     return {
       total: globalFilteredClusters.length,
       loading: loadingCount,
@@ -1595,6 +1618,7 @@ export function Clusters() {
       totalPods: globalFilteredClusters.reduce((sum, c) => sum + (c.podCount || 0), 0),
       totalGPUs,
       allocatedGPUs,
+      hasResourceData,
     }
   }, [globalFilteredClusters, gpuByCluster])
 
@@ -1660,9 +1684,9 @@ export function Clusters() {
               <p className="text-muted-foreground">Manage your Kubernetes clusters</p>
             </div>
             {isRefreshing && (
-              <span className="flex items-center gap-1.5 text-sm text-amber-400 animate-pulse" title="Updating cluster list...">
-                <Hourglass className="w-4 h-4" />
-                <span>Updating...</span>
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
               </span>
             )}
           </div>
@@ -1934,24 +1958,31 @@ export function Clusters() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-12 gap-4 auto-rows-[minmax(180px,auto)]">
                 {cards.map(card => {
                   const CardComponent = CARD_COMPONENTS[card.card_type]
                   if (!CardComponent) {
                     console.warn(`Unknown card type: ${card.card_type}`)
                     return null
                   }
+                  const cardWidth = card.position?.w || 4
                   return (
-                    <CardWrapper
+                    <div
                       key={card.id}
-                      cardId={card.id}
-                      cardType={card.card_type}
-                      title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      onConfigure={() => handleConfigureCard(card.id)}
-                      onRemove={() => handleRemoveCard(card.id)}
+                      style={{ gridColumn: `span ${cardWidth}` }}
                     >
-                      <CardComponent config={card.config} />
-                    </CardWrapper>
+                      <CardWrapper
+                        cardId={card.id}
+                        cardType={card.card_type}
+                        title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        cardWidth={cardWidth}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                      >
+                        <CardComponent config={card.config} />
+                      </CardWrapper>
+                    </div>
                   )
                 })}
               </div>

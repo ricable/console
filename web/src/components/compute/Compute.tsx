@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Cpu, MemoryStick, Server, Layers, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Cpu, MemoryStick, Server, Layers, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity, Hourglass } from 'lucide-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
+import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { Skeleton } from '../ui/Skeleton'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS } from '../cards/cardRegistry'
@@ -16,6 +18,7 @@ interface ComputeCard {
   card_type: string
   config: Record<string, unknown>
   title?: string
+  position?: { w: number; h: number }
 }
 
 const COMPUTE_CARDS_KEY = 'kubestellar-compute-cards'
@@ -34,11 +37,13 @@ function saveComputeCards(cards: ComputeCard[]) {
 }
 
 export function Compute() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
   } = useGlobalFilters()
+  const { drillToResources } = useDrillDownActions()
 
   // Card state
   const [cards, setCards] = useState<ComputeCard[]>(() => loadComputeCards())
@@ -58,6 +63,14 @@ export function Compute() {
   useEffect(() => {
     saveComputeCards(cards)
   }, [cards])
+
+  // Handle addCard URL param - open modal and clear param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Trigger refresh on mount (ensures data is fresh when navigating to this page)
   useEffect(() => {
@@ -107,6 +120,12 @@ export function Compute() {
     setConfiguringCard(null)
   }, [])
 
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
+  }, [])
+
   const applyTemplate = useCallback((template: DashboardTemplate) => {
     const newCards: ComputeCard[] = template.cards.map(card => ({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -124,18 +143,54 @@ export function Compute() {
     isAllClustersSelected || globalSelectedClusters.includes(c.name)
   )
 
-  // Calculate compute stats from clusters
-  const totalCPUs = filteredClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
-  const totalMemoryGB = filteredClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0)
-  const totalNodes = filteredClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0)
-  const totalPods = filteredClusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
+  // Calculate compute stats from clusters (only from reachable clusters)
+  // Clusters with reachable !== false are considered (includes undefined during refresh)
+  const reachableClusters = filteredClusters.filter(c => c.reachable !== false)
+  const currentStats = {
+    totalCPUs: reachableClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0),
+    totalMemoryGB: reachableClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0),
+    totalNodes: reachableClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0),
+    totalPods: reachableClusters.reduce((sum, c) => sum + (c.podCount || 0), 0),
+  }
 
-  // Format memory size
-  const formatMemory = (gb: number) => {
-    if (gb >= 1024) {
-      return `${(gb / 1024).toFixed(1)} TB`
+  // Check if we have any reachable clusters with actual data (not refreshing)
+  const hasActualData = filteredClusters.some(c =>
+    c.reachable !== false && c.nodeCount !== undefined && c.nodeCount > 0
+  )
+
+  // Cache the last known good stats to show during refresh
+  const cachedStats = useRef(currentStats)
+
+  // Update cache when we have real data (not all zeros during refresh)
+  useEffect(() => {
+    if (hasActualData && (currentStats.totalNodes > 0 || currentStats.totalCPUs > 0)) {
+      cachedStats.current = currentStats
     }
-    return `${Math.round(gb)} GB`
+  }, [hasActualData, currentStats.totalNodes, currentStats.totalCPUs, currentStats.totalMemoryGB, currentStats.totalPods])
+
+  // Use cached stats during refresh, current stats when data is available
+  // Show dash only when we've never had data (initial state with no clusters)
+  const stats = (hasActualData || cachedStats.current.totalNodes > 0)
+    ? (hasActualData ? currentStats : cachedStats.current)
+    : null
+
+  // Determine if we should show data or dashes
+  const hasDataToShow = stats !== null
+
+  // Format memory size - returns '-' if no data
+  const formatMemory = (gb: number, hasData = true) => {
+    if (!hasData) return '-'
+    const safeValue = Math.max(0, gb) // Never show negative
+    if (safeValue >= 1024) {
+      return `${(safeValue / 1024).toFixed(1)} TB`
+    }
+    return `${Math.round(safeValue)} GB`
+  }
+
+  // Format stat - returns '-' if no data available
+  const formatStatValue = (value: number, hasData = true) => {
+    if (!hasData) return '-'
+    return Math.max(0, value) // Never show negative
   }
 
   // Transform card for ConfigureCardModal
@@ -151,12 +206,20 @@ export function Compute() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Cpu className="w-6 h-6 text-purple-400" />
-              Compute
-            </h1>
-            <p className="text-muted-foreground">Monitor compute resources across clusters</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Cpu className="w-6 h-6 text-purple-400" />
+                Compute
+              </h1>
+              <p className="text-muted-foreground">Monitor compute resources across clusters</p>
+            </div>
+            {isRefreshing && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="compute-auto-refresh" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
@@ -217,38 +280,54 @@ export function Compute() {
                 ))}
               </>
             ) : (
-              // Real data
+              // Real data - use cached stats during refresh
               <>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={hasDataToShow ? drillToResources : undefined}
+                  title={hasDataToShow ? `${stats?.totalCPUs || 0} CPU cores allocatable across ${reachableClusters.length} cluster${reachableClusters.length !== 1 ? 's' : ''} - Click to view resources` : 'No reachable clusters'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Cpu className="w-5 h-5 text-blue-400" />
                     <span className="text-sm text-muted-foreground">CPU</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{totalCPUs}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatStatValue(stats?.totalCPUs || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">cores allocatable</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={hasDataToShow ? drillToResources : undefined}
+                  title={hasDataToShow ? `${formatMemory(stats?.totalMemoryGB || 0, hasDataToShow)} memory allocatable across ${reachableClusters.length} cluster${reachableClusters.length !== 1 ? 's' : ''} - Click to view resources` : 'No reachable clusters'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <MemoryStick className="w-5 h-5 text-green-400" />
                     <span className="text-sm text-muted-foreground">Memory</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{formatMemory(totalMemoryGB)}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatMemory(stats?.totalMemoryGB || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">allocatable</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={hasDataToShow ? drillToResources : undefined}
+                  title={hasDataToShow ? `${stats?.totalNodes || 0} total nodes across ${reachableClusters.length} cluster${reachableClusters.length !== 1 ? 's' : ''} - Click to view resources` : 'No reachable clusters'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Server className="w-5 h-5 text-cyan-400" />
                     <span className="text-sm text-muted-foreground">Nodes</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{totalNodes}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatStatValue(stats?.totalNodes || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">total nodes</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={hasDataToShow ? drillToResources : undefined}
+                  title={hasDataToShow ? `${stats?.totalPods || 0} running pods across ${reachableClusters.length} cluster${reachableClusters.length !== 1 ? 's' : ''} - Click to view resources` : 'No reachable clusters'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Layers className="w-5 h-5 text-purple-400" />
                     <span className="text-sm text-muted-foreground">Pods</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{totalPods}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatStatValue(stats?.totalPods || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">running pods</div>
                 </div>
               </>
@@ -309,24 +388,31 @@ export function Compute() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {cards.map(card => {
                   const CardComponent = CARD_COMPONENTS[card.card_type]
                   if (!CardComponent) {
                     console.warn(`Unknown card type: ${card.card_type}`)
                     return null
                   }
+                  const cardWidth = card.position?.w || 4
                   return (
-                    <CardWrapper
+                    <div
                       key={card.id}
-                      cardId={card.id}
-                      cardType={card.card_type}
-                      title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      onConfigure={() => handleConfigureCard(card.id)}
-                      onRemove={() => handleRemoveCard(card.id)}
+                      style={{ gridColumn: `span ${cardWidth}` }}
                     >
+                      <CardWrapper
+                        cardId={card.id}
+                        cardType={card.card_type}
+                        title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        cardWidth={cardWidth}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                      >
                       <CardComponent config={card.config} />
                     </CardWrapper>
+                    </div>
                   )
                 })}
               </div>

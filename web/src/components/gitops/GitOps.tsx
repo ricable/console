@@ -1,12 +1,14 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { StatusIndicator } from '../charts/StatusIndicator'
 import { DonutChart, BarChart } from '../charts'
 import { useToast } from '../ui/Toast'
 import { ClusterBadge } from '../ui/ClusterBadge'
-import { RefreshCw, Box, Loader2, Package, Ship, Layers, Cog, ChevronDown, ExternalLink, GitBranch, Clock, ArrowRight, AlertTriangle, CheckCircle2, XCircle, Plus, Layout, LayoutGrid, ChevronRight, Activity } from 'lucide-react'
+import { RefreshCw, Box, Loader2, Package, Ship, Layers, Cog, ChevronDown, ExternalLink, GitBranch, Clock, ArrowRight, AlertTriangle, CheckCircle2, XCircle, Plus, Layout, LayoutGrid, ChevronRight, Activity, Hourglass } from 'lucide-react'
 import { cn } from '../../lib/cn'
+import { formatStat } from '../../lib/formatStats'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -19,6 +21,7 @@ interface GitOpsCard {
   card_type: string
   config: Record<string, unknown>
   title?: string
+  position?: { w: number; h: number }
 }
 
 const GITOPS_CARDS_KEY = 'kubestellar-gitops-cards'
@@ -115,6 +118,7 @@ async function safeJsonParse(response: Response): Promise<{ ok: boolean; data?: 
 }
 
 export function GitOps() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { showToast } = useToast()
   const {
     selectedClusters: globalSelectedClusters,
@@ -144,13 +148,16 @@ export function GitOps() {
   const fetchVersionRef = useRef(0) // Track fetch version to prevent duplicate results
 
   // Fetch GitOps releases with gradual loading
-  const fetchReleases = useCallback(async () => {
+  const fetchReleases = useCallback(async (isRefresh = false) => {
     // Increment version to invalidate any in-progress fetches
     const currentVersion = ++fetchVersionRef.current
 
     setIsLoading(true)
     setError(null)
-    setReleases([]) // Clear existing releases
+    // Only clear releases on initial load, not on refresh - this prevents stats from resetting to 0
+    if (!isRefresh) {
+      setReleases([])
+    }
 
     const token = localStorage.getItem('token')
     const headers: HeadersInit = token ? { 'Authorization': `Bearer ${token}` } : {}
@@ -231,7 +238,8 @@ export function GitOps() {
     if (!autoRefresh) return
 
     const interval = setInterval(() => {
-      fetchReleases()
+      setIsRefreshing(true)
+      fetchReleases(true).finally(() => setIsRefreshing(false))
     }, 30000)
 
     return () => clearInterval(interval)
@@ -242,10 +250,18 @@ export function GitOps() {
     saveGitOpsCards(cards)
   }, [cards])
 
+  // Handle addCard URL param - open modal and clear param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
   // Handle refresh
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
-    await fetchReleases()
+    await fetchReleases(true)
     showToast('Refreshing GitOps releases...', 'info')
     setIsRefreshing(false)
     setLastUpdated(new Date())
@@ -277,6 +293,12 @@ export function GitOps() {
       c.id === cardId ? { ...c, config } : c
     ))
     setConfiguringCard(null)
+  }, [])
+
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
   }, [])
 
   const applyTemplate = useCallback((template: DashboardTemplate) => {
@@ -374,7 +396,8 @@ export function GitOps() {
       r.status?.toLowerCase().includes('pending') ||
       r.status?.toLowerCase().includes('progressing')
     ).length
-    const other = globalFilteredReleases.length - deployed - failed - pending
+    // Never show negative - clamp to 0
+    const other = Math.max(0, globalFilteredReleases.length - deployed - failed - pending)
 
     return {
       total: globalFilteredReleases.length,
@@ -537,12 +560,20 @@ export function GitOps() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <GitBranch className="w-6 h-6 text-purple-400" />
-              GitOps Releases
-            </h1>
-            <p className="text-muted-foreground">Helm, Kustomize, and Operator deployments across your clusters</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <GitBranch className="w-6 h-6 text-purple-400" />
+                GitOps Releases
+              </h1>
+              <p className="text-muted-foreground">Helm, Kustomize, and Operator deployments across your clusters</p>
+            </div>
+            {isRefreshing && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="gitops-auto-refresh" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
@@ -588,36 +619,52 @@ export function GitOps() {
 
         {showStats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass p-4 rounded-lg">
+            <div
+              className={`glass p-4 rounded-lg ${stats.total > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
+              onClick={() => { setTypeFilter('all'); setActiveTab('releases') }}
+              title={`${formatStat(stats.total)} total release${stats.total !== 1 ? 's' : ''} - Click to view all`}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <Package className="w-5 h-5 text-blue-400" />
                 <span className="text-sm text-muted-foreground">Total</span>
               </div>
-              <div className="text-3xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-3xl font-bold text-foreground">{formatStat(stats.total)}</div>
               <div className="text-xs text-muted-foreground">releases</div>
             </div>
-            <div className="glass p-4 rounded-lg">
+            <div
+              className={`glass p-4 rounded-lg ${stats.helm > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
+              onClick={() => { setTypeFilter('helm'); setActiveTab('releases') }}
+              title={stats.helm > 0 ? `${formatStat(stats.helm)} Helm chart${stats.helm !== 1 ? 's' : ''} - Click to view` : 'No Helm charts'}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <Ship className="w-5 h-5 text-cyan-400" />
                 <span className="text-sm text-muted-foreground">Helm</span>
               </div>
-              <div className="text-3xl font-bold text-cyan-400">{stats.helm}</div>
+              <div className="text-3xl font-bold text-cyan-400">{formatStat(stats.helm)}</div>
               <div className="text-xs text-muted-foreground">helm charts</div>
             </div>
-            <div className="glass p-4 rounded-lg">
+            <div
+              className={`glass p-4 rounded-lg ${stats.deployed > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
+              onClick={() => { setStatusFilter('deployed'); setActiveTab('releases') }}
+              title={stats.deployed > 0 ? `${formatStat(stats.deployed)} deployed release${stats.deployed !== 1 ? 's' : ''} - Click to view` : 'No deployed releases'}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle2 className="w-5 h-5 text-green-400" />
                 <span className="text-sm text-muted-foreground">Deployed</span>
               </div>
-              <div className="text-3xl font-bold text-green-400">{stats.deployed}</div>
+              <div className="text-3xl font-bold text-green-400">{formatStat(stats.deployed)}</div>
               <div className="text-xs text-muted-foreground">successful</div>
             </div>
-            <div className="glass p-4 rounded-lg">
+            <div
+              className={`glass p-4 rounded-lg ${stats.failed > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
+              onClick={() => { setStatusFilter('failed'); setActiveTab('releases') }}
+              title={stats.failed > 0 ? `${formatStat(stats.failed)} failed release${stats.failed !== 1 ? 's' : ''} - Click to view` : 'No failed releases'}
+            >
               <div className="flex items-center gap-2 mb-2">
                 <XCircle className="w-5 h-5 text-red-400" />
                 <span className="text-sm text-muted-foreground">Failed</span>
               </div>
-              <div className="text-3xl font-bold text-red-400">{stats.failed}</div>
+              <div className="text-3xl font-bold text-red-400">{formatStat(stats.failed)}</div>
               <div className="text-xs text-muted-foreground">releases</div>
             </div>
           </div>
@@ -647,35 +694,35 @@ export function GitOps() {
       {/* Stats Overview - shown on all tabs */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setTypeFilter('all'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-foreground">{stats.total}</div>
+          <div className="text-3xl font-bold text-foreground">{formatStat(stats.total)}</div>
           <div className="text-sm text-muted-foreground">Total</div>
         </div>
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setTypeFilter('helm'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-blue-400">{stats.helm}</div>
+          <div className="text-3xl font-bold text-blue-400">{formatStat(stats.helm)}</div>
           <div className="text-sm text-muted-foreground flex items-center gap-1">
             <Ship className="w-3 h-3" /> Helm
           </div>
         </div>
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setTypeFilter('kustomize'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-purple-400">{stats.kustomize}</div>
+          <div className="text-3xl font-bold text-purple-400">{formatStat(stats.kustomize)}</div>
           <div className="text-sm text-muted-foreground flex items-center gap-1">
             <Layers className="w-3 h-3" /> Kustomize
           </div>
         </div>
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setTypeFilter('operator'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-orange-400">{stats.operators}</div>
+          <div className="text-3xl font-bold text-orange-400">{formatStat(stats.operators)}</div>
           <div className="text-sm text-muted-foreground flex items-center gap-1">
             <Cog className="w-3 h-3" /> Operators
           </div>
         </div>
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setStatusFilter('deployed'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-green-400">{stats.deployed}</div>
+          <div className="text-3xl font-bold text-green-400">{formatStat(stats.deployed)}</div>
           <div className="text-sm text-muted-foreground flex items-center gap-1">
             <CheckCircle2 className="w-3 h-3" /> Deployed
           </div>
         </div>
         <div className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/30 transition-colors" onClick={() => { setStatusFilter('failed'); setActiveTab('releases') }}>
-          <div className="text-3xl font-bold text-red-400">{stats.failed}</div>
+          <div className="text-3xl font-bold text-red-400">{formatStat(stats.failed)}</div>
           <div className="text-sm text-muted-foreground flex items-center gap-1">
             <XCircle className="w-3 h-3" /> Failed
           </div>
@@ -734,24 +781,31 @@ export function GitOps() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {cards.map(card => {
                   const CardComponent = CARD_COMPONENTS[card.card_type]
                   if (!CardComponent) {
                     console.warn(`Unknown card type: ${card.card_type}`)
                     return null
                   }
+                  const cardWidth = card.position?.w || 4
                   return (
-                    <CardWrapper
+                    <div
                       key={card.id}
-                      cardId={card.id}
-                      cardType={card.card_type}
-                      title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      onConfigure={() => handleConfigureCard(card.id)}
-                      onRemove={() => handleRemoveCard(card.id)}
+                      style={{ gridColumn: `span ${cardWidth}` }}
                     >
-                      <CardComponent config={card.config} />
-                    </CardWrapper>
+                      <CardWrapper
+                        cardId={card.id}
+                        cardType={card.card_type}
+                        title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        cardWidth={cardWidth}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                      >
+                        <CardComponent config={card.config} />
+                      </CardWrapper>
+                    </div>
                   )
                 })}
               </div>
@@ -794,7 +848,7 @@ export function GitOps() {
                 data={stats.statusChartData}
                 size={160}
                 thickness={25}
-                centerValue={stats.total}
+                centerValue={formatStat(stats.total)}
                 centerLabel="Total"
               />
             ) : (
@@ -861,7 +915,7 @@ export function GitOps() {
                 className="px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-sm flex items-center gap-2"
               >
                 <AlertTriangle className="w-4 h-4" />
-                View Failed Releases ({stats.failed})
+                View Failed Releases ({formatStat(stats.failed)})
               </button>
               <button
                 onClick={() => { setStatusFilter('pending'); setActiveTab('releases') }}

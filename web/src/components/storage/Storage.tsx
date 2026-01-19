@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
-import { HardDrive, Database, FolderArchive, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity } from 'lucide-react'
-import { useClusters } from '../../hooks/useMCP'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { HardDrive, Database, FolderArchive, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity, Hourglass } from 'lucide-react'
+import { useClusters, usePVCs } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
+import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { Skeleton } from '../ui/Skeleton'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS } from '../cards/cardRegistry'
@@ -16,6 +18,7 @@ interface StorageCard {
   card_type: string
   config: Record<string, unknown>
   title?: string
+  position?: { w: number; h: number }
 }
 
 const STORAGE_CARDS_KEY = 'kubestellar-storage-cards'
@@ -34,11 +37,14 @@ function saveStorageCards(cards: StorageCard[]) {
 }
 
 export function Storage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
   } = useGlobalFilters()
+  const { pvcs } = usePVCs()
+  const { drillToPVC, drillToResources } = useDrillDownActions()
 
   // Card state
   const [cards, setCards] = useState<StorageCard[]>(() => loadStorageCards())
@@ -58,6 +64,14 @@ export function Storage() {
   useEffect(() => {
     saveStorageCards(cards)
   }, [cards])
+
+  // Handle addCard URL param - open modal and clear param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Trigger refresh on mount (ensures data is fresh when navigating to this page)
   useEffect(() => {
@@ -107,6 +121,12 @@ export function Storage() {
     setConfiguringCard(null)
   }, [])
 
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
+  }, [])
+
   const applyTemplate = useCallback((template: DashboardTemplate) => {
     const newCards: StorageCard[] = template.cards.map(card => ({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -124,17 +144,62 @@ export function Storage() {
     isAllClustersSelected || globalSelectedClusters.includes(c.name)
   )
 
-  // Calculate storage stats from clusters
-  const totalStorageGB = filteredClusters.reduce((sum, c) => sum + (c.storageGB || 0), 0)
-  const totalPVCs = filteredClusters.reduce((sum, c) => sum + (c.pvcCount || 0), 0)
-  const boundPVCs = filteredClusters.reduce((sum, c) => sum + (c.pvcBoundCount || 0), 0)
+  // Reachable clusters are those not explicitly marked as unreachable
+  const reachableClusters = filteredClusters.filter(c => c.reachable !== false)
 
-  // Format storage size
-  const formatStorage = (gb: number) => {
-    if (gb >= 1024) {
-      return `${(gb / 1024).toFixed(1)} TB`
+  // Filter PVCs by global selection (only from reachable clusters)
+  const filteredPVCs = pvcs.filter(p =>
+    isAllClustersSelected || (p.cluster && globalSelectedClusters.includes(p.cluster))
+  ).filter(p => {
+    const cluster = clusters.find(c => c.name === p.cluster)
+    return cluster?.reachable !== false
+  })
+
+  // Calculate storage stats from reachable clusters only
+  const currentStats = {
+    totalStorageGB: reachableClusters.reduce((sum, c) => sum + (c.storageGB || 0), 0),
+    totalPVCs: filteredPVCs.length,
+    boundPVCs: filteredPVCs.filter(p => p.status === 'Bound').length,
+    pendingPVCs: filteredPVCs.filter(p => p.status === 'Pending').length,
+  }
+
+  // Check if we have actual data (not just loading state)
+  const hasActualData = filteredClusters.some(c =>
+    c.reachable !== false && c.storageGB !== undefined && c.nodeCount !== undefined && c.nodeCount > 0
+  )
+
+  // Cache the last known good stats to show during refresh
+  const cachedStats = useRef(currentStats)
+
+  // Update cache when we have real data
+  useEffect(() => {
+    if (hasActualData && (currentStats.totalStorageGB > 0 || currentStats.totalPVCs > 0)) {
+      cachedStats.current = currentStats
     }
-    return `${Math.round(gb)} GB`
+  }, [hasActualData, currentStats.totalStorageGB, currentStats.totalPVCs, currentStats.boundPVCs, currentStats.pendingPVCs])
+
+  // Use cached stats during refresh, current stats when data is available
+  const stats = (hasActualData || cachedStats.current.totalStorageGB > 0 || cachedStats.current.totalPVCs > 0)
+    ? (hasActualData ? currentStats : cachedStats.current)
+    : null
+
+  // Determine if we should show data or dashes
+  const hasDataToShow = stats !== null
+
+  // Format storage size - returns '-' if no data, never negative
+  const formatStorage = (gb: number, hasData = true) => {
+    if (!hasData) return '-'
+    const safeValue = Math.max(0, gb) // Never show negative
+    if (safeValue >= 1024) {
+      return `${(safeValue / 1024).toFixed(1)} TB`
+    }
+    return `${Math.round(safeValue)} GB`
+  }
+
+  // Format stat value - returns '-' if no data
+  const formatStatValue = (value: number, hasData = true) => {
+    if (!hasData) return '-'
+    return Math.max(0, value)
   }
 
   // Transform card for ConfigureCardModal
@@ -150,12 +215,20 @@ export function Storage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <HardDrive className="w-6 h-6 text-purple-400" />
-              Storage
-            </h1>
-            <p className="text-muted-foreground">Monitor storage resources across clusters</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <HardDrive className="w-6 h-6 text-purple-400" />
+                Storage
+              </h1>
+              <p className="text-muted-foreground">Monitor storage resources across clusters</p>
+            </div>
+            {isRefreshing && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="storage-auto-refresh" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
@@ -216,38 +289,68 @@ export function Storage() {
                 ))}
               </>
             ) : (
-              // Real data
+              // Real data - use cached stats during refresh
               <>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={hasDataToShow ? drillToResources : undefined}
+                  title={hasDataToShow ? `${formatStorage(stats?.totalStorageGB || 0, hasDataToShow)} ephemeral storage allocatable across ${reachableClusters.length} cluster${reachableClusters.length !== 1 ? 's' : ''} - Click to view resources` : 'No reachable clusters'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <HardDrive className="w-5 h-5 text-purple-400" />
                     <span className="text-sm text-muted-foreground">Ephemeral Storage</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{formatStorage(totalStorageGB)}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatStorage(stats?.totalStorageGB || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">total allocatable</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow && (stats?.totalPVCs || 0) > 0 ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={() => {
+                    if (hasDataToShow && (stats?.totalPVCs || 0) > 0 && filteredPVCs[0]) {
+                      drillToPVC(filteredPVCs[0].cluster || 'default', filteredPVCs[0].namespace, filteredPVCs[0].name)
+                    }
+                  }}
+                  title={!hasDataToShow ? 'No reachable clusters' : (stats?.totalPVCs || 0) > 0 ? `${stats?.totalPVCs} persistent volume claim${(stats?.totalPVCs || 0) !== 1 ? 's' : ''} - Click to view details` : 'No PVCs found'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Database className="w-5 h-5 text-blue-400" />
                     <span className="text-sm text-muted-foreground">PVCs</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{totalPVCs}</div>
+                  <div className="text-3xl font-bold text-foreground">{formatStatValue(stats?.totalPVCs || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">persistent volume claims</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow && (stats?.boundPVCs || 0) > 0 ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={() => {
+                    if (hasDataToShow) {
+                      const boundPVC = filteredPVCs.find(p => p.status === 'Bound')
+                      if (boundPVC) drillToPVC(boundPVC.cluster || 'default', boundPVC.namespace, boundPVC.name)
+                    }
+                  }}
+                  title={!hasDataToShow ? 'No reachable clusters' : (stats?.boundPVCs || 0) > 0 ? `${stats?.boundPVCs} PVC${(stats?.boundPVCs || 0) !== 1 ? 's' : ''} bound - Click to view details` : 'No bound PVCs'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <FolderArchive className="w-5 h-5 text-green-400" />
                     <span className="text-sm text-muted-foreground">Bound</span>
                   </div>
-                  <div className="text-3xl font-bold text-green-400">{boundPVCs}</div>
+                  <div className="text-3xl font-bold text-green-400">{formatStatValue(stats?.boundPVCs || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">PVCs bound</div>
                 </div>
-                <div className="glass p-4 rounded-lg">
+                <div
+                  className={`glass p-4 rounded-lg ${hasDataToShow && (stats?.pendingPVCs || 0) > 0 ? 'cursor-pointer hover:bg-secondary/50' : ''} transition-colors`}
+                  onClick={() => {
+                    if (hasDataToShow) {
+                      const pendingPVC = filteredPVCs.find(p => p.status === 'Pending')
+                      if (pendingPVC) drillToPVC(pendingPVC.cluster || 'default', pendingPVC.namespace, pendingPVC.name)
+                    }
+                  }}
+                  title={!hasDataToShow ? 'No reachable clusters' : (stats?.pendingPVCs || 0) > 0 ? `${stats?.pendingPVCs} PVC${(stats?.pendingPVCs || 0) !== 1 ? 's' : ''} pending - Click to view details` : 'No pending PVCs'}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Database className="w-5 h-5 text-yellow-400" />
                     <span className="text-sm text-muted-foreground">Pending</span>
                   </div>
-                  <div className="text-3xl font-bold text-yellow-400">{totalPVCs - boundPVCs}</div>
+                  <div className="text-3xl font-bold text-yellow-400">{formatStatValue(stats?.pendingPVCs || 0, hasDataToShow)}</div>
                   <div className="text-xs text-muted-foreground">PVCs pending</div>
                 </div>
               </>
@@ -308,24 +411,31 @@ export function Storage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {cards.map(card => {
                   const CardComponent = CARD_COMPONENTS[card.card_type]
                   if (!CardComponent) {
                     console.warn(`Unknown card type: ${card.card_type}`)
                     return null
                   }
+                  const cardWidth = card.position?.w || 4
                   return (
-                    <CardWrapper
+                    <div
                       key={card.id}
-                      cardId={card.id}
-                      cardType={card.card_type}
-                      title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      onConfigure={() => handleConfigureCard(card.id)}
-                      onRemove={() => handleRemoveCard(card.id)}
+                      style={{ gridColumn: `span ${cardWidth}` }}
                     >
+                      <CardWrapper
+                        cardId={card.id}
+                        cardType={card.card_type}
+                        title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        cardWidth={cardWidth}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                      >
                       <CardComponent config={card.config} />
                     </CardWrapper>
+                    </div>
                   )
                 })}
               </div>

@@ -3,19 +3,14 @@ import { HardDrive, Database, CheckCircle, AlertTriangle, Clock } from 'lucide-r
 import { useClusters, usePVCs } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { RefreshIndicator } from '../ui/RefreshIndicator'
-
-// Format bytes to human readable
-function formatStorage(gb: number): string {
-  if (gb >= 1024) {
-    return `${(gb / 1024).toFixed(1)} TB`
-  }
-  return `${Math.round(gb)} GB`
-}
+import { useDrillDownActions } from '../../hooks/useDrillDown'
+import { formatStat, formatStorageStat } from '../../lib/formatStats'
 
 export function StorageOverview() {
   const { clusters, isLoading, isRefreshing, lastUpdated } = useClusters()
   const { pvcs, isLoading: pvcsLoading } = usePVCs()
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
+  const { drillToPVC } = useDrillDownActions()
 
   // Filter clusters by selection
   const filteredClusters = useMemo(() => {
@@ -55,8 +50,9 @@ export function StorageOverview() {
     }
   }, [filteredClusters, filteredPVCs])
 
+  // Check if we have real data from reachable clusters
   const hasRealData = !isLoading && filteredClusters.length > 0 &&
-    filteredClusters.some(c => c.storageGB !== undefined)
+    filteredClusters.some(c => c.reachable !== false && c.storageGB !== undefined && c.nodeCount !== undefined && c.nodeCount > 0)
 
   if (isLoading && !clusters.length) {
     return (
@@ -74,7 +70,7 @@ export function StorageOverview() {
           <HardDrive className="w-4 h-4 text-purple-400" />
           <span className="text-sm font-medium text-foreground">Storage Overview</span>
           {hasRealData && (
-            <span className="text-xs text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded">
+            <span className="text-xs text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded" title="Showing live data from clusters">
               Live
             </span>
           )}
@@ -88,23 +84,36 @@ export function StorageOverview() {
 
       {/* Main stats */}
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20">
+        <div
+          className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/20 cursor-default"
+          title={hasRealData ? `Total storage capacity: ${formatStorageStat(stats.totalStorageGB)} across ${stats.clustersWithStorage} cluster${stats.clustersWithStorage !== 1 ? 's' : ''}` : 'No data available - clusters may be unreachable'}
+        >
           <div className="flex items-center gap-2 mb-1">
             <Database className="w-4 h-4 text-purple-400" />
             <span className="text-xs text-purple-400">Total Capacity</span>
           </div>
-          <span className="text-2xl font-bold text-foreground">{formatStorage(stats.totalStorageGB)}</span>
+          <span className="text-2xl font-bold text-foreground">
+            {formatStorageStat(stats.totalStorageGB, hasRealData)}
+          </span>
           <div className="text-xs text-muted-foreground mt-1">
-            across {stats.clustersWithStorage} cluster{stats.clustersWithStorage !== 1 ? 's' : ''}
+            across {formatStat(stats.clustersWithStorage)} cluster{stats.clustersWithStorage !== 1 ? 's' : ''}
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+        <div
+          className={`p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 ${stats.totalPVCs > 0 ? 'cursor-pointer hover:bg-blue-500/20' : 'cursor-default'} transition-colors`}
+          onClick={() => {
+            if (filteredPVCs.length > 0 && filteredPVCs[0]) {
+              drillToPVC(filteredPVCs[0].cluster || 'default', filteredPVCs[0].namespace, filteredPVCs[0].name)
+            }
+          }}
+          title={stats.totalPVCs > 0 ? `${stats.totalPVCs} Persistent Volume Claims - Click to view details` : 'No PVCs found'}
+        >
           <div className="flex items-center gap-2 mb-1">
             <HardDrive className="w-4 h-4 text-blue-400" />
             <span className="text-xs text-blue-400">PVCs</span>
           </div>
-          <span className="text-2xl font-bold text-foreground">{stats.totalPVCs}</span>
+          <span className="text-2xl font-bold text-foreground">{formatStat(stats.totalPVCs)}</span>
           <div className="text-xs text-muted-foreground mt-1">
             persistent volume claims
           </div>
@@ -113,26 +122,47 @@ export function StorageOverview() {
 
       {/* PVC Status breakdown */}
       <div className="grid grid-cols-3 gap-2 mb-4">
-        <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/20">
+        <div
+          className={`p-2 rounded-lg bg-green-500/10 border border-green-500/20 ${stats.boundPVCs > 0 ? 'cursor-pointer hover:bg-green-500/20' : 'cursor-default'} transition-colors`}
+          onClick={() => {
+            const boundPVC = filteredPVCs.find(p => p.status === 'Bound')
+            if (boundPVC) drillToPVC(boundPVC.cluster || 'default', boundPVC.namespace, boundPVC.name)
+          }}
+          title={stats.boundPVCs > 0 ? `${stats.boundPVCs} PVC${stats.boundPVCs !== 1 ? 's' : ''} successfully bound - Click to view` : 'No bound PVCs'}
+        >
           <div className="flex items-center gap-1.5 mb-1">
             <CheckCircle className="w-3 h-3 text-green-400" />
             <span className="text-xs text-green-400">Bound</span>
           </div>
-          <span className="text-lg font-bold text-foreground">{stats.boundPVCs}</span>
+          <span className="text-lg font-bold text-foreground">{formatStat(stats.boundPVCs)}</span>
         </div>
-        <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+        <div
+          className={`p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20 ${stats.pendingPVCs > 0 ? 'cursor-pointer hover:bg-yellow-500/20' : 'cursor-default'} transition-colors`}
+          onClick={() => {
+            const pendingPVC = filteredPVCs.find(p => p.status === 'Pending')
+            if (pendingPVC) drillToPVC(pendingPVC.cluster || 'default', pendingPVC.namespace, pendingPVC.name)
+          }}
+          title={stats.pendingPVCs > 0 ? `${stats.pendingPVCs} PVC${stats.pendingPVCs !== 1 ? 's' : ''} pending - Click to view` : 'No pending PVCs'}
+        >
           <div className="flex items-center gap-1.5 mb-1">
             <Clock className="w-3 h-3 text-yellow-400" />
             <span className="text-xs text-yellow-400">Pending</span>
           </div>
-          <span className="text-lg font-bold text-foreground">{stats.pendingPVCs}</span>
+          <span className="text-lg font-bold text-foreground">{formatStat(stats.pendingPVCs)}</span>
         </div>
-        <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
+        <div
+          className={`p-2 rounded-lg bg-red-500/10 border border-red-500/20 ${stats.failedPVCs > 0 ? 'cursor-pointer hover:bg-red-500/20' : 'cursor-default'} transition-colors`}
+          onClick={() => {
+            const failedPVC = filteredPVCs.find(p => p.status !== 'Bound' && p.status !== 'Pending')
+            if (failedPVC) drillToPVC(failedPVC.cluster || 'default', failedPVC.namespace, failedPVC.name)
+          }}
+          title={stats.failedPVCs > 0 ? `${stats.failedPVCs} PVC${stats.failedPVCs !== 1 ? 's' : ''} in failed/lost state - Click to view` : 'No failed PVCs'}
+        >
           <div className="flex items-center gap-1.5 mb-1">
             <AlertTriangle className="w-3 h-3 text-red-400" />
             <span className="text-xs text-red-400">Failed</span>
           </div>
-          <span className="text-lg font-bold text-foreground">{stats.failedPVCs}</span>
+          <span className="text-lg font-bold text-foreground">{formatStat(stats.failedPVCs)}</span>
         </div>
       </div>
 
@@ -142,8 +172,8 @@ export function StorageOverview() {
           <div className="text-xs text-muted-foreground mb-2">Storage Classes</div>
           <div className="space-y-1.5">
             {stats.storageClasses.slice(0, 5).map(([name, count]) => (
-              <div key={name} className="flex items-center justify-between p-2 rounded bg-secondary/30">
-                <span className="text-sm text-foreground truncate">{name}</span>
+              <div key={name} className="flex items-center justify-between p-2 rounded bg-secondary/30 cursor-default" title={`Storage class "${name}" has ${count} PVC${count !== 1 ? 's' : ''}`}>
+                <span className="text-sm text-foreground truncate" title={name}>{name}</span>
                 <span className="text-xs text-muted-foreground">{count} PVCs</span>
               </div>
             ))}

@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { Activity, AlertTriangle, Clock, Bell, ChevronRight, CheckCircle2, Calendar, Zap, Plus, Layout, LayoutGrid, ChevronDown, RefreshCw } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Activity, AlertTriangle, Clock, Bell, ChevronRight, CheckCircle2, Calendar, Zap, Plus, Layout, LayoutGrid, ChevronDown, RefreshCw, Hourglass } from 'lucide-react'
 import { useEvents, useWarningEvents } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
@@ -7,6 +8,7 @@ import { ClusterBadge } from '../ui/ClusterBadge'
 import { DonutChart } from '../charts/PieChart'
 import { BarChart } from '../charts/BarChart'
 import { cn } from '../../lib/cn'
+import { formatStat } from '../../lib/formatStats'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -19,6 +21,7 @@ interface EventCard {
   card_type: string
   config: Record<string, unknown>
   title?: string
+  position?: { w: number; h: number }
 }
 
 const EVENTS_CARDS_KEY = 'kubestellar-events-cards'
@@ -97,6 +100,7 @@ function getEventIcon(type: string, reason: string): React.ReactNode {
 }
 
 export function Events() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -132,6 +136,14 @@ export function Events() {
   useEffect(() => {
     saveEventCards(cards)
   }, [cards])
+
+  // Handle addCard URL param - open modal and clear param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -182,6 +194,12 @@ export function Events() {
       c.id === cardId ? { ...c, config } : c
     ))
     setConfiguringCard(null)
+  }, [])
+
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
   }, [])
 
   const applyTemplate = useCallback((template: DashboardTemplate) => {
@@ -315,7 +333,8 @@ export function Events() {
   // Stats (based on globally filtered events)
   const stats = useMemo(() => {
     const warnings = globalFilteredWarningEvents.length
-    const normal = globalFilteredAllEvents.length - warnings
+    // Never show negative - clamp to 0
+    const normal = Math.max(0, globalFilteredAllEvents.length - warnings)
 
     // Reason counts for chart
     const reasonCounts = globalFilteredAllEvents.reduce((acc, e) => {
@@ -449,12 +468,20 @@ export function Events() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Activity className="w-6 h-6 text-purple-400" />
-              Events
-            </h1>
-            <p className="text-muted-foreground">Cluster events and activity across your infrastructure</p>
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Activity className="w-6 h-6 text-purple-400" />
+                Events
+              </h1>
+              <p className="text-muted-foreground">Cluster events and activity across your infrastructure</p>
+            </div>
+            {isRefreshing && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <label htmlFor="events-auto-refresh" className="flex items-center gap-2 cursor-pointer text-sm text-muted-foreground">
@@ -505,7 +532,7 @@ export function Events() {
                 <Bell className="w-5 h-5 text-purple-400" />
                 <span className="text-sm text-muted-foreground">Total</span>
               </div>
-              <div className="text-3xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-3xl font-bold text-foreground">{formatStat(stats.total)}</div>
               <div className="text-xs text-muted-foreground">events</div>
             </div>
             <div className="glass p-4 rounded-lg">
@@ -513,7 +540,7 @@ export function Events() {
                 <AlertTriangle className="w-5 h-5 text-yellow-400" />
                 <span className="text-sm text-muted-foreground">Warnings</span>
               </div>
-              <div className="text-3xl font-bold text-yellow-400">{stats.warnings}</div>
+              <div className="text-3xl font-bold text-yellow-400">{formatStat(stats.warnings)}</div>
               <div className="text-xs text-muted-foreground">warning events</div>
             </div>
             <div className="glass p-4 rounded-lg">
@@ -521,7 +548,7 @@ export function Events() {
                 <CheckCircle2 className="w-5 h-5 text-green-400" />
                 <span className="text-sm text-muted-foreground">Normal</span>
               </div>
-              <div className="text-3xl font-bold text-green-400">{stats.normal}</div>
+              <div className="text-3xl font-bold text-green-400">{formatStat(stats.normal)}</div>
               <div className="text-xs text-muted-foreground">normal events</div>
             </div>
             <div className="glass p-4 rounded-lg">
@@ -529,7 +556,7 @@ export function Events() {
                 <Clock className="w-5 h-5 text-blue-400" />
                 <span className="text-sm text-muted-foreground">Recent</span>
               </div>
-              <div className="text-3xl font-bold text-blue-400">{stats.recentCount}</div>
+              <div className="text-3xl font-bold text-blue-400">{formatStat(stats.recentCount)}</div>
               <div className="text-xs text-muted-foreground">in last hour</div>
             </div>
           </div>
@@ -619,24 +646,31 @@ export function Events() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-12 gap-4">
                 {cards.map(card => {
                   const CardComponent = CARD_COMPONENTS[card.card_type]
                   if (!CardComponent) {
                     console.warn(`Unknown card type: ${card.card_type}`)
                     return null
                   }
+                  const cardWidth = card.position?.w || 4
                   return (
-                    <CardWrapper
+                    <div
                       key={card.id}
-                      cardId={card.id}
-                      cardType={card.card_type}
-                      title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      onConfigure={() => handleConfigureCard(card.id)}
-                      onRemove={() => handleRemoveCard(card.id)}
+                      style={{ gridColumn: `span ${cardWidth}` }}
                     >
+                      <CardWrapper
+                        cardId={card.id}
+                        cardType={card.card_type}
+                        title={card.title || card.card_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        cardWidth={cardWidth}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                      >
                       <CardComponent config={card.config} />
                     </CardWrapper>
+                    </div>
                   )
                 })}
               </div>
@@ -682,7 +716,7 @@ export function Events() {
                   <Bell className="w-5 h-5 text-purple-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-foreground">{stats.total}</div>
+                  <div className="text-2xl font-bold text-foreground">{formatStat(stats.total)}</div>
                   <div className="text-xs text-muted-foreground">Total Events</div>
                 </div>
               </div>
@@ -696,7 +730,7 @@ export function Events() {
                   <AlertTriangle className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-yellow-400">{stats.warnings}</div>
+                  <div className="text-2xl font-bold text-yellow-400">{formatStat(stats.warnings)}</div>
                   <div className="text-xs text-muted-foreground">Warnings</div>
                 </div>
               </div>
@@ -710,7 +744,7 @@ export function Events() {
                   <CheckCircle2 className="w-5 h-5 text-green-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-400">{stats.normal}</div>
+                  <div className="text-2xl font-bold text-green-400">{formatStat(stats.normal)}</div>
                   <div className="text-xs text-muted-foreground">Normal</div>
                 </div>
               </div>
@@ -721,7 +755,7 @@ export function Events() {
                   <Zap className="w-5 h-5 text-blue-400" />
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-blue-400">{stats.recentCount}</div>
+                  <div className="text-2xl font-bold text-blue-400">{formatStat(stats.recentCount)}</div>
                   <div className="text-xs text-muted-foreground">Last Hour</div>
                 </div>
               </div>
@@ -947,7 +981,7 @@ export function Events() {
                 filter === 'all' ? 'ring-2 ring-purple-500' : 'hover:bg-secondary/30'
               )}
             >
-              <div className="text-3xl font-bold text-foreground">{stats.total}</div>
+              <div className="text-3xl font-bold text-foreground">{formatStat(stats.total)}</div>
               <div className="text-sm text-muted-foreground">Total Events</div>
             </button>
             <button
@@ -957,7 +991,7 @@ export function Events() {
                 filter === 'warning' ? 'ring-2 ring-yellow-500' : 'hover:bg-secondary/30'
               )}
             >
-              <div className="text-3xl font-bold text-yellow-400">{stats.warnings}</div>
+              <div className="text-3xl font-bold text-yellow-400">{formatStat(stats.warnings)}</div>
               <div className="text-sm text-muted-foreground">Warnings</div>
             </button>
             <button
@@ -967,7 +1001,7 @@ export function Events() {
                 filter === 'normal' ? 'ring-2 ring-green-500' : 'hover:bg-secondary/30'
               )}
             >
-              <div className="text-3xl font-bold text-green-400">{stats.normal}</div>
+              <div className="text-3xl font-bold text-green-400">{formatStat(stats.normal)}</div>
               <div className="text-sm text-muted-foreground">Normal</div>
             </button>
           </div>
