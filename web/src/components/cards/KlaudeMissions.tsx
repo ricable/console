@@ -172,9 +172,9 @@ export function KlaudeKubeconfigAuditCard(_props: KlaudeMissionCardProps) {
       initialPrompt: `Please audit my kubeconfig and help me clean it up.
 
 Current clusters (${clusters.length} total):
-${clusters.map(c => `- ${c.name}: ${c.reachable === false ? 'UNREACHABLE' : c.healthy ? 'healthy' : 'unhealthy'} (${c.nodeCount || 0} nodes)`).join('\n')}
+${clusters.map(c => `- ${c.name}: ${c.reachable === false ? 'OFFLINE' : c.healthy ? 'healthy' : 'unhealthy'} (${c.nodeCount || 0} nodes)`).join('\n')}
 
-Unreachable clusters (${unreachableClusters.length}):
+Offline clusters (${unreachableClusters.length}):
 ${unreachableClusters.map(c => `- ${c.name}: ${c.errorMessage || 'Connection failed'}`).join('\n') || 'None'}
 
 Please:
@@ -228,16 +228,16 @@ Please:
               : 'bg-green-500/10 border-green-500/20 cursor-default'
           )}
           onClick={() => unreachableClusters.length > 0 && unreachableClusters[0] && drillToCluster(unreachableClusters[0].name)}
-          title={unreachableClusters.length > 0 ? `${unreachableClusters.length} unreachable cluster${unreachableClusters.length !== 1 ? 's' : ''} - Click to view first` : 'All clusters are reachable'}
+          title={unreachableClusters.length > 0 ? `${unreachableClusters.length} offline cluster${unreachableClusters.length !== 1 ? 's' : ''} - Click to view first` : 'All clusters are reachable'}
         >
           <div className="text-2xl font-bold text-foreground">{unreachableClusters.length}</div>
           <div className={cn('text-xs', unreachableClusters.length > 0 ? 'text-yellow-400' : 'text-green-400')}>
-            Unreachable
+            Offline
           </div>
         </div>
       </div>
 
-      {/* Unreachable Clusters Preview */}
+      {/* Offline Clusters Preview */}
       <div className="flex-1 space-y-2 overflow-y-auto mb-4">
         {unreachableClusters.slice(0, 3).map((cluster, i) => (
           <div
@@ -317,7 +317,7 @@ Cluster Overview:
 - Total clusters: ${clusters.length}
 - Healthy: ${healthyClusters}
 - Unhealthy: ${unhealthyClusters}
-- Unreachable: ${unreachableClusters}
+- Offline: ${unreachableClusters}
 
 Resource Summary:
 - Total nodes: ${totalNodes}
@@ -325,7 +325,7 @@ Resource Summary:
 - Known issues: ${totalIssues}
 
 Clusters by status:
-${clusters.map(c => `- ${c.name}: ${c.healthy ? '✓ healthy' : c.reachable === false ? '✗ unreachable' : '⚠ unhealthy'} (${c.nodeCount || 0} nodes, ${c.podCount || 0} pods)`).join('\n')}
+${clusters.map(c => `- ${c.name}: ${c.healthy ? '✓ healthy' : c.reachable === false ? '✗ offline' : '⚠ unhealthy'} (${c.nodeCount || 0} nodes, ${c.podCount || 0} pods)`).join('\n')}
 
 Please provide:
 1. Overall infrastructure health score (1-10)
@@ -429,10 +429,10 @@ Please provide:
             const unreachableCluster = clusters.find(c => c.reachable === false)
             if (unreachableCluster) drillToCluster(unreachableCluster.name)
           }}
-          title={`${unreachableClusters} unreachable cluster${unreachableClusters !== 1 ? 's' : ''} - Click to view`}
+          title={`${unreachableClusters} offline cluster${unreachableClusters !== 1 ? 's' : ''} - Click to view`}
         >
           <div className="text-lg font-bold text-yellow-400">{unreachableClusters}</div>
-          <div className="text-[10px] text-muted-foreground">Unreachable</div>
+          <div className="text-[10px] text-muted-foreground">Offline</div>
         </div>
       </div>
 

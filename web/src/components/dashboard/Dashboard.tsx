@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, memo, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Plus, GripVertical, Layout, AlertTriangle, X, RefreshCw } from 'lucide-react'
 import {
   DndContext,
@@ -36,6 +37,15 @@ import { CardRecommendations } from './CardRecommendations'
 import { TemplatesModal } from './TemplatesModal'
 import { DashboardTemplate } from './templates'
 
+// Module-level cache for dashboard data (survives navigation)
+interface CachedDashboard {
+  dashboard: DashboardData | null
+  cards: Card[]
+  timestamp: number
+}
+let dashboardCache: CachedDashboard | null = null
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
 interface Card {
   id: string
   card_type: string
@@ -53,12 +63,14 @@ interface DashboardData {
 }
 
 export function Dashboard() {
-  const [dashboard, setDashboard] = useState<DashboardData | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  // Initialize from cache if available (progressive disclosure - no skeletons on navigation)
+  const [dashboard, setDashboard] = useState<DashboardData | null>(() => dashboardCache?.dashboard || null)
+  const [isLoading, setIsLoading] = useState(() => !dashboardCache) // Only show loading if no cache
+  const location = useLocation()
   const [isReplaceCardOpen, setIsReplaceCardOpen] = useState(false)
   const [isConfigureCardOpen, setIsConfigureCardOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
-  const [localCards, setLocalCards] = useState<Card[]>([])
+  const [localCards, setLocalCards] = useState<Card[]>(() => dashboardCache?.cards || [])
   const [demoBannerDismissed, setDemoBannerDismissed] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -194,9 +206,22 @@ export function Dashboard() {
     }
   }
 
+  // Load dashboard on mount and when navigating back to the page
   useEffect(() => {
-    loadDashboard()
-  }, [])
+    // If we have cached data, do a background refresh (no loading state)
+    if (dashboardCache && Date.now() - dashboardCache.timestamp < CACHE_TTL) {
+      loadDashboard(true)
+    } else {
+      loadDashboard(false)
+    }
+  }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep cache in sync when cards are modified locally
+  useEffect(() => {
+    if (dashboardCache && localCards.length > 0) {
+      dashboardCache = { ...dashboardCache, cards: localCards, timestamp: Date.now() }
+    }
+  }, [localCards])
 
   // Handle pending restore card from CardHistory
   useEffect(() => {
@@ -234,20 +259,60 @@ export function Dashboard() {
     }
   }, [pendingOpenAddCardModal, isLoading, openAddCardModal, setPendingOpenAddCardModal])
 
-  const loadDashboard = async () => {
+  // Helper to check if a card ID is a local-only (not persisted) card
+  const isLocalOnlyCard = (cardId: string) => {
+    return cardId.startsWith('new-') ||
+           cardId.startsWith('template-') ||
+           cardId.startsWith('restored-') ||
+           cardId.startsWith('ai-') ||
+           cardId.startsWith('rec-') ||
+           cardId.startsWith('demo-')
+  }
+
+  const loadDashboard = async (isBackground: boolean = false) => {
+    if (!isBackground) {
+      setIsLoading(true)
+    }
     try {
       const { data: dashboards } = await api.get<DashboardData[]>('/api/dashboards')
       if (dashboards && dashboards.length > 0) {
         const defaultDashboard = dashboards.find((d) => d.is_default) || dashboards[0]
         const { data } = await api.get<DashboardData>(`/api/dashboards/${defaultDashboard.id}`)
+        const apiCards = data.cards.length > 0 ? data.cards : getDemoCards()
         setDashboard(data)
-        setLocalCards(data.cards.length > 0 ? data.cards : getDemoCards())
+
+        // During background refresh, preserve local-only cards (not yet persisted to backend)
+        if (isBackground) {
+          setLocalCards((prevCards) => {
+            // Keep local-only cards that aren't in the API response
+            const localOnlyCards = prevCards.filter(c => isLocalOnlyCard(c.id))
+            // Merge: local-only cards first, then API cards
+            return [...localOnlyCards, ...apiCards]
+          })
+        } else {
+          setLocalCards(apiCards)
+        }
+        // Update cache
+        dashboardCache = { dashboard: data, cards: apiCards, timestamp: Date.now() }
       } else {
-        setLocalCards(getDemoCards())
+        // No dashboards from API - preserve local cards during background refresh
+        if (isBackground) {
+          // Keep existing cards during background refresh
+          return
+        }
+        const cards = getDemoCards()
+        setLocalCards(cards)
+        // Update cache with demo cards
+        dashboardCache = { dashboard: null, cards, timestamp: Date.now() }
       }
     } catch (error) {
       console.error('Failed to load dashboard:', error)
-      setLocalCards(getDemoCards())
+      // Only set demo cards if not a background refresh (keep existing data)
+      if (!isBackground) {
+        const cards = getDemoCards()
+        setLocalCards(cards)
+        dashboardCache = { dashboard: null, cards, timestamp: Date.now() }
+      }
     } finally {
       setIsLoading(false)
     }
@@ -508,12 +573,6 @@ export function Dashboard() {
         <div className="flex items-center gap-4">
           {/* Refresh controls */}
           <div className="flex items-center gap-3">
-            {isRefreshing && (
-              <span className="flex items-center gap-1.5 text-xs text-purple-400">
-                <RefreshCw className="w-3 h-3 animate-spin" />
-                Updating...
-              </span>
-            )}
             <label htmlFor="dashboard-auto-refresh" className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
               <input
                 type="checkbox"

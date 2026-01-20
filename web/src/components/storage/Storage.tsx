@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 import { HardDrive, Database, FolderArchive, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity, Hourglass, X, ExternalLink } from 'lucide-react'
 import { useClusters, usePVCs, PVC } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
@@ -166,6 +166,7 @@ function saveStorageCards(cards: StorageCard[]) {
 
 export function Storage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
   const {
     selectedClusters: globalSelectedClusters,
@@ -204,10 +205,10 @@ export function Storage() {
     }
   }, [searchParams, setSearchParams])
 
-  // Trigger refresh on mount (ensures data is fresh when navigating to this page)
+  // Trigger refresh when navigating to this page (location.key changes on each navigation)
   useEffect(() => {
     refetch()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-refresh every 30 seconds
   useEffect(() => {

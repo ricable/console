@@ -42,6 +42,19 @@ function saveGitOpsCards(cards: GitOpsCard[]) {
 // Module-level cache for releases (persists across navigation)
 let releasesCache: Release[] = []
 
+// Module-level cache for stats (persists across navigation)
+interface GitOpsStatsCache {
+  total: number
+  helm: number
+  kustomize: number
+  operators: number
+  deployed: number
+  failed: number
+  pending: number
+  other: number
+}
+let statsCache: GitOpsStatsCache | null = null
+
 // Release types
 type ReleaseType = 'helm' | 'kustomize' | 'operator'
 
@@ -434,7 +447,7 @@ export function GitOps() {
     // Never show negative - clamp to 0
     const other = Math.max(0, globalFilteredReleases.length - deployed - failed - pending)
 
-    return {
+    const currentStats = {
       total: globalFilteredReleases.length,
       helm: helmReleases.length,
       kustomize: kustomizations.length,
@@ -443,18 +456,32 @@ export function GitOps() {
       failed,
       pending,
       other,
-      // Chart data for status distribution
+    }
+
+    // Update cache when we have real data
+    if (currentStats.total > 0) {
+      statsCache = currentStats
+    }
+
+    // Use cached values when current values are zero (e.g., during re-fetch)
+    const displayStats = currentStats.total === 0 && statsCache
+      ? statsCache
+      : currentStats
+
+    return {
+      ...displayStats,
+      // Chart data for status distribution (uses display stats)
       statusChartData: [
-        { name: 'Deployed', value: deployed, color: '#22c55e' },
-        { name: 'Failed', value: failed, color: '#ef4444' },
-        { name: 'Pending', value: pending, color: '#3b82f6' },
-        { name: 'Other', value: other, color: '#6b7280' },
+        { name: 'Deployed', value: displayStats.deployed, color: '#22c55e' },
+        { name: 'Failed', value: displayStats.failed, color: '#ef4444' },
+        { name: 'Pending', value: displayStats.pending, color: '#3b82f6' },
+        { name: 'Other', value: displayStats.other, color: '#6b7280' },
       ].filter(d => d.value > 0),
-      // Chart data for type distribution
+      // Chart data for type distribution (uses display stats)
       typeChartData: [
-        { name: 'Helm', value: helmReleases.length, color: TYPE_CONFIG.helm.chartColor },
-        { name: 'Kustomize', value: kustomizations.length, color: TYPE_CONFIG.kustomize.chartColor },
-        { name: 'Operators', value: operators.length, color: TYPE_CONFIG.operator.chartColor },
+        { name: 'Helm', value: displayStats.helm, color: TYPE_CONFIG.helm.chartColor },
+        { name: 'Kustomize', value: displayStats.kustomize, color: TYPE_CONFIG.kustomize.chartColor },
+        { name: 'Operators', value: displayStats.operators, color: TYPE_CONFIG.operator.chartColor },
       ].filter(d => d.value > 0),
     }
   }, [globalFilteredReleases])

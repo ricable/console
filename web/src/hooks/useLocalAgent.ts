@@ -119,9 +119,23 @@ class AgentManager {
     this.listeners.forEach((listener) => listener(this.state))
   }
 
-  private setState(updates: Partial<AgentState>) {
+  private setState(updates: Partial<AgentState>, forceNotify = false) {
+    const prevState = this.state
     this.state = { ...this.state, ...updates }
-    this.notify()
+
+    // Only notify if state actually changed (prevents UI flashing on background polls)
+    const hasChanged = forceNotify ||
+      prevState.status !== this.state.status ||
+      prevState.error !== this.state.error ||
+      prevState.dataErrorCount !== this.state.dataErrorCount ||
+      // For health, only check meaningful changes
+      prevState.health?.clusters !== this.state.health?.clusters ||
+      prevState.health?.hasClaude !== this.state.health?.hasClaude ||
+      prevState.health?.status !== this.state.health?.status
+
+    if (hasChanged) {
+      this.notify()
+    }
   }
 
   private addEvent(type: ConnectionEvent['type'], message: string) {

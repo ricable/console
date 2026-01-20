@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react'
-import { Box, CheckCircle, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
+import { Box, CheckCircle, AlertTriangle, Clock, ChevronRight, Loader2 } from 'lucide-react'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { CardControls, SortDirection } from '../ui/CardControls'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
+import { useDeployments } from '../../hooks/useMCP'
 
 type SortByOption = 'status' | 'name' | 'clusters'
 
@@ -17,27 +18,16 @@ interface AppStatusProps {
   config?: any
 }
 
-// Demo data
-const rawApps = [
-  {
-    name: 'api-gateway',
-    clusters: ['vllm-d', 'prod-east', 'prod-west'],
-    status: { healthy: 3, warning: 0, pending: 0 },
-  },
-  {
-    name: 'frontend',
-    clusters: ['vllm-d', 'prod-east'],
-    status: { healthy: 1, warning: 1, pending: 0 },
-  },
-  {
-    name: 'worker-service',
-    clusters: ['prod-east', 'prod-west'],
-    status: { healthy: 1, warning: 0, pending: 1 },
-  },
-]
+interface AppData {
+  name: string
+  namespace: string
+  clusters: string[]
+  status: { healthy: number; warning: number; pending: number }
+}
 
 export function AppStatus(_props: AppStatusProps) {
   const { drillToDeployment } = useDrillDownActions()
+  const { deployments, isLoading } = useDeployments()
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -47,6 +37,40 @@ export function AppStatus(_props: AppStatusProps) {
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
 
+  // Transform deployments into app data grouped by name
+  const rawApps = useMemo((): AppData[] => {
+    const appMap = new Map<string, AppData>()
+
+    deployments.forEach(dep => {
+      const key = dep.name
+      if (!appMap.has(key)) {
+        appMap.set(key, {
+          name: dep.name,
+          namespace: dep.namespace,
+          clusters: [],
+          status: { healthy: 0, warning: 0, pending: 0 },
+        })
+      }
+      const app = appMap.get(key)!
+      const clusterName = dep.cluster?.split('/').pop() || dep.cluster || 'unknown'
+      if (!app.clusters.includes(clusterName)) {
+        app.clusters.push(clusterName)
+      }
+      // Determine status based on deployment state
+      if (dep.status === 'running' && dep.readyReplicas === dep.replicas) {
+        app.status.healthy++
+      } else if (dep.status === 'deploying' || dep.readyReplicas < dep.replicas) {
+        app.status.pending++
+      } else if (dep.status === 'failed') {
+        app.status.warning++
+      } else {
+        app.status.healthy++
+      }
+    })
+
+    return Array.from(appMap.values())
+  }, [deployments])
+
   const apps = useMemo(() => {
     // Apply global filters first
     let filtered = rawApps
@@ -55,7 +79,7 @@ export function AppStatus(_props: AppStatusProps) {
     if (!isAllClustersSelected) {
       filtered = filtered.map(app => ({
         ...app,
-        clusters: app.clusters.filter(c => globalSelectedClusters.includes(c))
+        clusters: app.clusters.filter(c => globalSelectedClusters.some(gc => gc.includes(c) || c.includes(gc.split('/').pop() || gc)))
       })).filter(app => app.clusters.length > 0)
     }
 
@@ -81,18 +105,26 @@ export function AppStatus(_props: AppStatusProps) {
     })
     if (limit === 'unlimited') return sorted
     return sorted.slice(0, limit)
-  }, [sortBy, sortDirection, limit, globalSelectedClusters, isAllClustersSelected, customFilter])
+  }, [rawApps, sortBy, sortDirection, limit, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  const handleAppClick = (appName: string, cluster: string) => {
-    // Drill down to the deployment in the first cluster
-    drillToDeployment(cluster, 'default', appName)
+  const handleAppClick = (app: AppData, cluster: string) => {
+    // Drill down to the deployment in the specified cluster
+    drillToDeployment(cluster, app.namespace, app.name)
+  }
+
+  if (isLoading && rawApps.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
   }
 
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-muted-foreground">App Status</span>
+        <span className="text-sm font-medium text-muted-foreground">Workload Status</span>
         <CardControls
           limit={limit}
           onLimitChange={setLimit}
@@ -105,13 +137,17 @@ export function AppStatus(_props: AppStatusProps) {
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto">
-      {apps.map((app) => {
+      {apps.length === 0 ? (
+        <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+          No workloads found
+        </div>
+      ) : apps.map((app) => {
         const total = app.status.healthy + app.status.warning + app.status.pending
 
         return (
           <div
-            key={app.name}
-            onClick={() => handleAppClick(app.name, app.clusters[0])}
+            key={`${app.name}-${app.namespace}`}
+            onClick={() => handleAppClick(app, app.clusters[0])}
             className="p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer group"
             title={`Click to view details for ${app.name}`}
           >

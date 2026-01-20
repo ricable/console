@@ -1,4 +1,5 @@
-import { Pencil, Loader2, Globe, User, ShieldAlert, ChevronRight, Star, WifiOff, RefreshCw } from 'lucide-react'
+import { memo } from 'react'
+import { Pencil, Globe, User, ShieldAlert, ChevronRight, Star, WifiOff, RefreshCw } from 'lucide-react'
 import { ClusterInfo } from '../../../hooks/useMCP'
 import { StatusIndicator } from '../../charts/StatusIndicator'
 import { isClusterUnreachable, isClusterLoading } from '../utils'
@@ -20,7 +21,7 @@ interface ClusterGridProps {
   onRefreshCluster?: (clusterName: string) => void
 }
 
-export function ClusterGrid({
+export const ClusterGrid = memo(function ClusterGrid({
   clusters,
   gpuByCluster,
   isConnected,
@@ -49,8 +50,8 @@ export function ClusterGrid({
         const hasCachedData = cluster.nodeCount !== undefined && cluster.nodeCount > 0
         // Only show initial loading state when we don't have cached data
         const initialLoading = loading && !hasCachedData
-        // Show refreshing state when we have data but refresh is in progress
-        const refreshing = cluster.refreshing === true && hasCachedData
+        // Show refreshing state when manual refresh is in progress (works for all clusters including unreachable)
+        const refreshing = cluster.refreshing === true
 
         // Determine status: initialLoading > unreachable > refreshing > healthy
         const status = initialLoading ? 'loading' : unreachable ? 'warning' : 'healthy'
@@ -80,7 +81,13 @@ export function ClusterGrid({
             </div>
             <div className="flex items-start justify-between mb-4 relative z-10">
               <div className="flex items-center gap-3">
-                <StatusIndicator status={status} size="lg" showLabel={false} />
+                {unreachable ? (
+                  <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center" title="Offline - check network connection">
+                    <WifiOff className="w-4 h-4 text-yellow-400" />
+                  </div>
+                ) : (
+                  <StatusIndicator status={status} size="lg" showLabel={false} />
+                )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <span
@@ -134,7 +141,7 @@ export function ClusterGrid({
                     <Star className="w-3.5 h-3.5 fill-current" />
                   </span>
                 )}
-                {refreshing && (
+                {refreshing && !unreachable && (
                   <span
                     className="flex items-center px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400"
                     title="Refreshing cluster data..."
@@ -142,27 +149,17 @@ export function ClusterGrid({
                     <RefreshCw className="w-3.5 h-3.5 animate-spin" />
                   </span>
                 )}
-                {unreachable && (
-                  <div className="flex items-center gap-1">
-                    <span
-                      className="flex items-center px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400"
-                      title="Unreachable - check network connection"
-                    >
-                      <WifiOff className="w-3.5 h-3.5" />
-                    </span>
-                    {onRefreshCluster && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onRefreshCluster(cluster.name)
-                        }}
-                        className="flex items-center px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors"
-                        title="Retry connection"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
+                {unreachable && onRefreshCluster && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRefreshCluster(cluster.name)
+                    }}
+                    className="flex items-center px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors"
+                    title="Retry connection"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  </button>
                 )}
                 {!permissionsLoading && !isClusterAdmin(cluster.name) && !unreachable && (
                   <span
@@ -177,27 +174,27 @@ export function ClusterGrid({
             </div>
 
             <div className="grid grid-cols-4 gap-4 text-center relative z-10">
-              <div title={initialLoading ? 'Checking...' : refreshing ? `${cluster.nodeCount || 0} nodes (updating...)` : unreachable ? 'Unreachable - showing cached data' : `${cluster.nodeCount || 0} worker nodes`}>
+              <div title={unreachable ? 'Offline' : hasCachedData ? `${cluster.nodeCount} worker nodes` : 'Loading...'}>
                 <div className={`text-lg font-bold ${refreshing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (cluster.nodeCount || (unreachable && hasCachedData ? cluster.nodeCount : '-'))}
+                  {hasCachedData ? cluster.nodeCount : '-'}
                 </div>
                 <div className="text-xs text-muted-foreground">Nodes</div>
               </div>
-              <div title={initialLoading ? 'Checking...' : refreshing ? `${cluster.cpuCores || 0} CPUs (updating...)` : unreachable ? 'Unreachable - showing cached data' : `${cluster.cpuCores || 0} CPU cores`}>
+              <div title={unreachable ? 'Offline' : hasCachedData ? `${cluster.cpuCores} CPU cores` : 'Loading...'}>
                 <div className={`text-lg font-bold ${refreshing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (cluster.cpuCores || (unreachable && hasCachedData ? cluster.cpuCores : '-'))}
+                  {hasCachedData ? cluster.cpuCores : '-'}
                 </div>
                 <div className="text-xs text-muted-foreground">CPUs</div>
               </div>
-              <div title={initialLoading ? 'Checking...' : refreshing ? `${cluster.podCount || 0} pods (updating...)` : unreachable ? 'Unreachable - showing cached data' : `${cluster.podCount || 0} running pods`}>
+              <div title={unreachable ? 'Offline' : hasCachedData ? `${cluster.podCount} running pods` : 'Loading...'}>
                 <div className={`text-lg font-bold ${refreshing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (cluster.podCount || (unreachable && hasCachedData ? cluster.podCount : '-'))}
+                  {hasCachedData ? cluster.podCount : '-'}
                 </div>
                 <div className="text-xs text-muted-foreground">Pods</div>
               </div>
-              <div title={initialLoading ? 'Checking...' : refreshing ? 'GPUs (updating...)' : unreachable ? 'Unreachable - no GPU data available' : gpuInfo ? `${gpuInfo.allocated} allocated / ${gpuInfo.total} total GPUs` : 'No GPUs detected'}>
+              <div title={unreachable ? 'Offline' : gpuInfo ? `${gpuInfo.allocated} allocated / ${gpuInfo.total} total GPUs` : 'No GPUs detected'}>
                 <div className={`text-lg font-bold ${refreshing ? 'text-muted-foreground' : 'text-foreground'}`}>
-                  {initialLoading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : (gpuInfo ? `${gpuInfo.allocated}/${gpuInfo.total}` : (unreachable ? '-' : '0'))}
+                  {hasCachedData ? (gpuInfo ? gpuInfo.total : 0) : '-'}
                 </div>
                 <div className="text-xs text-muted-foreground">GPUs</div>
               </div>
@@ -215,4 +212,4 @@ export function ClusterGrid({
       })}
     </div>
   )
-}
+})

@@ -449,7 +449,7 @@ export function NamespaceManager() {
                         })
                       }}
                       className="flex items-center gap-2 w-full text-left mb-2 group"
-                      title={isCollapsed ? 'Expand cluster' : isUnreachable ? `Cluster unreachable - check network connection` : 'Collapse cluster'}
+                      title={isCollapsed ? 'Expand cluster' : isUnreachable ? `Cluster offline - check network connection` : 'Collapse cluster'}
                     >
                       {isCollapsed ? (
                         <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-white transition-colors" />
@@ -458,13 +458,13 @@ export function NamespaceManager() {
                       )}
                       <ClusterBadge cluster={clusterName} size="sm" />
                       {isUnreachable && (
-                        <span title="Cluster unreachable">
+                        <span title="Cluster offline">
                           <WifiOff className="w-4 h-4 text-yellow-400" />
                         </span>
                       )}
                       <span className="text-sm text-muted-foreground">
                         {isUnreachable ? (
-                          <span className="text-yellow-400">unreachable</span>
+                          <span className="text-yellow-400">offline</span>
                         ) : isClusterLoading ? (
                           <span className="flex items-center gap-1.5">
                             <Hourglass className="w-3 h-3 animate-pulse" />
@@ -480,10 +480,10 @@ export function NamespaceManager() {
                     {!isCollapsed && (
                       <div className="space-y-2 ml-6">
                         {isUnreachable ? (
-                          // Show unreachable message for unreachable clusters
+                          // Show offline message for offline clusters
                           <div className="flex items-center gap-2 py-2 px-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                             <WifiOff className="w-4 h-4 text-yellow-400" />
-                            <span className="text-sm text-yellow-400">Cluster unreachable - cannot fetch namespaces</span>
+                            <span className="text-sm text-yellow-400">Cluster offline - cannot fetch namespaces</span>
                           </div>
                         ) : isClusterLoading && !hasData ? (
                           // Show skeleton for loading clusters (only on initial load, not refresh)

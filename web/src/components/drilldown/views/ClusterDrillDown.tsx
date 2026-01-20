@@ -82,7 +82,7 @@ export function ClusterDrillDown({ data }: Props) {
             <span className="text-sm text-muted-foreground">Status</span>
           </div>
           <div className="text-2xl font-bold text-foreground">
-            {health?.reachable === false ? 'Unreachable' : health?.healthy ? 'Healthy' : 'Unhealthy'}
+            {health?.reachable === false ? 'Offline' : health?.healthy ? 'Healthy' : 'Unhealthy'}
           </div>
         </div>
 

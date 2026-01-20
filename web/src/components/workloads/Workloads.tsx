@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Layers, Plus, Layout, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Activity, FolderOpen, AlertTriangle, AlertCircle, ListChecks, Hourglass } from 'lucide-react'
-import { useDeploymentIssues, usePodIssues, useClusters } from '../../hooks/useMCP'
+import { useDeploymentIssues, usePodIssues, useClusters, useDeployments } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
@@ -51,8 +51,9 @@ export function Workloads() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastUpdated, refetch: refetchPodIssues } = usePodIssues()
   const { issues: deploymentIssues, isLoading: deploymentIssuesLoading, isRefreshing: deploymentIssuesRefreshing, refetch: refetchDeploymentIssues } = useDeploymentIssues()
+  const { deployments: allDeployments, isLoading: deploymentsLoading, isRefreshing: deploymentsRefreshing, refetch: refetchDeployments } = useDeployments()
   const { clusters, isLoading: clustersLoading, refetch: refetchClusters } = useClusters()
-  const { drillToNamespace, drillToPod, drillToDeployment } = useDrillDownActions()
+  const { drillToNamespace } = useDrillDownActions()
 
   // Card state
   const [cards, setCards] = useState<WorkloadCard[]>(() => loadWorkloadCards())
@@ -64,11 +65,11 @@ export function Workloads() {
   const [autoRefresh, setAutoRefresh] = useState(true)
 
   // Combined loading/refreshing states
-  const isLoading = podIssuesLoading || deploymentIssuesLoading || clustersLoading
-  const isRefreshing = podIssuesRefreshing || deploymentIssuesRefreshing
+  const isLoading = podIssuesLoading || deploymentIssuesLoading || deploymentsLoading || clustersLoading
+  const isRefreshing = podIssuesRefreshing || deploymentIssuesRefreshing || deploymentsRefreshing
   const isFetching = isLoading || isRefreshing
   // Only show skeletons when we have no data yet
-  const showSkeletons = (podIssues.length === 0 && deploymentIssues.length === 0) && isLoading
+  const showSkeletons = (allDeployments.length === 0 && podIssues.length === 0 && deploymentIssues.length === 0) && isLoading
 
   // Save cards to localStorage when they change
   useEffect(() => {
@@ -88,17 +89,18 @@ export function Workloads() {
     if (!autoRefresh) return
 
     const interval = setInterval(() => {
-      Promise.all([refetchPodIssues(), refetchDeploymentIssues(), refetchClusters()])
+      Promise.all([refetchPodIssues(), refetchDeploymentIssues(), refetchDeployments(), refetchClusters()])
     }, 30000)
 
     return () => clearInterval(interval)
-  }, [autoRefresh, refetchPodIssues, refetchDeploymentIssues, refetchClusters])
+  }, [autoRefresh, refetchPodIssues, refetchDeploymentIssues, refetchDeployments, refetchClusters])
 
   const handleRefresh = useCallback(() => {
     refetchPodIssues()
     refetchDeploymentIssues()
+    refetchDeployments()
     refetchClusters()
-  }, [refetchPodIssues, refetchDeploymentIssues, refetchClusters])
+  }, [refetchPodIssues, refetchDeploymentIssues, refetchDeployments, refetchClusters])
 
   const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
     const cardsToAdd: WorkloadCard[] = newCards.map(card => ({
@@ -153,11 +155,15 @@ export function Workloads() {
 
   // Group applications by namespace with global filter applied
   const apps = useMemo(() => {
-    // Filter issues by global cluster selection
+    // Filter deployments and issues by global cluster selection
+    let filteredDeployments = allDeployments
     let filteredPodIssues = podIssues
     let filteredDeploymentIssues = deploymentIssues
 
     if (!isAllClustersSelected) {
+      filteredDeployments = filteredDeployments.filter(d =>
+        d.cluster && globalSelectedClusters.includes(d.cluster)
+      )
       filteredPodIssues = filteredPodIssues.filter(issue =>
         issue.cluster && globalSelectedClusters.includes(issue.cluster)
       )
@@ -166,11 +172,14 @@ export function Workloads() {
       )
     }
 
-    // Note: Status filter not applied here as issues represent problems, not running state
-
     // Apply custom text filter
     if (customFilter.trim()) {
       const query = customFilter.toLowerCase()
+      filteredDeployments = filteredDeployments.filter(d =>
+        d.name.toLowerCase().includes(query) ||
+        d.namespace.toLowerCase().includes(query) ||
+        (d.cluster && d.cluster.toLowerCase().includes(query))
+      )
       filteredPodIssues = filteredPodIssues.filter(issue =>
         issue.name.toLowerCase().includes(query) ||
         issue.namespace.toLowerCase().includes(query) ||
@@ -185,7 +194,24 @@ export function Workloads() {
 
     const appMap = new Map<string, AppSummary>()
 
-    // Group pod issues by namespace
+    // First, populate from ALL deployments (not just issues)
+    filteredDeployments.forEach(deployment => {
+      const key = `${deployment.cluster}/${deployment.namespace}`
+      if (!appMap.has(key)) {
+        appMap.set(key, {
+          namespace: deployment.namespace,
+          cluster: deployment.cluster || 'unknown',
+          deploymentCount: 0,
+          podIssues: 0,
+          deploymentIssues: 0,
+          status: 'healthy',
+        })
+      }
+      const app = appMap.get(key)!
+      app.deploymentCount++
+    })
+
+    // Add pod issues to the map
     filteredPodIssues.forEach(issue => {
       const key = `${issue.cluster}/${issue.namespace}`
       if (!appMap.has(key)) {
@@ -203,7 +229,7 @@ export function Workloads() {
       app.status = app.podIssues > 3 ? 'error' : 'warning'
     })
 
-    // Group deployment issues by namespace
+    // Add deployment issues to the map
     filteredDeploymentIssues.forEach(issue => {
       const key = `${issue.cluster}/${issue.namespace}`
       if (!appMap.has(key)) {
@@ -217,7 +243,6 @@ export function Workloads() {
         })
       }
       const app = appMap.get(key)!
-      app.deploymentCount++
       app.deploymentIssues++
       if (app.status !== 'error') {
         app.status = 'warning'
@@ -225,20 +250,22 @@ export function Workloads() {
     })
 
     return Array.from(appMap.values()).sort((a, b) => {
-      // Sort by status (critical first), then by issue count
+      // Sort by status (critical first), then by deployment count
       const statusOrder: Record<string, number> = { error: 0, critical: 0, warning: 1, healthy: 2 }
       if (statusOrder[a.status] !== statusOrder[b.status]) {
         return statusOrder[a.status] - statusOrder[b.status]
       }
-      return (b.podIssues + b.deploymentIssues) - (a.podIssues + a.deploymentIssues)
+      // Then sort by deployment count (more deployments = more important)
+      return b.deploymentCount - a.deploymentCount
     })
-  }, [podIssues, deploymentIssues, globalSelectedClusters, isAllClustersSelected, customFilter])
+  }, [allDeployments, podIssues, deploymentIssues, globalSelectedClusters, isAllClustersSelected, customFilter])
 
   const stats = useMemo(() => ({
     total: apps.length,
     healthy: apps.filter(a => a.status === 'healthy').length,
     warning: apps.filter(a => a.status === 'warning').length,
     critical: apps.filter(a => a.status === 'error').length,
+    totalDeployments: apps.reduce((sum, a) => sum + a.deploymentCount, 0),
     totalPodIssues: podIssues.length,
     totalDeploymentIssues: deploymentIssues.length,
   }), [apps, podIssues, deploymentIssues])
@@ -378,23 +405,20 @@ export function Workloads() {
                   <div className="text-xs text-muted-foreground">warning issues</div>
                 </div>
                 <div
-                  className={`glass p-4 rounded-lg ${(stats.totalPodIssues + stats.totalDeploymentIssues) > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
+                  className={`glass p-4 rounded-lg ${stats.totalDeployments > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
                   onClick={() => {
-                    // Drill to first pod issue if available, otherwise first deployment issue
-                    if (podIssues.length > 0 && podIssues[0]) {
-                      drillToPod(podIssues[0].cluster || 'default', podIssues[0].namespace, podIssues[0].name)
-                    } else if (deploymentIssues.length > 0 && deploymentIssues[0]) {
-                      drillToDeployment(deploymentIssues[0].cluster || 'default', deploymentIssues[0].namespace, deploymentIssues[0].name)
+                    if (apps.length > 0 && apps[0]) {
+                      drillToNamespace(apps[0].cluster, apps[0].namespace)
                     }
                   }}
-                  title={(stats.totalPodIssues + stats.totalDeploymentIssues) > 0 ? `${stats.totalPodIssues} pod + ${stats.totalDeploymentIssues} deployment issues - Click to view` : 'No issues detected'}
+                  title={`${stats.totalDeployments} deployments across ${stats.total} namespaces`}
                 >
                   <div className="flex items-center gap-2 mb-2">
                     <ListChecks className="w-5 h-5 text-blue-400" />
-                    <span className="text-sm text-muted-foreground">Total</span>
+                    <span className="text-sm text-muted-foreground">Deployments</span>
                   </div>
-                  <div className="text-3xl font-bold text-foreground">{stats.totalPodIssues + stats.totalDeploymentIssues}</div>
-                  <div className="text-xs text-muted-foreground">total issues</div>
+                  <div className="text-3xl font-bold text-foreground">{stats.totalDeployments}</div>
+                  <div className="text-xs text-muted-foreground">total deployments</div>
                 </div>
               </>
             )}
@@ -511,8 +535,8 @@ export function Workloads() {
       />
 
       {/* Workloads List */}
-      {isLoading ? (
-        // Loading skeletons for workloads list
+      {showSkeletons ? (
+        // Loading skeletons for workloads list (only when no cached data)
         <div className="space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="glass p-4 rounded-lg border-l-4 border-l-gray-500/50">
@@ -531,9 +555,9 @@ export function Workloads() {
         </div>
       ) : apps.length === 0 ? (
         <div className="text-center py-12">
-          <div className="text-6xl mb-4">✨</div>
-          <p className="text-lg text-foreground">All systems healthy!</p>
-          <p className="text-sm text-muted-foreground">No application issues detected across your clusters</p>
+          <div className="text-6xl mb-4">📦</div>
+          <p className="text-lg text-foreground">No workloads found</p>
+          <p className="text-sm text-muted-foreground">No deployments detected across your clusters</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -557,10 +581,14 @@ export function Workloads() {
                 </div>
 
                 <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="text-lg font-bold text-foreground">{app.deploymentCount}</div>
+                    <div className="text-xs text-muted-foreground">Deployments</div>
+                  </div>
                   {app.deploymentIssues > 0 && (
                     <div className="text-center">
                       <div className="text-lg font-bold text-orange-400">{app.deploymentIssues}</div>
-                      <div className="text-xs text-muted-foreground">Deployment Issues</div>
+                      <div className="text-xs text-muted-foreground">Issues</div>
                     </div>
                   )}
                   {app.podIssues > 0 && (

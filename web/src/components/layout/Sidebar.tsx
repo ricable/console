@@ -147,7 +147,7 @@ export function Sidebar() {
               >
                 <span className="flex items-center gap-1.5 text-sm text-foreground">
                   <WifiOff className="w-3.5 h-3.5 text-yellow-400" />
-                  Unreachable
+                  Offline
                 </span>
                 <span className="text-sm font-medium text-yellow-400">{unreachableClusters}</span>
               </button>

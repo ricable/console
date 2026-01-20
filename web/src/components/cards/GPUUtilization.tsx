@@ -28,23 +28,35 @@ export function GPUUtilization() {
   const { clusters } = useClusters()
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
 
-  // Check if any selected clusters are reachable
+  // Filter by selected clusters AND exclude offline/unreachable clusters
   const filteredClusters = useMemo(() => {
-    if (isAllClustersSelected) return clusters
-    return clusters.filter(c => selectedClusters.includes(c.name))
+    const reachableClusters = clusters.filter(c => c.reachable !== false)
+    if (isAllClustersSelected) return reachableClusters
+    return reachableClusters.filter(c => selectedClusters.includes(c.name))
   }, [clusters, selectedClusters, isAllClustersSelected])
 
-  const hasReachableClusters = filteredClusters.some(c => c.reachable !== false && c.nodeCount !== undefined && c.nodeCount > 0)
+  // Get names of reachable clusters for node filtering
+  const reachableClusterNames = useMemo(() => {
+    return new Set(clusters.filter(c => c.reachable !== false).map(c => c.name))
+  }, [clusters])
+
+  const hasReachableClusters = filteredClusters.some(c => c.nodeCount !== undefined && c.nodeCount > 0)
 
   // Track historical data points
   const historyRef = useRef<GPUPoint[]>([])
   const [history, setHistory] = useState<GPUPoint[]>([])
 
-  // Filter by selected clusters
+  // Filter by selected clusters AND exclude nodes from offline/unreachable clusters
   const filteredNodes = useMemo(() => {
-    if (isAllClustersSelected) return gpuNodes
-    return gpuNodes.filter(n => selectedClusters.some(c => n.cluster.startsWith(c)))
-  }, [gpuNodes, selectedClusters, isAllClustersSelected])
+    // First filter to only nodes from reachable clusters
+    const reachableNodes = gpuNodes.filter(n => {
+      // Extract cluster name from the node's cluster field (may be prefixed)
+      const clusterName = n.cluster.split('/')[0]
+      return reachableClusterNames.has(clusterName)
+    })
+    if (isAllClustersSelected) return reachableNodes
+    return reachableNodes.filter(n => selectedClusters.some(c => n.cluster.startsWith(c)))
+  }, [gpuNodes, selectedClusters, isAllClustersSelected, reachableClusterNames])
 
   // Calculate current stats
   const currentStats = useMemo(() => {

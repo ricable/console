@@ -137,7 +137,7 @@ export function ResourcesDrillDown({ data: _data }: Props) {
                     <div>
                       <div className="font-medium text-foreground">{cluster.name.split('/').pop()}</div>
                       <div className="text-xs text-muted-foreground">
-                        {cluster.reachable !== false ? `${cluster.nodeCount ?? '-'} nodes • ${cluster.podCount ?? '-'} pods` : 'Cluster unreachable'}
+                        {cluster.reachable !== false ? `${cluster.nodeCount ?? '-'} nodes • ${cluster.podCount ?? '-'} pods` : 'Cluster offline'}
                       </div>
                     </div>
                   </div>

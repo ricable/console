@@ -29,16 +29,24 @@ export function PodHealthTrend() {
   const historyRef = useRef<HealthPoint[]>([])
   const [history, setHistory] = useState<HealthPoint[]>([])
 
-  // Filter by selected clusters
+  // Filter by selected clusters AND exclude offline/unreachable clusters
   const filteredClusters = useMemo(() => {
-    if (isAllClustersSelected) return clusters
-    return clusters.filter(c => selectedClusters.includes(c.name))
+    const reachableClusters = clusters.filter(c => c.reachable !== false)
+    if (isAllClustersSelected) return reachableClusters
+    return reachableClusters.filter(c => selectedClusters.includes(c.name))
   }, [clusters, selectedClusters, isAllClustersSelected])
 
+  // Get names of reachable clusters for issue filtering
+  const reachableClusterNames = useMemo(() => {
+    return new Set(clusters.filter(c => c.reachable !== false).map(c => c.name))
+  }, [clusters])
+
   const filteredIssues = useMemo(() => {
-    if (isAllClustersSelected) return issues
-    return issues.filter(i => i.cluster && selectedClusters.includes(i.cluster))
-  }, [issues, selectedClusters, isAllClustersSelected])
+    // First filter to only issues from reachable clusters
+    const reachableIssues = issues.filter(i => i.cluster && reachableClusterNames.has(i.cluster))
+    if (isAllClustersSelected) return reachableIssues
+    return reachableIssues.filter(i => i.cluster && selectedClusters.includes(i.cluster))
+  }, [issues, selectedClusters, isAllClustersSelected, reachableClusterNames])
 
   // Calculate current stats
   const currentStats = useMemo(() => {

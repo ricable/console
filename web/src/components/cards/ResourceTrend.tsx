@@ -33,10 +33,11 @@ export function ResourceTrend() {
   const historyRef = useRef<ResourcePoint[]>([])
   const [history, setHistory] = useState<ResourcePoint[]>([])
 
-  // Filter by selected clusters
+  // Filter by selected clusters AND exclude offline/unreachable clusters
   const filteredClusters = useMemo(() => {
-    if (isAllClustersSelected) return clusters
-    return clusters.filter(c => selectedClusters.includes(c.name))
+    const reachableClusters = clusters.filter(c => c.reachable !== false)
+    if (isAllClustersSelected) return reachableClusters
+    return reachableClusters.filter(c => selectedClusters.includes(c.name))
   }, [clusters, selectedClusters, isAllClustersSelected])
 
   // Calculate current totals
