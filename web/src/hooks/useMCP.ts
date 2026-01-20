@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { api } from '../lib/api'
 import { reportAgentDataError, reportAgentDataSuccess } from './useLocalAgent'
+import { getDemoMode, useDemoMode } from './useDemoMode'
 
 // Refresh interval for automatic polling (2 minutes) - manual refresh bypasses this
 const REFRESH_INTERVAL_MS = 120000
@@ -846,6 +847,17 @@ let fetchInProgress = false
 // Full refetch - updates shared cache with loading state
 // Deduplicates concurrent calls - only one fetch runs at a time
 async function fullFetchClusters() {
+  // If demo mode is enabled, use demo data instead of fetching
+  if (getDemoMode()) {
+    updateClusterCache({
+      clusters: getDemoClusters(),
+      isLoading: false,
+      isRefreshing: false,
+      error: null,
+    })
+    return
+  }
+
   // If a fetch is already in progress, skip this call (deduplication)
   if (fetchInProgress) {
     return
@@ -1014,6 +1026,8 @@ export async function refreshSingleCluster(clusterName: string): Promise<void> {
 export function useClusters() {
   // Local state that syncs with shared cache
   const [localState, setLocalState] = useState<ClusterCache>(clusterCache)
+  // Track demo mode to re-fetch when it changes
+  const { isDemoMode } = useDemoMode()
 
   // Subscribe to shared cache updates
   useEffect(() => {
@@ -1030,6 +1044,15 @@ export function useClusters() {
       clusterSubscribers.delete(handleUpdate)
     }
   }, [])
+
+  // Re-fetch when demo mode changes
+  useEffect(() => {
+    // Reset fetch flag to allow re-fetching
+    initialFetchStarted = false
+    fullFetchClusters()
+    // Also refetch GPU nodes
+    fetchGPUNodes()
+  }, [isDemoMode])
 
   // Trigger initial fetch only once (shared across all hook instances)
   useEffect(() => {
@@ -1107,6 +1130,14 @@ export function useClusterHealth(cluster?: string) {
   const [error, setError] = useState<string | null>(null)
 
   const refetch = useCallback(async () => {
+    // If demo mode is enabled, use demo data
+    if (getDemoMode()) {
+      setHealth(getDemoHealth(cluster))
+      setIsLoading(false)
+      setError(null)
+      return
+    }
+
     setIsLoading(true)
     try {
       const url = cluster ? `/api/mcp/clusters/${cluster}/health` : '/api/mcp/clusters/health'
@@ -2149,6 +2180,17 @@ function updateGPUNodeCache(updates: Partial<GPUNodeCache>) {
 // Fetch GPU nodes (shared across all consumers)
 let gpuFetchInProgress = false
 async function fetchGPUNodes(cluster?: string) {
+  // If demo mode is enabled, use demo data instead of fetching
+  if (getDemoMode()) {
+    updateGPUNodeCache({
+      nodes: getDemoGPUNodes(),
+      lastUpdated: new Date(),
+      isLoading: false,
+      error: null,
+    })
+    return
+  }
+
   if (gpuFetchInProgress) return
   gpuFetchInProgress = true
 

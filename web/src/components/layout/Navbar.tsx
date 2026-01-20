@@ -6,6 +6,7 @@ import { useAuth } from '../../lib/auth'
 import { useTheme } from '../../hooks/useTheme'
 import { useTokenUsage } from '../../hooks/useTokenUsage'
 import { useLocalAgent } from '../../hooks/useLocalAgent'
+import { useDemoMode } from '../../hooks/useDemoMode'
 import { useGlobalFilters, SEVERITY_LEVELS, SEVERITY_CONFIG, STATUS_LEVELS, STATUS_CONFIG } from '../../hooks/useGlobalFilters'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
 import { languages } from '../../lib/i18n'
@@ -43,6 +44,7 @@ export function Navbar() {
   const { theme, toggleTheme } = useTheme()
   const { usage, alertLevel, percentage, remaining } = useTokenUsage()
   const { status: agentStatus, health: agentHealth, connectionEvents, isConnected, isDegraded, dataErrorCount, lastDataError } = useLocalAgent()
+  const { isDemoMode, toggleDemoMode } = useDemoMode()
   const {
     selectedClusters,
     toggleCluster,
@@ -628,7 +630,9 @@ export function Navbar() {
             onClick={() => setShowAgentStatus(!showAgentStatus)}
             className={cn(
               'flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors',
-              isDegraded
+              isDemoMode
+                ? 'bg-purple-500/10 text-purple-400 hover:bg-purple-500/20'
+                : isDegraded
                 ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                 : isConnected
                 ? 'bg-green-500/10 text-green-400 hover:bg-green-500/20'
@@ -636,46 +640,84 @@ export function Navbar() {
                 ? 'bg-yellow-500/10 text-yellow-400 hover:bg-yellow-500/20'
                 : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
             )}
-            title={isDegraded ? `KKC Agent degraded (${dataErrorCount} errors)` : isConnected ? 'KKC Agent connected' : agentStatus === 'connecting' ? 'Connecting to agent...' : 'KKC Agent disconnected'}
+            title={isDemoMode ? 'Demo Mode - showing sample data' : isDegraded ? `KKC Agent degraded (${dataErrorCount} errors)` : isConnected ? 'KKC Agent connected' : agentStatus === 'connecting' ? 'Connecting to agent...' : 'KKC Agent disconnected'}
           >
-            {isConnected ? (
+            {isDemoMode ? (
+              <Box className="w-4 h-4" />
+            ) : isConnected ? (
               <Wifi className="w-4 h-4" />
             ) : (
               <WifiOff className="w-4 h-4" />
             )}
+            {isDemoMode && (
+              <span className="text-xs font-medium hidden sm:inline">Demo</span>
+            )}
             <span className={cn(
               'w-2 h-2 rounded-full',
-              isDegraded ? 'bg-yellow-400 animate-pulse' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
+              isDemoMode ? 'bg-purple-400' : isDegraded ? 'bg-yellow-400 animate-pulse' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' : 'bg-red-400'
             )} />
           </button>
 
           {/* Agent status dropdown */}
           {showAgentStatus && (
             <div className="absolute top-full right-0 mt-2 w-72 bg-card border border-border rounded-lg shadow-xl z-50">
+              {/* Demo Mode Toggle */}
+              <div className="p-3 border-b border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Box className="w-4 h-4 text-purple-400" />
+                    <span className="text-sm font-medium text-foreground">Demo Mode</span>
+                  </div>
+                  <button
+                    onClick={toggleDemoMode}
+                    className={cn(
+                      'relative w-11 h-6 rounded-full transition-colors',
+                      isDemoMode ? 'bg-purple-500' : 'bg-secondary'
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'absolute top-1 w-4 h-4 bg-white rounded-full transition-transform shadow-sm',
+                        isDemoMode ? 'translate-x-6' : 'translate-x-1'
+                      )}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {isDemoMode
+                    ? 'Showing sample data with all cloud providers'
+                    : 'Enable to view demo data without agent connection'
+                  }
+                </p>
+              </div>
+
+              {/* Agent Status */}
               <div className="p-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <div className={cn(
                     'w-3 h-3 rounded-full',
-                    isDegraded ? 'bg-yellow-400' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
+                    isDemoMode ? 'bg-gray-400' : isDegraded ? 'bg-yellow-400' : isConnected ? 'bg-green-400' : agentStatus === 'connecting' ? 'bg-yellow-400' : 'bg-red-400'
                   )} />
-                  <span className="text-sm font-medium text-foreground">
-                    KKC Agent: {isDegraded ? 'Degraded' : isConnected ? 'Connected' : agentStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
+                  <span className={cn('text-sm font-medium', isDemoMode ? 'text-muted-foreground' : 'text-foreground')}>
+                    KKC Agent: {isDemoMode ? 'Bypassed' : isDegraded ? 'Degraded' : isConnected ? 'Connected' : agentStatus === 'connecting' ? 'Connecting...' : 'Disconnected'}
                   </span>
-                  {isConnected && agentHealth?.version && agentHealth.version !== 'demo' && (
+                  {!isDemoMode && isConnected && agentHealth?.version && agentHealth.version !== 'demo' && (
                     <span className="text-xs text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
                       v{agentHealth.version}
                     </span>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {isDegraded
+                  {isDemoMode
+                    ? 'Agent connection bypassed in demo mode'
+                    : isDegraded
                     ? `Connected but experiencing data errors (${dataErrorCount} in last minute)`
                     : isConnected
                     ? `Connected to local agent at 127.0.0.1:8585`
                     : 'Unable to connect to local agent'
                   }
                 </p>
-                {isDegraded && lastDataError && (
+                {!isDemoMode && isDegraded && lastDataError && (
                   <p className="text-xs text-yellow-400 mt-1">
                     Last error: {lastDataError}
                   </p>
