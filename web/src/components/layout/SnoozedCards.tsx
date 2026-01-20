@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Clock, X, ArrowRight, Bell, Lightbulb, Plus, Zap, AlertTriangle, Shield, Server, Scale, Activity } from 'lucide-react'
+import { Clock, X, ArrowRight, Bell, Lightbulb, Zap, AlertTriangle, Shield, Server, Scale, Activity } from 'lucide-react'
 import { useSnoozedCards, formatTimeRemaining, SnoozedSwap } from '../../hooks/useSnoozedCards'
 import { useSnoozedRecommendations, formatElapsedTime, SnoozedRecommendation } from '../../hooks/useSnoozedRecommendations'
 import { useSnoozedMissions, SnoozedMission, formatTimeRemaining as formatMissionTimeRemaining } from '../../hooks/useSnoozedMissions'
@@ -293,7 +293,7 @@ function SnoozedRecommendationItem({ rec, onApply, onDismiss }: SnoozedRecommend
           <button
             onClick={onApply}
             className={cn(
-              'px-2 py-0.5 rounded transition-colors flex items-center gap-1',
+              'px-2 py-0.5 rounded transition-colors',
               rec.recommendation.priority === 'high'
                 ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
                 : rec.recommendation.priority === 'medium'
@@ -301,8 +301,7 @@ function SnoozedRecommendationItem({ rec, onApply, onDismiss }: SnoozedRecommend
                 : 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30'
             )}
           >
-            <Plus className="w-3 h-3" />
-            Add
+            Restore
           </button>
         )}
       </div>
