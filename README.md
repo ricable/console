@@ -96,6 +96,71 @@ Console uses the `klaude-ops` and `klaude-deploy` MCP servers to fetch data from
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+## KKC Agent (Local Agent)
+
+The **kkc-agent** is a local agent that runs on your machine and bridges the browser-based console to your local kubeconfig and Claude Code CLI. This allows the hosted console to access your clusters without exposing your kubeconfig over the internet.
+
+### Installation
+
+```bash
+brew tap kubestellar/tap
+brew install --head kkc-agent
+```
+
+### Running the Agent
+
+```bash
+# Start the agent (runs on localhost:8585)
+kkc-agent
+
+# Or run as a background service
+brew services start kubestellar/tap/kkc-agent
+```
+
+### Configuration
+
+The agent supports the following environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `KKC_ALLOWED_ORIGINS` | Comma-separated list of allowed origins for CORS | localhost only |
+| `KKC_AGENT_TOKEN` | Optional shared secret for authentication | (none) |
+
+#### Adding Custom Origins
+
+If you're running the console on a custom domain, add it to the allowed origins:
+
+```bash
+# Single origin
+KKC_ALLOWED_ORIGINS="https://my-console.example.com" kkc-agent
+
+# Multiple origins
+KKC_ALLOWED_ORIGINS="https://console1.example.com,https://console2.example.com" kkc-agent
+```
+
+#### Running as a Service with Custom Origins
+
+To persist the configuration when running as a brew service, add to your shell profile (`~/.zshrc` or `~/.bashrc`):
+
+```bash
+export KKC_ALLOWED_ORIGINS="https://my-console.example.com"
+```
+
+Then restart the service:
+
+```bash
+brew services restart kubestellar/tap/kkc-agent
+```
+
+### Security
+
+The agent implements several security measures:
+
+- **Origin Validation**: Only allows connections from configured origins (localhost by default)
+- **Localhost Only**: Binds to `127.0.0.1` - not accessible from other machines
+- **Optional Token Auth**: Can require a shared secret via `KKC_AGENT_TOKEN`
+- **Command Allowlist**: Only permits safe kubectl commands (get, describe, logs, etc.)
+
 ## Available Card Types
 
 | Card Type | Description | Data Source |
