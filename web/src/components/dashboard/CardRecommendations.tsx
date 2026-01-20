@@ -1,11 +1,29 @@
 import { useState } from 'react'
-import { Clock } from 'lucide-react'
+import { Clock, ChevronDown, X, Plus, AlertTriangle, Info, Lightbulb } from 'lucide-react'
 import { useCardRecommendations, CardRecommendation } from '../../hooks/useCardRecommendations'
 import { useSnoozedRecommendations } from '../../hooks/useSnoozedRecommendations'
 
 interface Props {
   currentCardTypes: string[]
   onAddCard: (cardType: string, config?: Record<string, unknown>) => void
+}
+
+const PRIORITY_STYLES = {
+  high: {
+    bg: 'bg-red-500/20',
+    border: 'border-red-500/30',
+    text: 'text-red-400',
+  },
+  medium: {
+    bg: 'bg-yellow-500/20',
+    border: 'border-yellow-500/30',
+    text: 'text-yellow-400',
+  },
+  low: {
+    bg: 'bg-blue-500/20',
+    border: 'border-blue-500/30',
+    text: 'text-blue-400',
+  },
 }
 
 export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
@@ -16,15 +34,20 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
 
   const handleAddCard = async (rec: CardRecommendation) => {
     setAddingCard(rec.id)
-    // Simulate a brief delay for visual feedback
     await new Promise(resolve => setTimeout(resolve, 300))
     onAddCard(rec.cardType, rec.config)
     setAddingCard(null)
     setExpandedRec(null)
   }
 
-  const handleSnooze = (rec: CardRecommendation) => {
+  const handleSnooze = (e: React.MouseEvent, rec: CardRecommendation) => {
+    e.stopPropagation()
     snoozeRecommendation(rec)
+    setExpandedRec(null)
+  }
+
+  const handleDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation()
     setExpandedRec(null)
   }
 
@@ -33,127 +56,111 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
 
   if (!hasRecommendations || visibleRecommendations.length === 0) return null
 
-  const priorityColor = (priority: string) => {
+  const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'high': return 'bg-red-500/20 text-red-400 border-red-500/30'
-      case 'medium': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-      default: return 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-    }
-  }
-
-  const priorityIcon = (priority: string) => {
-    switch (priority) {
-      case 'high':
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        )
-      case 'medium':
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-          </svg>
-        )
+      case 'high': return AlertTriangle
+      case 'medium': return Info
+      default: return Lightbulb
     }
   }
 
   return (
-    <div data-tour="recommendations" className="mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-        </svg>
-        <h3 className="text-sm font-medium text-foreground">AI Recommendations</h3>
+    <div data-tour="recommendations" className="mb-4">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1.5 text-muted-foreground mr-1">
+          <Lightbulb className="w-4 h-4 text-primary" />
+          <span className="text-xs font-medium">AI:</span>
+        </div>
+
+        {/* Inline recommendation chips */}
+        {visibleRecommendations.slice(0, 6).map((rec) => {
+          const style = PRIORITY_STYLES[rec.priority as keyof typeof PRIORITY_STYLES] || PRIORITY_STYLES.low
+          const isExpanded = expandedRec === rec.id
+          const isAdding = addingCard === rec.id
+          const Icon = getPriorityIcon(rec.priority)
+
+          return (
+            <div key={rec.id} className="relative">
+              {/* Compact chip */}
+              <button
+                onClick={() => setExpandedRec(isExpanded ? null : rec.id)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-all hover:scale-105 ${style.border} ${style.bg} ${style.text}`}
+              >
+                <Icon className="w-3 h-3" />
+                <span className="max-w-[150px] truncate">{rec.title}</span>
+                {rec.priority === 'high' && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                )}
+                {isAdding && <div className="spinner w-3 h-3" />}
+                <ChevronDown className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Expanded dropdown */}
+              {isExpanded && (
+                <div className={`absolute top-full left-0 mt-1 z-50 w-72 rounded-lg border ${style.border} ${style.bg} backdrop-blur-sm shadow-xl`}>
+                  <div className="p-3">
+                    {/* Reason */}
+                    <p className="text-xs text-muted-foreground mb-2">{rec.reason}</p>
+
+                    {/* What this will do */}
+                    <div className="text-xs text-muted-foreground mb-3">
+                      <ul className="ml-3 list-disc space-y-0.5">
+                        <li>Add "{rec.title}" card to dashboard</li>
+                        <li>Show real-time cluster data</li>
+                        {rec.priority === 'high' && <li>Address critical issues faster</li>}
+                      </ul>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap gap-1.5">
+                      <button
+                        onClick={() => handleAddCard(rec)}
+                        disabled={isAdding}
+                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                          rec.priority === 'high'
+                            ? 'bg-red-500 hover:bg-red-600 text-white'
+                            : rec.priority === 'medium'
+                            ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                            : 'bg-blue-500 hover:bg-blue-600 text-white'
+                        } disabled:opacity-50`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        {isAdding ? 'Adding...' : 'Add Card'}
+                      </button>
+                      <button
+                        onClick={(e) => handleSnooze(e, rec)}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        title="Snooze"
+                      >
+                        <Clock className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={handleDismiss}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        title="Dismiss"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+
+        {/* Stats badges */}
         {highPriorityCount > 0 && (
-          <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs">
+          <span className="px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 text-[10px]">
             {highPriorityCount} urgent
           </span>
         )}
-      </div>
 
-      <div className="flex flex-wrap gap-3">
-        {visibleRecommendations.map((rec) => (
-          <div
-            key={rec.id}
-            className={`rounded-lg border ${priorityColor(rec.priority)} transition-all ${
-              expandedRec === rec.id ? 'w-full md:w-96' : 'w-auto'
-            }`}
-          >
-            {/* Collapsed view */}
-            <div
-              className={`p-3 cursor-pointer ${expandedRec === rec.id ? '' : 'hover:scale-105'} transition-transform`}
-              onClick={() => setExpandedRec(expandedRec === rec.id ? null : rec.id)}
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {priorityIcon(rec.priority)}
-                <span className="font-medium text-sm">{rec.title}</span>
-                {addingCard === rec.id && (
-                  <div className="ml-auto spinner w-4 h-4" />
-                )}
-              </div>
-              <p className="text-xs opacity-80">{rec.reason}</p>
-              {expandedRec !== rec.id && (
-                <div className="mt-2 text-xs opacity-60">Click to expand</div>
-              )}
-            </div>
-
-            {/* Expanded view with actions */}
-            {expandedRec === rec.id && (
-              <div className="px-3 pb-3 border-t border-current/20 mt-2 pt-3">
-                <div className="text-xs opacity-80 mb-3">
-                  <strong>What this will do:</strong>
-                  <ul className="mt-1 ml-4 list-disc space-y-1">
-                    <li>Add a new "{rec.title}" card to your dashboard</li>
-                    <li>Show real-time data from your clusters</li>
-                    {rec.priority === 'high' && <li>Help you address critical issues faster</li>}
-                  </ul>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAddCard(rec)}
-                    disabled={addingCard === rec.id}
-                    className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      rec.priority === 'high'
-                        ? 'bg-red-500 hover:bg-red-600 text-foreground'
-                        : rec.priority === 'medium'
-                        ? 'bg-yellow-500 hover:bg-yellow-600 text-foreground'
-                        : 'bg-blue-500 hover:bg-blue-600 text-foreground'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {addingCard === rec.id ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <div className="spinner w-4 h-4" /> Adding...
-                      </span>
-                    ) : (
-                      'Add to Dashboard'
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleSnooze(rec)}
-                    className="px-3 py-2 rounded-lg text-sm font-medium bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 transition-colors flex items-center gap-1"
-                    title="Snooze this recommendation"
-                  >
-                    <Clock className="w-4 h-4" />
-                    Snooze
-                  </button>
-                  <button
-                    onClick={() => setExpandedRec(null)}
-                    className="px-3 py-2 rounded-lg text-sm font-medium bg-card/30 hover:bg-card/50 transition-colors"
-                  >
-                    Dismiss
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
+        {visibleRecommendations.length > 6 && (
+          <span className="text-[10px] text-muted-foreground">
+            +{visibleRecommendations.length - 6} more
+          </span>
+        )}
       </div>
     </div>
   )
