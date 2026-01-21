@@ -101,7 +101,7 @@ jobs:
           Please implement the fix now."
 
           # Run Claude Code in non-interactive mode using npx
-          echo "$PROMPT" | npx -y @anthropic-ai/claude-code --print || true
+          npx -y @anthropic-ai/claude-code --print "$PROMPT" || true
 
       - name: Check for changes
         id: check_changes
