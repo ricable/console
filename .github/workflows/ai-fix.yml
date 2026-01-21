@@ -35,7 +35,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "🚀 Claude Code is analyzing this issue and working on a fix. I'll update you when I have results!"
+          gh issue comment ${{ github.event.issue.number }} --repo ${{ github.repository }} --body "🚀 Claude Code is analyzing this issue and working on a fix. I'll update you when I have results!
+
+          View progress: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
       - name: Checkout repository
         uses: actions/checkout@v4
