@@ -2,13 +2,7 @@ name: AI Fix with Claude Code
 
 on:
   issues:
-    types: [labeled, opened]
-  workflow_dispatch:
-    inputs:
-      issue_number:
-        description: 'Issue number to fix'
-        required: true
-        type: number
+    types: [labeled]
 
 permissions:
   contents: write
@@ -17,11 +11,7 @@ permissions:
 
 jobs:
   ai-fix:
-    if: |
-      github.event_name == 'issues' && (
-        (github.event.action == 'labeled' && github.event.label.name == 'ai-fix-requested') ||
-        (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'ai-fix-requested'))
-      )
+    if: github.event.label.name == 'ai-fix-requested'
     runs-on: ubuntu-latest
 
     steps:
@@ -57,15 +47,18 @@ jobs:
       - name: Run Claude Code
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           # Create prompt file for Claude Code
-          cat > /tmp/claude-prompt.txt <<'EOF'
+          cat > /tmp/claude-prompt.txt <<EOF
 You are fixing a bug or implementing a feature request for the KubeStellar Console project.
 
-Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}
+Issue #${ISSUE_NUMBER}: ${ISSUE_TITLE}
 
 Description:
-${{ github.event.issue.body }}
+${ISSUE_BODY}
 
 Instructions:
 1. Analyze the codebase to understand the issue
