@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Package, CheckCircle, AlertTriangle, XCircle, RefreshCw, ArrowUpCircle } from 'lucide-react'
+import { Package, CheckCircle, AlertTriangle, XCircle, RefreshCw, ArrowUpCircle, Search } from 'lucide-react'
 import { useClusters, useOperators, Operator } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { Skeleton } from '../ui/Skeleton'
@@ -29,6 +29,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
+  const [localSearch, setLocalSearch] = useState('')
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -71,9 +72,19 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     // Apply status filter
     result = filterByStatus(result)
 
-    // Apply custom text filter
+    // Apply custom text filter (global)
     if (customFilter.trim()) {
       const query = customFilter.toLowerCase()
+      result = result.filter(op =>
+        op.name.toLowerCase().includes(query) ||
+        op.namespace.toLowerCase().includes(query) ||
+        op.version.toLowerCase().includes(query)
+      )
+    }
+
+    // Apply local search filter
+    if (localSearch.trim()) {
+      const query = localSearch.toLowerCase()
       result = result.filter(op =>
         op.name.toLowerCase().includes(query) ||
         op.namespace.toLowerCase().includes(query) ||
@@ -103,7 +114,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     })
 
     return result
-  }, [rawOperators, filterByStatus, customFilter, sortBy, sortDirection])
+  }, [rawOperators, filterByStatus, customFilter, localSearch, sortBy, sortDirection])
 
   // Use pagination hook
   const effectivePerPage = limit === 'unlimited' ? 1000 : limit
@@ -216,6 +227,18 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
           {/* Scope badge */}
           <div className="flex items-center gap-2 mb-4">
             <ClusterBadge cluster={selectedCluster} />
+          </div>
+
+          {/* Local Search */}
+          <div className="relative mb-4">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <input
+              type="text"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              placeholder="Search operators..."
+              className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+            />
           </div>
 
           {/* Summary */}

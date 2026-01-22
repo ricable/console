@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Cpu, Box, ChevronRight, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
+import { Cpu, Box, ChevronRight, AlertTriangle, CheckCircle, Loader2, Search } from 'lucide-react'
 import { useGPUNodes, useAllPods, useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
@@ -55,6 +55,7 @@ export function GPUWorkloads({ config: _config }: GPUWorkloadsProps) {
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
+  const [localSearch, setLocalSearch] = useState('')
 
   // Only show loading when no cached data exists
   const isLoading = (gpuLoading && gpuNodes.length === 0) || (podsLoading && allPods.length === 0)
@@ -102,8 +103,19 @@ export function GPUWorkloads({ config: _config }: GPUWorkloadsProps) {
       })
     }
 
+    // Apply local search filter
+    if (localSearch.trim()) {
+      const query = localSearch.toLowerCase()
+      filtered = filtered.filter(pod =>
+        pod.name.toLowerCase().includes(query) ||
+        (pod.namespace?.toLowerCase() || '').includes(query) ||
+        (pod.cluster?.toLowerCase() || '').includes(query) ||
+        (pod.node?.toLowerCase() || '').includes(query)
+      )
+    }
+
     return filtered
-  }, [allPods, gpuNodes, selectedClusters, isAllClustersSelected])
+  }, [allPods, gpuNodes, selectedClusters, isAllClustersSelected, localSearch])
 
   // Sort workloads
   const sortedWorkloads = useMemo(() => {
@@ -256,6 +268,18 @@ export function GPUWorkloads({ config: _config }: GPUWorkloadsProps) {
             onRefresh={handleRefresh}
           />
         </div>
+      </div>
+
+      {/* Local search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          placeholder="Search workloads..."
+          className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+        />
       </div>
 
       {/* Summary stats */}
