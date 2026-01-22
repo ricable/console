@@ -36,10 +36,10 @@ export function useConsoleUsers() {
       const { data } = await api.get<ConsoleUser[]>('/api/users')
       setUsers(data || [])
     } catch (err) {
-      // Don't log or set error for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else {
+      // Don't log or set error for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure) {
         setError('Failed to load users')
         if (err instanceof Error && err.message) {
           console.warn('Failed to load users:', err.message)
@@ -113,10 +113,10 @@ export function useUserManagementSummary() {
       const { data } = await api.get<UserManagementSummary>('/api/users/summary')
       setSummary(data)
     } catch (err) {
-      // Don't log or set error for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else {
+      // Don't log or set error for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure) {
         setError('Failed to load summary')
         if (err instanceof Error && err.message) {
           console.warn('Failed to load user summary:', err.message)
@@ -184,10 +184,10 @@ export function useK8sServiceAccounts(cluster?: string, namespace?: string) {
       const { data } = await api.get<K8sServiceAccount[]>(`/api/rbac/service-accounts?${params}`)
       setServiceAccounts(data || [])
     } catch (err) {
-      // Don't log or set error for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else {
+      // Don't log or set error for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure) {
         setError('Failed to load service accounts')
         if (err instanceof Error && err.message) {
           console.warn('Failed to load service accounts:', err.message)

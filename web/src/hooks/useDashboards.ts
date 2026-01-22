@@ -30,10 +30,10 @@ export function useDashboards() {
       setDashboards(data || [])
       setError(null)
     } catch (err) {
-      // Don't log or set error for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else {
+      // Don't log or set error for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure) {
         console.error('Failed to load dashboards:', err)
         setError('Failed to load dashboards')
       }

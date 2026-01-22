@@ -242,10 +242,10 @@ export function useFeatureRequests(currentUserId?: string) {
       setRequests(sorted)
       setError(null)
     } catch (err) {
-      // Don't log or set error for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else {
+      // Don't log or set error for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure) {
         if (err instanceof Error && err.message) {
           console.warn('Failed to load feature requests:', err.message)
         }
@@ -418,10 +418,10 @@ export function useNotifications() {
       const { data } = await api.get<Notification[]>('/api/notifications')
       setNotifications(data || [])
     } catch (err) {
-      // Don't log for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else if (err instanceof Error && err.message) {
+      // Don't log for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure && err instanceof Error && err.message) {
         console.warn('Failed to load notifications:', err.message)
       }
     }
@@ -437,10 +437,10 @@ export function useNotifications() {
       const { data } = await api.get<{ count: number }>('/api/notifications/unread-count')
       setUnreadCount(data.count)
     } catch (err) {
-      // Don't log for expected failures (backend unavailable)
-      if (err instanceof BackendUnavailableError) {
-        // Silent - backend is known to be unavailable
-      } else if (err instanceof Error && err.message) {
+      // Don't log for expected failures (backend unavailable or timeout)
+      const isExpectedFailure = err instanceof BackendUnavailableError ||
+        (err instanceof Error && err.message.includes('Request timeout'))
+      if (!isExpectedFailure && err instanceof Error && err.message) {
         console.warn('Failed to load unread count:', err.message)
       }
     }
