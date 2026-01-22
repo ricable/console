@@ -38,6 +38,7 @@ import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
 import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 
 interface EventCard {
   id: string
@@ -229,7 +230,6 @@ export function Events() {
 
   // Card state
   const [cards, setCards] = useState<EventCard[]>(() => loadEventCards())
-  const [showStats, setShowStats] = useState(true)
   const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-events')
   const [showAddCard, setShowAddCard] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -593,6 +593,24 @@ export function Events() {
     ? { ...stats, ...eventsStatsCache }
     : stats
 
+  // Stats value getter for the configurable StatsOverview component
+  const getStatValue = useCallback((blockId: string): StatBlockValue => {
+    switch (blockId) {
+      case 'total':
+        return { value: formatStat(displayStats.total), sublabel: 'events' }
+      case 'warnings':
+        return { value: formatStat(displayStats.warnings), sublabel: 'warning events' }
+      case 'normal':
+        return { value: formatStat(displayStats.normal), sublabel: 'normal events' }
+      case 'recent':
+        return { value: formatStat(displayStats.recentCount), sublabel: 'in last hour' }
+      case 'errors':
+        return { value: formatStat(displayStats.warnings), sublabel: 'error events' }
+      default:
+        return { value: '-', sublabel: '' }
+    }
+  }, [displayStats])
+
   // Group events by time
   const groupedEvents = useMemo(() => {
     const groups: Record<string, typeof filteredEvents> = {
@@ -681,61 +699,15 @@ export function Events() {
         </div>
       </div>
 
-      {/* Stats Overview - collapsible */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-3">
-          <button
-            onClick={() => setShowStats(!showStats)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Activity className="w-4 h-4" />
-            <span>Stats Overview</span>
-            {showStats ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          {lastUpdated && (
-            <span className="text-xs text-muted-foreground/60">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-
-        {showStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="glass p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Bell className="w-5 h-5 text-purple-400" />
-                <span className="text-sm text-muted-foreground">Total</span>
-              </div>
-              <div className="text-3xl font-bold text-foreground">{formatStat(displayStats.total)}</div>
-              <div className="text-xs text-muted-foreground">events</div>
-            </div>
-            <div className="glass p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <AlertTriangle className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm text-muted-foreground">Warnings</span>
-              </div>
-              <div className="text-3xl font-bold text-yellow-400">{formatStat(displayStats.warnings)}</div>
-              <div className="text-xs text-muted-foreground">warning events</div>
-            </div>
-            <div className="glass p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <CheckCircle2 className="w-5 h-5 text-green-400" />
-                <span className="text-sm text-muted-foreground">Normal</span>
-              </div>
-              <div className="text-3xl font-bold text-green-400">{formatStat(displayStats.normal)}</div>
-              <div className="text-xs text-muted-foreground">normal events</div>
-            </div>
-            <div className="glass p-4 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Clock className="w-5 h-5 text-blue-400" />
-                <span className="text-sm text-muted-foreground">Recent</span>
-              </div>
-              <div className="text-3xl font-bold text-blue-400">{formatStat(displayStats.recentCount)}</div>
-              <div className="text-xs text-muted-foreground">in last hour</div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Stats Overview - configurable */}
+      <StatsOverview
+        dashboardType="events"
+        getStatValue={getStatValue}
+        hasData={displayStats.total > 0}
+        isLoading={isLoading}
+        lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-events-stats-collapsed"
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-border">

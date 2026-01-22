@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, memo } from 'react'
-import { useSearchParams, useLocation } from 'react-router-dom'
-import { Cpu, Plus, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Hourglass, GripVertical } from 'lucide-react'
+import { useState, useEffect, useCallback, memo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Cog, RefreshCw, Hourglass, GripVertical, ChevronDown, ChevronRight, Plus, LayoutGrid } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -23,8 +23,8 @@ import { CSS } from '@dnd-kit/utilities'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
-import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -33,9 +33,8 @@ import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
 import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
-import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 
-interface ComputeCard {
+interface OperatorsCard {
   id: string
   card_type: string
   config: Record<string, unknown>
@@ -43,49 +42,48 @@ interface ComputeCard {
   position?: { w: number; h: number }
 }
 
-const COMPUTE_CARDS_KEY = 'kubestellar-compute-cards'
+const OPERATORS_CARDS_KEY = 'kubestellar-operators-cards'
 
-// Default cards for the compute dashboard
-const DEFAULT_COMPUTE_CARDS: ComputeCard[] = [
-  { id: 'default-compute-overview', card_type: 'compute_overview', title: 'Compute Overview', config: {}, position: { w: 4, h: 3 } },
-  { id: 'default-resource-usage', card_type: 'resource_usage', title: 'Resource Usage', config: {}, position: { w: 4, h: 2 } },
-  { id: 'default-resource-capacity', card_type: 'resource_capacity', title: 'Resource Capacity', config: {}, position: { w: 4, h: 2 } },
-  { id: 'default-cluster-metrics', card_type: 'cluster_metrics', title: 'Cluster Metrics', config: {}, position: { w: 4, h: 2 } },
-  { id: 'default-top-pods', card_type: 'top_pods', title: 'Top Resource Consumers', config: {}, position: { w: 8, h: 3 } },
+// Default cards for the operators dashboard
+const DEFAULT_OPERATORS_CARDS: OperatorsCard[] = [
+  { id: 'default-operator-status', card_type: 'operator_status', title: 'Operator Status', config: {}, position: { w: 4, h: 3 } },
+  { id: 'default-operator-subscriptions', card_type: 'operator_subscriptions', title: 'Subscriptions', config: {}, position: { w: 8, h: 3 } },
+  { id: 'default-crd-health', card_type: 'crd_health', title: 'CRD Health', config: {}, position: { w: 4, h: 3 } },
+  { id: 'default-event-stream', card_type: 'event_stream', title: 'Operator Events', config: { filter: 'operator' }, position: { w: 8, h: 3 } },
 ]
 
-function loadComputeCards(): ComputeCard[] {
+function loadOperatorsCards(): OperatorsCard[] {
   try {
-    const stored = localStorage.getItem(COMPUTE_CARDS_KEY)
+    const stored = localStorage.getItem(OPERATORS_CARDS_KEY)
     if (stored) {
       return JSON.parse(stored)
     }
   } catch {
     // Fall through to return defaults
   }
-  return DEFAULT_COMPUTE_CARDS
+  return DEFAULT_OPERATORS_CARDS
 }
 
-function saveComputeCards(cards: ComputeCard[]) {
-  localStorage.setItem(COMPUTE_CARDS_KEY, JSON.stringify(cards))
+function saveOperatorsCards(cards: OperatorsCard[]) {
+  localStorage.setItem(OPERATORS_CARDS_KEY, JSON.stringify(cards))
 }
 
 // Sortable card component with drag handle
-interface SortableComputeCardProps {
-  card: ComputeCard
+interface SortableOperatorsCardProps {
+  card: OperatorsCard
   onConfigure: () => void
   onRemove: () => void
   onWidthChange: (newWidth: number) => void
   isDragging: boolean
 }
 
-const SortableComputeCard = memo(function SortableComputeCard({
+const SortableOperatorsCard = memo(function SortableOperatorsCard({
   card,
   onConfigure,
   onRemove,
   onWidthChange,
   isDragging,
-}: SortableComputeCardProps) {
+}: SortableOperatorsCardProps) {
   const {
     attributes,
     listeners,
@@ -137,7 +135,7 @@ const SortableComputeCard = memo(function SortableComputeCard({
 })
 
 // Drag preview for overlay
-function ComputeDragPreviewCard({ card }: { card: ComputeCard }) {
+function OperatorsDragPreviewCard({ card }: { card: OperatorsCard }) {
   const cardWidth = card.position?.w || 4
   return (
     <div
@@ -154,30 +152,25 @@ function ComputeDragPreviewCard({ card }: { card: ComputeCard }) {
   )
 }
 
-export function Compute() {
+export function Operators() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const location = useLocation()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
-  const {
-    selectedClusters: globalSelectedClusters,
-    isAllClustersSelected,
-  } = useGlobalFilters()
-  const { drillToResources } = useDrillDownActions()
+  const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
 
   // Card state
-  const [cards, setCards] = useState<ComputeCard[]>(() => loadComputeCards())
-  const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-compute')
+  const [cards, setCards] = useState<OperatorsCard[]>(() => loadOperatorsCards())
+  const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-operators')
   const [showAddCard, setShowAddCard] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
 
   // Reset functionality using shared hook
   const { isCustomized, setCustomized, reset } = useDashboardReset({
-    storageKey: COMPUTE_CARDS_KEY,
-    defaultCards: DEFAULT_COMPUTE_CARDS,
+    storageKey: OPERATORS_CARDS_KEY,
+    defaultCards: DEFAULT_OPERATORS_CARDS,
     setCards,
     cards,
   })
-  const [configuringCard, setConfiguringCard] = useState<ComputeCard | null>(null)
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [configuringCard, setConfiguringCard] = useState<OperatorsCard | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(true)
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -210,18 +203,13 @@ export function Compute() {
     }
   }
 
-  // Combined loading/refreshing states (useClusters has shared cache so data persists)
-  const isFetching = isLoading || isRefreshing
-  // Only show skeletons when we have no data yet
-  const showSkeletons = clusters.length === 0 && isLoading
-
-  // Save cards to localStorage when they change (mark as customized)
+  // Save cards to localStorage when they change
   useEffect(() => {
-    saveComputeCards(cards)
+    saveOperatorsCards(cards)
     setCustomized(true)
   }, [cards, setCustomized])
 
-  // Handle addCard URL param - open modal and clear param
+  // Handle addCard URL param
   useEffect(() => {
     if (searchParams.get('addCard') === 'true') {
       setShowAddCard(true)
@@ -229,19 +217,10 @@ export function Compute() {
     }
   }, [searchParams, setSearchParams])
 
-  // Trigger refresh when navigating to this page (location.key changes on each navigation)
-  useEffect(() => {
-    refetch()
-  }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      refetch()
-    }, 30000)
-
+    const interval = setInterval(() => refetch(), 30000)
     return () => clearInterval(interval)
   }, [autoRefresh, refetch])
 
@@ -250,7 +229,7 @@ export function Compute() {
   }, [refetch])
 
   const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
-    const cardsToAdd: ComputeCard[] = newCards.map(card => ({
+    const cardsToAdd: OperatorsCard[] = newCards.map(card => ({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       card_type: card.type,
       config: card.config,
@@ -259,7 +238,7 @@ export function Compute() {
     setCards(prev => [...prev, ...cardsToAdd])
     expandCards()
     setShowAddCard(false)
-  }, [])
+  }, [expandCards])
 
   const handleRemoveCard = useCallback((cardId: string) => {
     setCards(prev => prev.filter(c => c.id !== cardId))
@@ -284,7 +263,7 @@ export function Compute() {
   }, [])
 
   const applyTemplate = useCallback((template: DashboardTemplate) => {
-    const newCards: ComputeCard[] = template.cards.map(card => ({
+    const newCards: OperatorsCard[] = template.cards.map(card => ({
       id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       card_type: card.card_type,
       config: card.config || {},
@@ -293,99 +272,25 @@ export function Compute() {
     setCards(newCards)
     expandCards()
     setShowTemplates(false)
-  }, [])
+  }, [expandCards])
 
   // Filter clusters based on global selection
   const filteredClusters = clusters.filter(c =>
     isAllClustersSelected || globalSelectedClusters.includes(c.name)
   )
-
-  // Calculate compute stats from clusters (only from reachable clusters)
-  // Clusters with reachable !== false are considered (includes undefined during refresh)
   const reachableClusters = filteredClusters.filter(c => c.reachable !== false)
-  const currentStats = {
-    totalCPUs: reachableClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0),
-    totalMemoryGB: reachableClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0),
-    totalNodes: reachableClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0),
-    totalPods: reachableClusters.reduce((sum, c) => sum + (c.podCount || 0), 0),
-  }
-
-  // Check if we have any reachable clusters with actual data (not refreshing)
-  const hasActualData = filteredClusters.some(c =>
-    c.reachable !== false && c.nodeCount !== undefined && c.nodeCount > 0
-  )
-
-  // Cache the last known good stats to show during refresh
-  const cachedStats = useRef(currentStats)
-
-  // Update cache when we have real data (not all zeros during refresh)
-  useEffect(() => {
-    if (hasActualData && (currentStats.totalNodes > 0 || currentStats.totalCPUs > 0)) {
-      cachedStats.current = currentStats
-    }
-  }, [hasActualData, currentStats.totalNodes, currentStats.totalCPUs, currentStats.totalMemoryGB, currentStats.totalPods])
-
-  // Use cached stats during refresh, current stats when data is available
-  // Show dash only when we've never had data (initial state with no clusters)
-  const stats = (hasActualData || cachedStats.current.totalNodes > 0)
-    ? (hasActualData ? currentStats : cachedStats.current)
-    : null
-
-  // Determine if we should show data or dashes
-  const hasDataToShow = stats !== null
-
-  // Format memory size - returns '-' if no data
-  const formatMemory = (gb: number, hasData = true) => {
-    if (!hasData) return '-'
-    const safeValue = Math.max(0, gb) // Never show negative
-    if (safeValue >= 1024) {
-      return `${(safeValue / 1024).toFixed(1)} TB`
-    }
-    return `${Math.round(safeValue)} GB`
-  }
-
-  // Format stat - returns '-' if no data available
-  const formatStatValue = (value: number, hasData = true) => {
-    if (!hasData) return '-'
-    return Math.max(0, value) // Never show negative
-  }
-
-  // Calculate utilization from available data
-  const cpuUtilization = (() => {
-    const totalCPU = reachableClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
-    const requestedCPU = reachableClusters.reduce((sum, c) => sum + (c.cpuRequestsCores || 0), 0)
-    return totalCPU > 0 ? Math.round((requestedCPU / totalCPU) * 100) : 0
-  })()
-
-  const memoryUtilization = (() => {
-    const totalMemory = reachableClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0)
-    const requestedMemory = reachableClusters.reduce((sum, c) => sum + (c.memoryRequestsGB || 0), 0)
-    return totalMemory > 0 ? Math.round((requestedMemory / totalMemory) * 100) : 0
-  })()
 
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
-      case 'nodes':
-        return { value: formatStatValue(stats?.totalNodes || 0, hasDataToShow), sublabel: 'total nodes', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'cpus':
-        return { value: formatStatValue(stats?.totalCPUs || 0, hasDataToShow), sublabel: 'cores allocatable', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'memory':
-        return { value: formatMemory(stats?.totalMemoryGB || 0, hasDataToShow), sublabel: 'allocatable', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'gpus':
-        return { value: 0, sublabel: 'total GPUs', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'tpus':
-        return { value: 0, sublabel: 'total TPUs', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'pods':
-        return { value: formatStatValue(stats?.totalPods || 0, hasDataToShow), sublabel: 'running pods', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'cpu_util':
-        return { value: hasDataToShow ? `${cpuUtilization}%` : '-', sublabel: 'average', onClick: drillToResources, isClickable: hasDataToShow }
-      case 'memory_util':
-        return { value: hasDataToShow ? `${memoryUtilization}%` : '-', sublabel: 'average', onClick: drillToResources, isClickable: hasDataToShow }
+      case 'clusters':
+        return { value: reachableClusters.length, sublabel: 'clusters' }
+      case 'healthy':
+        return { value: reachableClusters.length, sublabel: 'with OLM' }
       default:
-        return { value: '-', sublabel: '' }
+        return { value: 0 }
     }
-  }, [stats, hasDataToShow, cpuUtilization, memoryUtilization, drillToResources])
+  }, [reachableClusters.length])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
@@ -403,10 +308,10 @@ export function Compute() {
           <div className="flex items-center gap-3">
             <div>
               <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                <Cpu className="w-6 h-6 text-purple-400" />
-                Compute
+                <Cog className="w-6 h-6 text-purple-400" />
+                Operators
               </h1>
-              <p className="text-muted-foreground">Monitor compute resources across clusters</p>
+              <p className="text-muted-foreground">Monitor OLM operators, subscriptions, and CRDs</p>
             </div>
             {isRefreshing && (
               <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
@@ -416,10 +321,10 @@ export function Compute() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <label htmlFor="compute-auto-refresh" className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
+            <label htmlFor="operators-auto-refresh" className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
               <input
                 type="checkbox"
-                id="compute-auto-refresh"
+                id="operators-auto-refresh"
                 checked={autoRefresh}
                 onChange={(e) => setAutoRefresh(e.target.checked)}
                 className="rounded border-border w-3.5 h-3.5"
@@ -428,51 +333,49 @@ export function Compute() {
             </label>
             <button
               onClick={handleRefresh}
-              disabled={isFetching}
+              disabled={isRefreshing}
               className="p-2 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
               title="Refresh data"
             >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Stats Overview - configurable */}
+      {/* Stats Overview */}
       <StatsOverview
-        dashboardType="compute"
+        dashboardType="clusters"
         getStatValue={getStatValue}
-        hasData={hasDataToShow}
-        isLoading={showSkeletons}
+        hasData={reachableClusters.length > 0}
+        isLoading={isLoading}
         lastUpdated={lastUpdated}
-        collapsedStorageKey="kubestellar-compute-stats-collapsed"
+        collapsedStorageKey="kubestellar-operators-stats-collapsed"
       />
 
       {/* Dashboard Cards Section */}
       <div className="mb-6">
-        {/* Card section header with toggle and buttons */}
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setShowCards(!showCards)}
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <LayoutGrid className="w-4 h-4" />
-            <span>Compute Cards ({cards.length})</span>
+            <span>Operator Cards ({cards.length})</span>
             {showCards ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
           </button>
         </div>
 
-        {/* Cards grid */}
         {showCards && (
           <>
             {cards.length === 0 ? (
               <div className="glass p-8 rounded-lg border-2 border-dashed border-border/50 text-center">
                 <div className="flex justify-center mb-4">
-                  <Cpu className="w-12 h-12 text-muted-foreground" />
+                  <Cog className="w-12 h-12 text-muted-foreground" />
                 </div>
-                <h3 className="text-lg font-medium text-foreground mb-2">Compute Dashboard</h3>
+                <h3 className="text-lg font-medium text-foreground mb-2">Operators Dashboard</h3>
                 <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
-                  Add cards to monitor CPU and memory utilization, node health, and resource quotas across your clusters.
+                  Add cards to monitor OLM operators, subscriptions, and Custom Resource Definitions across your clusters.
                 </p>
                 <button
                   onClick={() => setShowAddCard(true)}
@@ -492,7 +395,7 @@ export function Compute() {
                 <SortableContext items={cards.map(c => c.id)} strategy={rectSortingStrategy}>
                   <div className="grid grid-cols-12 gap-4">
                     {cards.map(card => (
-                      <SortableComputeCard
+                      <SortableOperatorsCard
                         key={card.id}
                         card={card}
                         onConfigure={() => handleConfigureCard(card.id)}
@@ -506,7 +409,7 @@ export function Compute() {
                 <DragOverlay>
                   {activeId ? (
                     <div className="opacity-80 rotate-3 scale-105">
-                      <ComputeDragPreviewCard card={cards.find(c => c.id === activeId)!} />
+                      <OperatorsDragPreviewCard card={cards.find(c => c.id === activeId)!} />
                     </div>
                   ) : null}
                 </DragOverlay>

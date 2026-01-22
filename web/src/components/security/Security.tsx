@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback, memo } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Shield, ShieldAlert, ShieldCheck, ShieldX, Users, Key, Lock, Eye, Clock, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Plus, LayoutGrid, ChevronDown, RefreshCw, Activity, Hourglass, GripVertical } from 'lucide-react'
+import { Shield, ShieldAlert, ShieldCheck, ShieldX, Users, Key, Lock, Eye, Clock, AlertTriangle, CheckCircle2, XCircle, ChevronRight, Plus, LayoutGrid, ChevronDown, RefreshCw, Hourglass, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -37,6 +37,7 @@ import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
 import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 
 interface SecurityCard {
   id: string
@@ -300,7 +301,6 @@ export function Security() {
   } = useGlobalFilters()
   // Card state
   const [cards, setCards] = useState<SecurityCard[]>(() => loadSecurityCards())
-  const [showStats, setShowStats] = useState(true)
   const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-security')
   const [showAddCard, setShowAddCard] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
@@ -624,6 +624,29 @@ export function Security() {
     title: configuringCard.title,
   } : null
 
+  // Stats value getter for the configurable StatsOverview component
+  const getStatValue = useCallback((blockId: string): StatBlockValue => {
+    const hasDataToShow = stats.total > 0
+    switch (blockId) {
+      case 'issues':
+        return { value: stats.total, sublabel: 'total issues', onClick: () => setActiveTab('issues'), isClickable: hasDataToShow }
+      case 'critical':
+        return { value: 0, sublabel: 'critical issues' }
+      case 'high':
+        return { value: stats.high, sublabel: 'high severity', onClick: () => { setSeverityFilter('high'); setActiveTab('issues') }, isClickable: stats.high > 0 }
+      case 'medium':
+        return { value: stats.medium, sublabel: 'medium severity', onClick: () => { setSeverityFilter('medium'); setActiveTab('issues') }, isClickable: stats.medium > 0 }
+      case 'low':
+        return { value: stats.low, sublabel: 'low severity', onClick: () => { setSeverityFilter('low'); setActiveTab('issues') }, isClickable: stats.low > 0 }
+      case 'privileged':
+        return { value: stats.typeCounts['privileged'] || 0, sublabel: 'privileged containers' }
+      case 'root':
+        return { value: stats.typeCounts['root'] || 0, sublabel: 'running as root' }
+      default:
+        return { value: 0 }
+    }
+  }, [stats, setActiveTab, setSeverityFilter])
+
   return (
     <div className="pt-16">
       {/* Header */}
@@ -667,77 +690,15 @@ export function Security() {
         </div>
       </div>
 
-      {/* Stats Overview - collapsible */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-3">
-          <button
-            onClick={() => setShowStats(!showStats)}
-            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <Activity className="w-4 h-4" />
-            <span>Stats Overview</span>
-            {showStats ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          {lastUpdated && (
-            <span className="text-xs text-muted-foreground/60">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </span>
-          )}
-        </div>
-
-        {showStats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div
-              className={`glass p-4 rounded-lg ${stats.high > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
-              onClick={() => { if (stats.high > 0) { setSeverityFilter('high'); setActiveTab('issues') } }}
-              title={stats.high > 0 ? `${stats.high} high severity issue${stats.high !== 1 ? 's' : ''} - Click to view` : 'No high severity issues'}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldAlert className="w-5 h-5 text-red-400" />
-                <span className="text-sm text-muted-foreground">High Severity</span>
-              </div>
-              <div className="text-3xl font-bold text-red-400">{stats.high}</div>
-              <div className="text-xs text-muted-foreground">security issues</div>
-            </div>
-            <div
-              className={`glass p-4 rounded-lg ${stats.medium > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
-              onClick={() => { if (stats.medium > 0) { setSeverityFilter('medium'); setActiveTab('issues') } }}
-              title={stats.medium > 0 ? `${stats.medium} medium severity issue${stats.medium !== 1 ? 's' : ''} - Click to view` : 'No medium severity issues'}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldX className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm text-muted-foreground">Medium Severity</span>
-              </div>
-              <div className="text-3xl font-bold text-yellow-400">{stats.medium}</div>
-              <div className="text-xs text-muted-foreground">security issues</div>
-            </div>
-            <div
-              className={`glass p-4 rounded-lg ${stats.rbacTotal > 0 ? 'cursor-pointer hover:bg-secondary/50' : 'cursor-default'} transition-colors`}
-              onClick={() => { if (stats.rbacTotal > 0) setActiveTab('rbac') }}
-              title={stats.rbacTotal > 0 ? `${stats.rbacTotal} RBAC binding${stats.rbacTotal !== 1 ? 's' : ''} - Click to view` : 'No RBAC bindings'}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Users className="w-5 h-5 text-blue-400" />
-                <span className="text-sm text-muted-foreground">RBAC Bindings</span>
-              </div>
-              <div className="text-3xl font-bold text-foreground">{stats.rbacTotal}</div>
-              <div className="text-xs text-muted-foreground">total bindings</div>
-            </div>
-            <div
-              className="glass p-4 rounded-lg cursor-pointer hover:bg-secondary/50 transition-colors"
-              onClick={() => setActiveTab('compliance')}
-              title={`${stats.complianceScore}% compliance score - Click to view details`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <ShieldCheck className="w-5 h-5 text-green-400" />
-                <span className="text-sm text-muted-foreground">Compliance</span>
-              </div>
-              <div className="text-3xl font-bold text-green-400">{stats.complianceScore}%</div>
-              <div className="text-xs text-muted-foreground">compliance score</div>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Configurable Stats Overview */}
+      <StatsOverview
+        dashboardType="security"
+        getStatValue={getStatValue}
+        hasData={stats.total > 0}
+        isLoading={isRefreshing}
+        lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-security-stats-collapsed"
+      />
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-border">
