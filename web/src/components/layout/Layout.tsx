@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react'
-import { Box, WifiOff, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Box, WifiOff, X, Settings } from 'lucide-react'
 import { Navbar } from './Navbar'
 import { Sidebar } from './Sidebar'
 import { MissionSidebar, MissionSidebarToggle } from './MissionSidebar'
@@ -88,10 +89,17 @@ export function Layout({ children }: LayoutProps) {
               <WifiOff className="w-4 h-4 text-orange-400 shrink-0" />
               <span className="text-sm text-orange-400 font-medium shrink-0">Offline</span>
               <span className="text-xs text-orange-400/70 truncate">
-                — No agent connection. Check VPN/network or start kkc-agent.
+                — Install agent: <code className="bg-orange-500/20 px-1 rounded">brew install kubestellar/tap/kkc-agent</code> then run <code className="bg-orange-500/20 px-1 rounded">kkc-agent</code>
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-2">
+              <Link
+                to="/settings"
+                className="flex items-center gap-1 text-xs px-2 py-0.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded transition-colors whitespace-nowrap"
+              >
+                <Settings className="w-3 h-3" />
+                Setup
+              </Link>
               <button
                 onClick={toggleDemoMode}
                 className="text-xs px-2 py-0.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded transition-colors whitespace-nowrap"
