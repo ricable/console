@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { Activity, AlertTriangle, Info, AlertCircle, Clock } from 'lucide-react'
+import { Activity, AlertTriangle, Info, AlertCircle, Clock, Search } from 'lucide-react'
 import { useClusters, useWarningEvents, useNamespaces } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { Skeleton } from '../ui/Skeleton'
@@ -33,6 +33,7 @@ export function NamespaceEvents({ config }: NamespaceEventsProps) {
   const [sortBy, setSortBy] = useState<SortByOption>('time')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
+  const [localSearch, setLocalSearch] = useState('')
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -71,6 +72,18 @@ export function NamespaceEvents({ config }: NamespaceEventsProps) {
       events = events.filter(e => e.namespace === selectedNamespace)
     }
 
+    // Apply local search
+    if (localSearch.trim()) {
+      const query = localSearch.toLowerCase()
+      events = events.filter(e =>
+        e.message.toLowerCase().includes(query) ||
+        e.object.toLowerCase().includes(query) ||
+        e.namespace.toLowerCase().includes(query) ||
+        e.type.toLowerCase().includes(query) ||
+        (e.reason?.toLowerCase() || '').includes(query)
+      )
+    }
+
     // Sort events
     const sorted = [...events].sort((a, b) => {
       let compare = 0
@@ -93,7 +106,7 @@ export function NamespaceEvents({ config }: NamespaceEventsProps) {
       return sortDirection === 'asc' ? compare : -compare
     })
     return sorted
-  }, [allEvents, selectedCluster, selectedNamespace, sortBy, sortDirection])
+  }, [allEvents, selectedCluster, selectedNamespace, sortBy, sortDirection, localSearch])
 
   // Use pagination hook
   const effectivePerPage = limit === 'unlimited' ? 1000 : limit
@@ -222,6 +235,18 @@ export function NamespaceEvents({ config }: NamespaceEventsProps) {
           )}
         </div>
       )}
+
+      {/* Local Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          placeholder="Search events..."
+          className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+        />
+      </div>
 
       {/* Events list */}
       <div className="flex-1 space-y-2 overflow-y-auto">

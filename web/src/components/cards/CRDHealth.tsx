@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { FileCode, CheckCircle, AlertTriangle, XCircle, Database } from 'lucide-react'
+import { FileCode, CheckCircle, AlertTriangle, XCircle, Database, Search } from 'lucide-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { Skeleton } from '../ui/Skeleton'
@@ -39,6 +39,7 @@ export function CRDHealth({ config }: CRDHealthProps) {
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
+  const [localSearch, setLocalSearch] = useState('')
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -64,19 +65,20 @@ export function CRDHealth({ config }: CRDHealthProps) {
     return result
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  // Mock CRD data
-  const allCRDs: CRD[] = selectedCluster ? [
-    { name: 'certificates', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 45 },
-    { name: 'clusterissuers', group: 'cert-manager.io', version: 'v1', scope: 'Cluster', status: 'Established', instances: 2 },
-    { name: 'issuers', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 8 },
-    { name: 'prometheuses', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 3 },
-    { name: 'servicemonitors', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 127 },
-    { name: 'alertmanagers', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 2 },
-    { name: 'kafkas', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced', status: 'Established', instances: 4 },
-    { name: 'kafkatopics', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced', status: 'NotEstablished', instances: 0 },
-    { name: 'applications', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced', status: 'Established', instances: 56 },
-    { name: 'appprojects', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced', status: 'Established', instances: 5 },
-  ] : []
+  // Mock CRD data - now shows all clusters when none selected
+  const mockCRDs = [
+    { name: 'certificates', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 45 },
+    { name: 'clusterissuers', group: 'cert-manager.io', version: 'v1', scope: 'Cluster' as const, status: 'Established' as const, instances: 2 },
+    { name: 'issuers', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 8 },
+    { name: 'prometheuses', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 3 },
+    { name: 'servicemonitors', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 127 },
+    { name: 'alertmanagers', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 2 },
+    { name: 'kafkas', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced' as const, status: 'Established' as const, instances: 4 },
+    { name: 'kafkatopics', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced' as const, status: 'NotEstablished' as const, instances: 0 },
+    { name: 'applications', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 56 },
+    { name: 'appprojects', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 5 },
+  ]
+  const allCRDs: CRD[] = selectedCluster ? mockCRDs : (clusters.length > 0 ? mockCRDs : [])
 
   // Get unique groups
   const groups = useMemo(() => {
@@ -87,6 +89,17 @@ export function CRDHealth({ config }: CRDHealthProps) {
   // Filter and sort CRDs
   const filteredAndSorted = useMemo(() => {
     let result = filterGroup ? allCRDs.filter(c => c.group === filterGroup) : allCRDs
+
+    // Apply local search
+    if (localSearch.trim()) {
+      const query = localSearch.toLowerCase()
+      result = result.filter(crd =>
+        crd.name.toLowerCase().includes(query) ||
+        crd.group.toLowerCase().includes(query) ||
+        crd.version.toLowerCase().includes(query) ||
+        crd.scope.toLowerCase().includes(query)
+      )
+    }
 
     // Sort
     const statusOrder: Record<string, number> = { NotEstablished: 0, Terminating: 1, Established: 2 }
@@ -110,7 +123,7 @@ export function CRDHealth({ config }: CRDHealthProps) {
     })
 
     return result
-  }, [allCRDs, filterGroup, sortBy, sortDirection])
+  }, [allCRDs, filterGroup, sortBy, sortDirection, localSearch])
 
   // Use pagination hook
   const effectivePerPage = limit === 'unlimited' ? 1000 : limit
@@ -206,15 +219,31 @@ export function CRDHealth({ config }: CRDHealthProps) {
         ))}
       </select>
 
-      {!selectedCluster ? (
+      {/* Local Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          placeholder="Search CRDs..."
+          className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+        />
+      </div>
+
+      {clusters.length === 0 ? (
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Select a cluster to view CRDs
+          No clusters available
         </div>
       ) : (
         <>
           {/* Scope badge and filter */}
           <div className="flex items-center gap-2 mb-4">
-            <ClusterBadge cluster={selectedCluster} />
+            {selectedCluster ? (
+              <ClusterBadge cluster={selectedCluster} />
+            ) : (
+              <span className="text-xs px-2 py-1 rounded bg-secondary text-muted-foreground">All clusters</span>
+            )}
             <select
               value={filterGroup}
               onChange={(e) => setFilterGroup(e.target.value)}

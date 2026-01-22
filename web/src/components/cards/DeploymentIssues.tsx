@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { AlertTriangle, AlertCircle, Clock, Scale, ChevronRight } from 'lucide-react'
+import { AlertTriangle, AlertCircle, Clock, Scale, ChevronRight, Search } from 'lucide-react'
 import { useDeploymentIssues, DeploymentIssue } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
@@ -50,10 +50,24 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [itemsPerPage, setItemsPerPage] = useState<number | 'unlimited'>(5)
+  const [localSearch, setLocalSearch] = useState('')
 
   // Filter and sort issues
   const filteredAndSorted = useMemo(() => {
-    const filtered = filterByCluster(rawIssues)
+    let filtered = filterByCluster(rawIssues)
+
+    // Apply local search
+    if (localSearch.trim()) {
+      const query = localSearch.toLowerCase()
+      filtered = filtered.filter(issue =>
+        issue.name.toLowerCase().includes(query) ||
+        issue.namespace.toLowerCase().includes(query) ||
+        (issue.cluster?.toLowerCase() || '').includes(query) ||
+        (issue.reason?.toLowerCase() || '').includes(query) ||
+        (issue.message?.toLowerCase() || '').includes(query)
+      )
+    }
+
     const sorted = [...filtered].sort((a, b) => {
       let result = 0
       if (sortBy === 'status') result = (a.reason || '').localeCompare(b.reason || '')
@@ -62,7 +76,7 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
       return sortDirection === 'asc' ? result : -result
     })
     return sorted
-  }, [rawIssues, sortBy, sortDirection, filterByCluster])
+  }, [rawIssues, sortBy, sortDirection, filterByCluster, localSearch])
 
   // Use pagination hook
   const effectivePerPage = itemsPerPage === 'unlimited' ? 1000 : itemsPerPage
@@ -170,6 +184,18 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
             onRefresh={() => refetch()}
           />
         </div>
+      </div>
+
+      {/* Local Search */}
+      <div className="relative mb-3">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <input
+          type="text"
+          value={localSearch}
+          onChange={(e) => setLocalSearch(e.target.value)}
+          placeholder="Search issues..."
+          className="w-full pl-8 pr-3 py-1.5 text-xs bg-secondary rounded-md text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+        />
       </div>
 
       {/* Issues list */}
