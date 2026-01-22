@@ -20,7 +20,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useClusters } from '../../hooks/useMCP'
+import { useClusters, useGPUNodes } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
@@ -158,6 +158,7 @@ export function Compute() {
   const [searchParams, setSearchParams] = useSearchParams()
   const location = useLocation()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
+  const { nodes: gpuNodes } = useGPUNodes()
   const {
     selectedClusters: globalSelectedClusters,
     isAllClustersSelected,
@@ -363,6 +364,16 @@ export function Compute() {
     return totalMemory > 0 ? Math.round((requestedMemory / totalMemory) * 100) : 0
   })()
 
+  // Calculate total GPUs from GPU nodes, filtered by selected clusters
+  const gpuStats = (() => {
+    const filteredGPUNodes = gpuNodes.filter(n =>
+      isAllClustersSelected || globalSelectedClusters.some(c => n.cluster === c || n.cluster.startsWith(c))
+    )
+    const totalGPUs = filteredGPUNodes.reduce((sum, n) => sum + (n.gpuCount || 0), 0)
+    const allocatedGPUs = filteredGPUNodes.reduce((sum, n) => sum + (n.gpuAllocated || 0), 0)
+    return { totalGPUs, allocatedGPUs }
+  })()
+
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
@@ -373,9 +384,9 @@ export function Compute() {
       case 'memory':
         return { value: formatMemory(stats?.totalMemoryGB || 0, hasDataToShow), sublabel: 'allocatable', onClick: drillToResources, isClickable: hasDataToShow }
       case 'gpus':
-        return { value: 0, sublabel: 'total GPUs', onClick: drillToResources, isClickable: hasDataToShow }
+        return { value: formatStatValue(gpuStats.totalGPUs, hasDataToShow), sublabel: gpuStats.allocatedGPUs > 0 ? `${gpuStats.allocatedGPUs} allocated` : 'total GPUs', onClick: drillToResources, isClickable: hasDataToShow && gpuStats.totalGPUs > 0 }
       case 'tpus':
-        return { value: 0, sublabel: 'total TPUs', onClick: drillToResources, isClickable: hasDataToShow }
+        return { value: 0, sublabel: 'total TPUs', onClick: drillToResources, isClickable: false } // TPU data not yet available
       case 'pods':
         return { value: formatStatValue(stats?.totalPods || 0, hasDataToShow), sublabel: 'running pods', onClick: drillToResources, isClickable: hasDataToShow }
       case 'cpu_util':
@@ -385,7 +396,7 @@ export function Compute() {
       default:
         return { value: '-', sublabel: '' }
     }
-  }, [stats, hasDataToShow, cpuUtilization, memoryUtilization, drillToResources])
+  }, [stats, hasDataToShow, cpuUtilization, memoryUtilization, gpuStats, drillToResources])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
