@@ -22,7 +22,6 @@ import { Services } from './components/services/Services'
 import { Operators } from './components/operators/Operators'
 import { HelmReleases } from './components/helm/HelmReleases'
 import { Logs } from './components/logs/Logs'
-import { Pods } from './components/pods/Pods'
 import { CardHistory } from './components/history/CardHistory'
 import { CardHistoryEntry } from './hooks/useCardHistory'
 import { UserManagementPage } from './pages/UserManagement'
@@ -139,18 +138,6 @@ function App() {
               <OnboardedRoute>
                 <Layout>
                   <Workloads />
-                </Layout>
-              </OnboardedRoute>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pods"
-          element={
-            <ProtectedRoute>
-              <OnboardedRoute>
-                <Layout>
-                  <Pods />
                 </Layout>
               </OnboardedRoute>
             </ProtectedRoute>
