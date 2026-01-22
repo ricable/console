@@ -75,6 +75,15 @@ export function HelmHistory({ config }: HelmHistoryProps) {
   // Fetch ALL Helm releases from all clusters once (not per-cluster)
   const { releases: allHelmReleases, isLoading: releasesLoading } = useHelmReleases()
 
+  // Look up namespace from the selected release (required for helm history command)
+  const selectedReleaseNamespace = useMemo(() => {
+    if (!selectedCluster || !selectedRelease) return undefined
+    const release = allHelmReleases.find(
+      r => r.cluster === selectedCluster && r.name === selectedRelease
+    )
+    return release?.namespace
+  }, [allHelmReleases, selectedCluster, selectedRelease])
+
   // Fetch history for selected release (hook handles caching)
   const {
     history: rawHistory,
@@ -87,7 +96,7 @@ export function HelmHistory({ config }: HelmHistoryProps) {
   } = useHelmHistory(
     selectedCluster || undefined,
     selectedRelease || undefined,
-    undefined
+    selectedReleaseNamespace
   )
 
   // Only show skeleton when no cached data exists
@@ -276,8 +285,13 @@ export function HelmHistory({ config }: HelmHistoryProps) {
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           Select a cluster and release to view history
         </div>
-      ) : historyLoading && rawHistory.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center">
+      ) : (historyLoading || historyRefreshing) && rawHistory.length === 0 ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-blue-400">
+            <RotateCcw className="w-4 h-4 animate-spin" />
+            <span>Loading history for {selectedRelease}...</span>
+          </div>
+          <Skeleton variant="rounded" height={50} className="w-full" />
           <Skeleton variant="rounded" height={50} className="w-full" />
         </div>
       ) : (
