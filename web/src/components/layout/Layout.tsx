@@ -89,7 +89,7 @@ export function Layout({ children }: LayoutProps) {
               <WifiOff className="w-4 h-4 text-orange-400 shrink-0" />
               <span className="text-sm text-orange-400 font-medium shrink-0">Offline</span>
               <span className="text-xs text-orange-400/70 truncate">
-                — Install: <code className="bg-orange-500/20 px-1 rounded">brew install kubestellar/tap/kkc-agent</code> → run <code className="bg-orange-500/20 px-1 rounded">kkc-agent</code> → configure your AI agent API keys in settings
+                — Install: <code className="bg-orange-500/20 px-1 rounded">brew install kubestellar/tap/kkc-agent</code> → run <code className="bg-orange-500/20 px-1 rounded">kkc-agent</code> → configure your AI agent API keys in Settings
               </span>
             </div>
             <div className="flex items-center gap-2 shrink-0 ml-2">
@@ -98,7 +98,7 @@ export function Layout({ children }: LayoutProps) {
                 className="flex items-center gap-1 text-xs px-2 py-0.5 bg-orange-500/20 hover:bg-orange-500/30 text-orange-400 rounded transition-colors whitespace-nowrap"
               >
                 <Settings className="w-3 h-3" />
-                Setup
+                Settings
               </Link>
               <button
                 onClick={toggleDemoMode}
