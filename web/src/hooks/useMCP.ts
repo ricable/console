@@ -4307,16 +4307,18 @@ export function useHelmHistory(cluster?: string, release?: string, namespace?: s
   const [lastRefresh, setLastRefresh] = useState<number | null>(cachedEntry?.timestamp || null)
 
   const refetch = useCallback(async () => {
+    // Always set isRefreshing to show animation on manual refresh (even if returning early)
+    setIsRefreshing(true)
+
     if (!release) {
       setHistory([])
+      // Brief delay before clearing isRefreshing so animation shows
+      setTimeout(() => setIsRefreshing(false), 100)
       return
     }
-
-    // Always set isRefreshing to show animation on manual refresh
-    setIsRefreshing(true)
     // Also set loading if no cached data (use functional update to check)
     setHistory(prev => {
-      if (prev.length === 0 && (!cachedEntry?.data?.length)) {
+      if (prev.length === 0) {
         setIsLoading(true)
       }
       return prev
@@ -4347,19 +4349,24 @@ export function useHelmHistory(cluster?: string, release?: string, namespace?: s
       setError(errorMessage)
       setConsecutiveFailures(prev => prev + 1)
 
-      // Update cache failure count
-      if (cluster && release && cachedEntry) {
-        helmHistoryCache.set(`${cluster}:${release}`, {
-          ...cachedEntry,
-          consecutiveFailures: (cachedEntry.consecutiveFailures || 0) + 1
-        })
+      // Update cache failure count on error
+      if (cluster && release) {
+        const currentCached = helmHistoryCache.get(`${cluster}:${release}`)
+        if (currentCached) {
+          helmHistoryCache.set(`${cluster}:${release}`, {
+            ...currentCached,
+            consecutiveFailures: (currentCached.consecutiveFailures || 0) + 1
+          })
+        }
       }
       // Keep cached data on error
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
     }
-  }, [cluster, release, namespace, cachedEntry])
+    // Note: cachedEntry deliberately excluded to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cluster, release, namespace])
 
   useEffect(() => {
     // Use cached data if available
@@ -4405,13 +4412,16 @@ export function useHelmValues(cluster?: string, release?: string, namespace?: st
   const [lastRefresh, setLastRefresh] = useState<number | null>(cachedEntry?.timestamp || null)
 
   const refetch = useCallback(async () => {
+    // Always set isRefreshing to show animation on manual refresh (even if returning early)
+    setIsRefreshing(true)
+
     if (!release) {
       setValues(null)
+      // Brief delay before clearing isRefreshing so animation shows
+      setTimeout(() => setIsRefreshing(false), 100)
       return
     }
 
-    // Always set isRefreshing to show animation on manual refresh
-    setIsRefreshing(true)
     // Also set loading if no cached data (use functional update to check)
     setValues(prev => {
       if (prev === null && cachedEntry?.values === null) {
