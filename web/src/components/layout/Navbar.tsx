@@ -132,10 +132,10 @@ export function Navbar() {
   // Animate token icon when usage increases significantly
   useEffect(() => {
     const increase = usage.used - previousTokensRef.current
-    // Trigger animation if tokens increased by more than 500
-    if (increase > 500) {
+    // Trigger animation if tokens increased by more than 100 (lowered for better visibility)
+    if (increase > 100) {
       setTokenAnimating(true)
-      const timer = setTimeout(() => setTokenAnimating(false), 1000)
+      const timer = setTimeout(() => setTokenAnimating(false), 2000)
       return () => clearTimeout(timer)
     }
     previousTokensRef.current = usage.used
@@ -838,7 +838,7 @@ export function Navbar() {
             }`}
             title={`Token usage: ${percentage.toFixed(0)}%`}
           >
-            <Coins className={cn("w-4 h-4 transition-transform", tokenAnimating && "animate-bounce text-yellow-400")} />
+            <Coins className={cn("w-4 h-4 transition-transform", tokenAnimating && "animate-bounce text-yellow-400 scale-125")} />
             <span className="text-xs font-medium hidden sm:inline">{percentage.toFixed(0)}%</span>
             <div className="w-12 h-1.5 bg-secondary rounded-full overflow-hidden hidden sm:block">
               <div

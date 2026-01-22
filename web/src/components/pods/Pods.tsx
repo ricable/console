@@ -1,0 +1,622 @@
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { Box, Plus, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Hourglass, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { usePodIssues, useClusters } from '../../hooks/useMCP'
+import { useGlobalFilters } from '../../hooks/useGlobalFilters'
+import { useShowCards } from '../../hooks/useShowCards'
+import { useDrillDownActions } from '../../hooks/useDrillDown'
+import { useDashboardReset } from '../../hooks/useDashboardReset'
+import { StatusIndicator } from '../charts/StatusIndicator'
+import { ClusterBadge } from '../ui/ClusterBadge'
+import { Skeleton } from '../ui/Skeleton'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
+import { CardWrapper } from '../cards/CardWrapper'
+import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
+import { AddCardModal } from '../dashboard/AddCardModal'
+import { TemplatesModal } from '../dashboard/TemplatesModal'
+import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
+import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
+import { DashboardTemplate } from '../dashboard/templates'
+import { formatCardTitle } from '../../lib/formatCardTitle'
+
+interface PodCard {
+  id: string
+  card_type: string
+  config: Record<string, unknown>
+  title?: string
+  position?: { w: number; h: number }
+}
+
+const PODS_CARDS_KEY = 'kubestellar-pods-cards'
+
+// Default cards for the pods dashboard
+const DEFAULT_POD_CARDS: PodCard[] = [
+  { id: 'default-pod-issues', card_type: 'pod_issues', title: 'Pod Issues', config: {}, position: { w: 6, h: 2 } },
+  { id: 'default-pod-health-trend', card_type: 'pod_health_trend', title: 'Pod Health Trend', config: {}, position: { w: 6, h: 2 } },
+  { id: 'default-top-pods', card_type: 'top_pods', title: 'Top Pods', config: {}, position: { w: 6, h: 2 } },
+  { id: 'default-app-status', card_type: 'app_status', title: 'Workload Status', config: {}, position: { w: 6, h: 2 } },
+]
+
+function loadPodCards(): PodCard[] {
+  try {
+    const stored = localStorage.getItem(PODS_CARDS_KEY)
+    if (stored) {
+      return JSON.parse(stored)
+    }
+  } catch {
+    // Fall through to return defaults
+  }
+  return DEFAULT_POD_CARDS
+}
+
+function savePodCards(cards: PodCard[]) {
+  localStorage.setItem(PODS_CARDS_KEY, JSON.stringify(cards))
+}
+
+// Sortable card component with drag handle
+interface SortablePodCardProps {
+  card: PodCard
+  onConfigure: () => void
+  onRemove: () => void
+  onWidthChange: (newWidth: number) => void
+  isDragging: boolean
+}
+
+const SortablePodCard = memo(function SortablePodCard({
+  card,
+  onConfigure,
+  onRemove,
+  onWidthChange,
+  isDragging,
+}: SortablePodCardProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id: card.id })
+
+  const cardWidth = card.position?.w || 4
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    gridColumn: `span ${cardWidth}`,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  const CardComponent = CARD_COMPONENTS[card.card_type]
+  if (!CardComponent) {
+    console.warn(`Unknown card type: ${card.card_type}`)
+    return null
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <CardWrapper
+        cardId={card.id}
+        cardType={card.card_type}
+        title={formatCardTitle(card.card_type)}
+        cardWidth={cardWidth}
+        onConfigure={onConfigure}
+        onRemove={onRemove}
+        onWidthChange={onWidthChange}
+        isDemoData={DEMO_DATA_CARDS.has(card.card_type)}
+        dragHandle={
+          <button
+            {...attributes}
+            {...listeners}
+            className="p-1 rounded hover:bg-secondary cursor-grab active:cursor-grabbing"
+            title="Drag to reorder"
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </button>
+        }
+      >
+        <CardComponent config={card.config} />
+      </CardWrapper>
+    </div>
+  )
+})
+
+// Drag preview for overlay
+function PodDragPreviewCard({ card }: { card: PodCard }) {
+  const cardWidth = card.position?.w || 4
+  return (
+    <div
+      className="glass rounded-lg p-4 shadow-xl"
+      style={{ width: `${(cardWidth / 12) * 100}%`, minWidth: 200, maxWidth: 400 }}
+    >
+      <div className="flex items-center gap-2">
+        <GripVertical className="w-4 h-4 text-muted-foreground" />
+        <span className="text-sm font-medium truncate">
+          {formatCardTitle(card.card_type)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+export function Pods() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastUpdated, refetch: refetchPodIssues } = usePodIssues()
+  const { clusters, isLoading: clustersLoading, refetch: refetchClusters } = useClusters()
+  const { drillToPod } = useDrillDownActions()
+
+  // Card state
+  const [cards, setCards] = useState<PodCard[]>(() => loadPodCards())
+  const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-pods')
+  const [showAddCard, setShowAddCard] = useState(false)
+
+  // Reset functionality using shared hook
+  const { isCustomized, setCustomized, reset } = useDashboardReset({
+    storageKey: PODS_CARDS_KEY,
+    defaultCards: DEFAULT_POD_CARDS,
+    setCards,
+    cards,
+  })
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [configuringCard, setConfiguringCard] = useState<PodCard | null>(null)
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string)
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setActiveId(null)
+
+    if (over && active.id !== over.id) {
+      setCards((items) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id)
+        const newIndex = items.findIndex((item) => item.id === over.id)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
+
+  // Combined loading/refreshing states
+  const isLoading = podIssuesLoading || clustersLoading
+  const isRefreshing = podIssuesRefreshing
+  const isFetching = isLoading || isRefreshing
+  const showSkeletons = podIssues.length === 0 && isLoading
+
+  // Save cards to localStorage when they change
+  useEffect(() => {
+    savePodCards(cards)
+    setCustomized(true)
+  }, [cards, setCustomized])
+
+  // Handle addCard URL param
+  useEffect(() => {
+    if (searchParams.get('addCard') === 'true') {
+      setShowAddCard(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    if (!autoRefresh) return
+
+    const interval = setInterval(() => {
+      Promise.all([refetchPodIssues(), refetchClusters()])
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [autoRefresh, refetchPodIssues, refetchClusters])
+
+  const handleRefresh = useCallback(() => {
+    refetchPodIssues()
+    refetchClusters()
+  }, [refetchPodIssues, refetchClusters])
+
+  const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
+    const cardsToAdd: PodCard[] = newCards.map(card => ({
+      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      card_type: card.type,
+      config: card.config,
+      title: card.title,
+    }))
+    setCards(prev => [...prev, ...cardsToAdd])
+    expandCards()
+    setShowAddCard(false)
+  }, [expandCards])
+
+  const handleRemoveCard = useCallback((cardId: string) => {
+    setCards(prev => prev.filter(c => c.id !== cardId))
+  }, [])
+
+  const handleConfigureCard = useCallback((cardId: string) => {
+    const card = cards.find(c => c.id === cardId)
+    if (card) setConfiguringCard(card)
+  }, [cards])
+
+  const handleSaveCardConfig = useCallback((cardId: string, config: Record<string, unknown>) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, config } : c
+    ))
+    setConfiguringCard(null)
+  }, [])
+
+  const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
+    setCards(prev => prev.map(c =>
+      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
+    ))
+  }, [])
+
+  const applyTemplate = useCallback((template: DashboardTemplate) => {
+    const newCards: PodCard[] = template.cards.map(card => ({
+      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      card_type: card.card_type,
+      config: card.config || {},
+      title: card.title,
+    }))
+    setCards(newCards)
+    expandCards()
+    setShowTemplates(false)
+  }, [expandCards])
+
+  const {
+    selectedClusters: globalSelectedClusters,
+    isAllClustersSelected,
+    customFilter,
+  } = useGlobalFilters()
+
+  // Filter pod issues by global cluster selection
+  const filteredPodIssues = useMemo(() => {
+    let filtered = podIssues
+
+    if (!isAllClustersSelected) {
+      filtered = filtered.filter(issue =>
+        issue.cluster && globalSelectedClusters.includes(issue.cluster)
+      )
+    }
+
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      filtered = filtered.filter(issue =>
+        issue.name.toLowerCase().includes(query) ||
+        issue.namespace.toLowerCase().includes(query) ||
+        (issue.cluster && issue.cluster.toLowerCase().includes(query)) ||
+        (issue.reason && issue.reason.toLowerCase().includes(query))
+      )
+    }
+
+    return filtered
+  }, [podIssues, globalSelectedClusters, isAllClustersSelected, customFilter])
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    const totalPods = clusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
+    const issueCount = filteredPodIssues.length
+    const pendingCount = filteredPodIssues.filter(p => p.reason === 'Pending' || p.status === 'Pending').length
+    const restartCount = filteredPodIssues.filter(p => (p.restarts || 0) > 5).length
+    const clusterCount = isAllClustersSelected ? clusters.length : globalSelectedClusters.length
+
+    return {
+      totalPods,
+      healthy: Math.max(0, totalPods - issueCount),
+      issues: issueCount,
+      pending: pendingCount,
+      restarts: restartCount,
+      clusters: clusterCount,
+    }
+  }, [clusters, filteredPodIssues, isAllClustersSelected, globalSelectedClusters])
+
+  // Stats value getter
+  const getStatValue = useCallback((blockId: string): StatBlockValue => {
+    const drillToFirstIssue = () => {
+      if (filteredPodIssues.length > 0 && filteredPodIssues[0]) {
+        drillToPod(filteredPodIssues[0].cluster || '', filteredPodIssues[0].namespace, filteredPodIssues[0].name)
+      }
+    }
+
+    switch (blockId) {
+      case 'total_pods':
+        return { value: stats.totalPods, sublabel: 'total pods' }
+      case 'healthy':
+        return { value: stats.healthy, sublabel: 'healthy pods' }
+      case 'issues':
+        return { value: stats.issues, sublabel: 'pod issues', onClick: drillToFirstIssue, isClickable: stats.issues > 0 }
+      case 'pending':
+        return { value: stats.pending, sublabel: 'pending pods' }
+      case 'restarts':
+        return { value: stats.restarts, sublabel: 'high restart pods' }
+      case 'clusters':
+        return { value: stats.clusters, sublabel: 'clusters' }
+      default:
+        return { value: '-', sublabel: '' }
+    }
+  }, [stats, filteredPodIssues, drillToPod])
+
+  // Transform card for ConfigureCardModal
+  const configureCard = configuringCard ? {
+    id: configuringCard.id,
+    card_type: configuringCard.card_type,
+    config: configuringCard.config,
+    title: configuringCard.title,
+  } : null
+
+  return (
+    <div className="pt-16">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Box className="w-6 h-6 text-purple-400" />
+                Pods
+              </h1>
+              <p className="text-muted-foreground">Monitor pod health and issues across clusters</p>
+            </div>
+            {isRefreshing && (
+              <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
+                <Hourglass className="w-3 h-3" />
+                <span>Updating</span>
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <label htmlFor="pods-auto-refresh" className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
+              <input
+                type="checkbox"
+                id="pods-auto-refresh"
+                checked={autoRefresh}
+                onChange={(e) => setAutoRefresh(e.target.checked)}
+                className="rounded border-border w-3.5 h-3.5"
+              />
+              Auto
+            </label>
+            <button
+              onClick={handleRefresh}
+              disabled={isFetching}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors disabled:opacity-50"
+              title="Refresh data"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <StatsOverview
+        dashboardType="pods"
+        getStatValue={getStatValue}
+        hasData={!showSkeletons}
+        isLoading={showSkeletons}
+        lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-pods-stats-collapsed"
+      />
+
+      {/* Dashboard Cards Section */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setShowCards(!showCards)}
+            className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <LayoutGrid className="w-4 h-4" />
+            <span>Pod Cards ({cards.length})</span>
+            {showCards ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Cards grid */}
+        {showCards && (
+          <>
+            {cards.length === 0 ? (
+              <div className="glass p-8 rounded-lg border-2 border-dashed border-border/50 text-center">
+                <div className="flex justify-center mb-4">
+                  <Box className="w-12 h-12 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground mb-2">Pods Dashboard</h3>
+                <p className="text-muted-foreground text-sm max-w-md mx-auto mb-4">
+                  Add cards to monitor pod health, issues, and resource usage across your clusters.
+                </p>
+                <button
+                  onClick={() => setShowAddCard(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Cards
+                </button>
+              </div>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={cards.map(c => c.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-12 gap-4">
+                    {cards.map(card => (
+                      <SortablePodCard
+                        key={card.id}
+                        card={card}
+                        onConfigure={() => handleConfigureCard(card.id)}
+                        onRemove={() => handleRemoveCard(card.id)}
+                        onWidthChange={(newWidth) => handleWidthChange(card.id, newWidth)}
+                        isDragging={activeId === card.id}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+                <DragOverlay>
+                  {activeId ? (
+                    <div className="opacity-80 rotate-3 scale-105">
+                      <PodDragPreviewCard card={cards.find(c => c.id === activeId)!} />
+                    </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Floating action buttons */}
+      <FloatingDashboardActions
+        onAddCard={() => setShowAddCard(true)}
+        onOpenTemplates={() => setShowTemplates(true)}
+        onReset={reset}
+        isCustomized={isCustomized}
+      />
+
+      {/* Add Card Modal */}
+      <AddCardModal
+        isOpen={showAddCard}
+        onClose={() => setShowAddCard(false)}
+        onAddCards={handleAddCards}
+        existingCardTypes={cards.map(c => c.card_type)}
+      />
+
+      {/* Templates Modal */}
+      <TemplatesModal
+        isOpen={showTemplates}
+        onClose={() => setShowTemplates(false)}
+        onApplyTemplate={applyTemplate}
+      />
+
+      {/* Configure Card Modal */}
+      <ConfigureCardModal
+        isOpen={!!configuringCard}
+        card={configureCard}
+        onClose={() => setConfiguringCard(null)}
+        onSave={handleSaveCardConfig}
+      />
+
+      {/* Pod Issues List */}
+      {showSkeletons ? (
+        <div className="space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="glass p-4 rounded-lg border-l-4 border-l-gray-500/50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Skeleton variant="circular" width={24} height={24} />
+                  <div>
+                    <Skeleton variant="text" width={150} height={20} className="mb-1" />
+                    <Skeleton variant="rounded" width={80} height={18} />
+                  </div>
+                </div>
+                <Skeleton variant="text" width={100} height={20} />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : filteredPodIssues.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎉</div>
+          <p className="text-lg text-foreground">No Pod Issues</p>
+          <p className="text-sm text-muted-foreground">All pods are running healthy across your clusters</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-foreground mb-4">Pod Issues ({filteredPodIssues.length})</h2>
+          {filteredPodIssues.map((issue, i) => (
+            <div
+              key={i}
+              onClick={() => drillToPod(issue.cluster || '', issue.namespace, issue.name)}
+              className={`glass p-4 rounded-lg cursor-pointer transition-all hover:scale-[1.01] border-l-4 ${
+                issue.reason === 'CrashLoopBackOff' || issue.reason === 'OOMKilled' ? 'border-l-red-500' :
+                issue.reason === 'Pending' || issue.reason === 'ContainerCreating' ? 'border-l-yellow-500' :
+                'border-l-orange-500'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <StatusIndicator
+                    status={issue.reason === 'CrashLoopBackOff' || issue.reason === 'OOMKilled' ? 'error' : 'warning'}
+                    size="lg"
+                  />
+                  <div>
+                    <h3 className="font-semibold text-foreground">{issue.name}</h3>
+                    <div className="flex items-center gap-2">
+                      <ClusterBadge cluster={issue.cluster?.split('/').pop() || 'unknown'} size="sm" />
+                      <span className="text-xs text-muted-foreground">{issue.namespace}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <div className="text-sm font-medium text-orange-400">{issue.reason || 'Unknown'}</div>
+                    <div className="text-xs text-muted-foreground">{issue.status || 'Unknown status'}</div>
+                  </div>
+                  {(issue.restarts || 0) > 0 && (
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-red-400">{issue.restarts}</div>
+                      <div className="text-xs text-muted-foreground">Restarts</div>
+                    </div>
+                  )}
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Clusters Summary */}
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold text-foreground mb-4">Clusters Overview</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {clusters
+            .filter(cluster => isAllClustersSelected || globalSelectedClusters.includes(cluster.name))
+            .map((cluster) => (
+            <div key={cluster.name} className="glass p-3 rounded-lg">
+              <div className="flex items-center gap-2 mb-2">
+                <StatusIndicator
+                  status={cluster.reachable === false ? 'unreachable' : cluster.healthy ? 'healthy' : 'error'}
+                  size="sm"
+                />
+                <span className="font-medium text-foreground text-sm truncate">
+                  {cluster.context || cluster.name.split('/').pop()}
+                </span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {cluster.reachable !== false ? (cluster.podCount ?? '-') : '-'} pods
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
