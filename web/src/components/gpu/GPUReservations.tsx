@@ -119,7 +119,7 @@ function getMockQuotas(): GPUQuota[] {
 export function GPUReservations() {
   const { nodes: rawNodes, isLoading } = useGPUNodes()
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
-  const { isDemoMode } = useDemoMode()
+  const { isDemoMode: _isDemoMode } = useDemoMode()
   const [activeTab, setActiveTab] = useState<ViewTab>('overview')
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [showNewReservationForm, setShowNewReservationForm] = useState(false)

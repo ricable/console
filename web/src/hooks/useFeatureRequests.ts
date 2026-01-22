@@ -344,6 +344,46 @@ export function useNotifications() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const pollingRef = useRef<number | null>(null)
 
+  // Get unread count for a specific feature request
+  const getUnreadCountForRequest = useCallback((featureRequestId: string): number => {
+    return notifications.filter(n =>
+      n.feature_request_id === featureRequestId && !n.read
+    ).length
+  }, [notifications])
+
+  // Mark all notifications for a specific feature request as read
+  const markRequestNotificationsAsRead = useCallback(async (featureRequestId: string) => {
+    // Get unread notifications for this request
+    const unreadForRequest = notifications.filter(n =>
+      n.feature_request_id === featureRequestId && !n.read
+    )
+
+    if (unreadForRequest.length === 0) return
+
+    // In demo mode, just update local state
+    if (isDemoUser()) {
+      setNotifications(prev =>
+        prev.map(n => n.feature_request_id === featureRequestId ? { ...n, read: true } : n)
+      )
+      setUnreadCount(prev => Math.max(0, prev - unreadForRequest.length))
+      return
+    }
+
+    // Mark each notification as read
+    try {
+      await Promise.all(unreadForRequest.map(n =>
+        api.post(`/api/notifications/${n.id}/read`)
+      ))
+      setNotifications(prev =>
+        prev.map(n => n.feature_request_id === featureRequestId ? { ...n, read: true } : n)
+      )
+      setUnreadCount(prev => Math.max(0, prev - unreadForRequest.length))
+    } catch (err) {
+      console.error('Failed to mark request notifications as read:', err)
+      throw err
+    }
+  }, [notifications])
+
   const loadNotifications = useCallback(async () => {
     // In demo mode, use mock data
     if (isDemoUser()) {
@@ -453,6 +493,8 @@ export function useNotifications() {
     markAsRead,
     markAllAsRead,
     refresh,
+    getUnreadCountForRequest,
+    markRequestNotificationsAsRead,
   }
 }
 

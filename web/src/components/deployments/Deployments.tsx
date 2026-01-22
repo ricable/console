@@ -26,7 +26,7 @@ import { useShowCards } from '../../hooks/useShowCards'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
-import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
+import { CARD_COMPONENTS, DEMO_DATA_CARDS, getDefaultCardWidth } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
 import { TemplatesModal } from '../dashboard/TemplatesModal'
 import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
@@ -93,10 +93,12 @@ const SortableDeploymentsCard = memo(function SortableDeploymentsCard({
   } = useSortable({ id: card.id })
 
   const cardWidth = card.position?.w || 6
+  const cardHeight = card.position?.h || 3
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     gridColumn: `span ${cardWidth}`,
+    gridRow: `span ${cardHeight}`,
     opacity: isDragging ? 0.5 : 1,
   }
 
@@ -156,7 +158,7 @@ export function Deployments() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { deployments, isLoading, isRefreshing, lastUpdated, refetch } = useDeployments()
   const { issues: deploymentIssues, refetch: refetchIssues } = useDeploymentIssues()
-  const { clusters } = useClusters()
+  const { clusters: _clusters } = useClusters()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
 
   // Card state
@@ -240,6 +242,10 @@ export function Deployments() {
       card_type: card.type,
       config: card.config,
       title: card.title,
+      position: {
+        w: getDefaultCardWidth(card.type),
+        h: card.type === 'cluster_resource_tree' ? 5 : 3,
+      },
     }))
     setCards(prev => [...prev, ...cardsToAdd])
     expandCards()

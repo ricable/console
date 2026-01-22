@@ -28,7 +28,7 @@ import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
 import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { CardWrapper } from '../cards/CardWrapper'
-import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
+import { CARD_COMPONENTS, DEMO_DATA_CARDS, getDefaultCardWidth } from '../cards/cardRegistry'
 import { getDefaultCards, DashboardType, DEFAULT_CLUSTERS_CARDS } from '../../lib/defaultCards'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
 import { ClusterDetailModal } from './ClusterDetailModal'
@@ -96,10 +96,12 @@ const SortableClusterCard = memo(function SortableClusterCard({
   } = useSortable({ id: card.id })
 
   const cardWidth = card.position?.w || 4
+  const cardHeight = card.position?.h || 3
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     gridColumn: `span ${cardWidth}`,
+    gridRow: `span ${cardHeight}`,
     opacity: isDragging ? 0.5 : 1,
   }
 
@@ -1610,7 +1612,11 @@ export function Clusters() {
       card_type: card.type,
       config: card.config,
       title: card.title,
-      position: { w: 4, h: 2 },
+      // Use default width from card registry, with height based on card type
+      position: {
+        w: getDefaultCardWidth(card.type),
+        h: card.type === 'cluster_resource_tree' ? 5 : 3, // Taller for tree view
+      },
     }))
     setCards(prev => [...prev, ...cardsToAdd])
     expandCards()

@@ -235,7 +235,10 @@ export function ClusterMetrics() {
 
     // Build data with all clusters as keys
     const chartData = filteredHistory.map(point => {
-      const entry: Record<string, string | number> = { time: point.time }
+      const entry: { time: string; value: number; [key: string]: string | number } = {
+        time: point.time,
+        value: 0, // Required by DataPoint interface, not used by MultiSeriesChart
+      }
       clusterNames.forEach(name => {
         const clusterData = point.clusters?.[name]
         entry[name] = clusterData ? clusterData[selectedMetric] : 0
