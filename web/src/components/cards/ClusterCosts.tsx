@@ -1,11 +1,42 @@
-import { useMemo, useState, useEffect } from 'react'
-import { DollarSign, Server, Cpu, HardDrive, TrendingUp, Info, ExternalLink, ChevronDown, Sparkles, Settings2 } from 'lucide-react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
+import { DollarSign, Server, Cpu, HardDrive, TrendingUp, Info, ExternalLink, ChevronDown, Sparkles, Settings2, Pencil } from 'lucide-react'
 import { useClusters, useGPUNodes } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { Skeleton } from '../ui/Skeleton'
 import { RefreshButton } from '../ui/RefreshIndicator'
+import { CloudProviderIcon, type CloudProvider as IconProvider } from '../ui/CloudProviderIcon'
 
 type CloudProvider = 'estimate' | 'aws' | 'gcp' | 'azure' | 'oci' | 'openshift'
+
+// Map ClusterCosts provider type to CloudProviderIcon provider type
+const mapProviderToIconProvider = (provider: CloudProvider): IconProvider => {
+  switch (provider) {
+    case 'aws': return 'eks'
+    case 'gcp': return 'gke'
+    case 'azure': return 'aks'
+    case 'openshift': return 'openshift'
+    case 'oci': return 'oci'
+    case 'estimate':
+    default:
+      return 'kubernetes'
+  }
+}
+
+// LocalStorage key for persisting provider overrides (moved outside component)
+const PROVIDER_OVERRIDES_KEY = 'kubestellar-cluster-provider-overrides'
+
+// Load persisted overrides from localStorage (moved outside component)
+const loadPersistedOverrides = (configOverrides?: Record<string, CloudProvider>): Record<string, CloudProvider> => {
+  try {
+    const saved = localStorage.getItem(PROVIDER_OVERRIDES_KEY)
+    if (saved) {
+      return JSON.parse(saved)
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return configOverrides || {}
+}
 type PricingMode = 'uniform' | 'per-cluster'
 
 // Cloud provider icons (simple text badges for now, could be SVG logos)
@@ -128,20 +159,6 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
     customFilter,
   } = useGlobalFilters()
 
-  // Load persisted provider overrides from localStorage
-  const PROVIDER_OVERRIDES_KEY = 'kubestellar-cluster-provider-overrides'
-  const loadPersistedOverrides = (): Record<string, CloudProvider> => {
-    try {
-      const saved = localStorage.getItem(PROVIDER_OVERRIDES_KEY)
-      if (saved) {
-        return JSON.parse(saved)
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return config?.clusterProviders || {}
-  }
-
   // Cloud provider selection
   const [selectedProvider, setSelectedProvider] = useState<CloudProvider>(config?.provider || 'estimate')
   const [showProviderMenu, setShowProviderMenu] = useState(false)
@@ -150,7 +167,7 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
   const [pricingMode, setPricingMode] = useState<PricingMode>(config?.pricingMode || 'per-cluster')
   const [showSettingsMenu, setShowSettingsMenu] = useState(false)
   const [clusterProviderOverrides, setClusterProviderOverrides] = useState<Record<string, CloudProvider>>(
-    loadPersistedOverrides
+    () => loadPersistedOverrides(config?.clusterProviders)
   )
 
   // Persist provider overrides to localStorage
@@ -227,8 +244,8 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
     return map
   }, [gpuNodes])
 
-  // Get the provider for a specific cluster
-  const getClusterProvider = (clusterName: string, context?: string): CloudProvider => {
+  // Get the provider for a specific cluster (memoized to prevent re-renders)
+  const getClusterProvider = useCallback((clusterName: string, context?: string): CloudProvider => {
     // Check for manual override first
     if (clusterProviderOverrides[clusterName]) {
       return clusterProviderOverrides[clusterName]
@@ -239,7 +256,7 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
     }
     // In per-cluster mode, detect from cluster name
     return detectClusterProvider(clusterName, context)
-  }
+  }, [clusterProviderOverrides, pricingMode, selectedProvider])
 
   // Get per-cluster detected providers for the UI
   const clusterProviders = useMemo(() => {
@@ -248,7 +265,7 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
       map[cluster.name] = getClusterProvider(cluster.name, cluster.context)
     })
     return map
-  }, [clusters, pricingMode, selectedProvider, clusterProviderOverrides])
+  }, [clusters, getClusterProvider])
 
   const clusterCosts = useMemo(() => {
     return clusters.map(cluster => {
@@ -568,44 +585,52 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <Server className="w-4 h-4 text-muted-foreground" />
-                  {/* Vendor badge - left of cluster name */}
-                  <div className="relative group/provider">
-                    <button
-                      className={`px-1.5 py-0.5 text-[9px] font-medium rounded ${providerIcon.bg} ${providerIcon.color} ${
-                        isOverridden ? 'ring-1 ring-purple-500/50' : ''
-                      } hover:opacity-80 transition-opacity`}
-                      title={`${providerPricing.name}${isOverridden ? ' (manually set)' : pricingMode === 'per-cluster' ? ' (auto-detected)' : ''} - Click to change`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        // Cycle through providers
-                        const providers: CloudProvider[] = ['estimate', 'aws', 'gcp', 'azure', 'oci', 'openshift']
-                        const currentIdx = providers.indexOf(cluster.provider)
-                        const nextProvider = providers[(currentIdx + 1) % providers.length]
-                        setClusterProviderOverrides(prev => ({
-                          ...prev,
-                          [cluster.name]: nextProvider
-                        }))
-                      }}
-                      onContextMenu={(e) => {
-                        e.preventDefault()
-                        // Right-click to clear override and use auto-detection
-                        if (clusterProviderOverrides[cluster.name]) {
-                          setClusterProviderOverrides(prev => {
-                            const next = { ...prev }
-                            delete next[cluster.name]
-                            return next
-                          })
-                        }
-                      }}
-                    >
-                      {providerIcon.short}
-                    </button>
+                  {/* 1. Server icon */}
+                  <Server className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  {/* 2. Vendor logo icon */}
+                  <div className="flex-shrink-0" title={providerPricing.name}>
+                    <CloudProviderIcon provider={mapProviderToIconProvider(cluster.provider)} size={16} />
                   </div>
-                  <span className="text-sm font-medium text-foreground">{cluster.name}</span>
-                  <div className={`w-1.5 h-1.5 rounded-full ${cluster.healthy ? 'bg-green-500' : 'bg-red-500'}`} />
+                  {/* 3. Text badge (clickable to change) - styled as obvious editable button */}
+                  <button
+                    className={`group/badge px-1.5 py-0.5 text-[9px] font-medium rounded flex-shrink-0 flex items-center gap-0.5 border border-dashed ${providerIcon.bg} ${providerIcon.color} ${
+                      isOverridden
+                        ? 'ring-1 ring-purple-500/50 border-purple-500/50'
+                        : 'border-current/30 hover:border-current/60'
+                    } hover:scale-105 active:scale-95 transition-all cursor-pointer`}
+                    title={`${providerPricing.name}${isOverridden ? ' (manually set)' : pricingMode === 'per-cluster' ? ' (auto-detected)' : ''}\nClick to change • Right-click to reset`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      // Cycle through providers
+                      const providers: CloudProvider[] = ['estimate', 'aws', 'gcp', 'azure', 'oci', 'openshift']
+                      const currentIdx = providers.indexOf(cluster.provider)
+                      const nextProvider = providers[(currentIdx + 1) % providers.length]
+                      setClusterProviderOverrides(prev => ({
+                        ...prev,
+                        [cluster.name]: nextProvider
+                      }))
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault()
+                      // Right-click to clear override and use auto-detection
+                      if (clusterProviderOverrides[cluster.name]) {
+                        setClusterProviderOverrides(prev => {
+                          const next = { ...prev }
+                          delete next[cluster.name]
+                          return next
+                        })
+                      }
+                    }}
+                  >
+                    {providerIcon.short}
+                    <Pencil className="w-2 h-2 opacity-0 group-hover/badge:opacity-100 transition-opacity" />
+                  </button>
+                  {/* 4. Cluster name */}
+                  <span className="text-sm font-medium text-foreground truncate">{cluster.name}</span>
+                  {/* 5. Health dot */}
+                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cluster.healthy ? 'bg-green-500' : 'bg-red-500'}`} />
                 </div>
-                <span className="text-sm font-medium text-green-400">
+                <span className="text-sm font-medium text-green-400 flex-shrink-0">
                   ${cluster.monthly.toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo
                 </span>
               </div>
