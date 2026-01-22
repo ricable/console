@@ -869,20 +869,75 @@ function mapVisualizationToCardType(visualization: string, type: string): string
 
 // Get recommended default size for specific card types
 function getDefaultCardSize(cardType: string): { w: number; h: number } {
-  const largeSizeCards: Record<string, { w: number; h: number }> = {
-    // Full-width tall cards
+  const cardSizes: Record<string, { w: number; h: number }> = {
+    // Full-width cards (12 cols) - hierarchical/complex views
     cluster_resource_tree: { w: 12, h: 6 },
-    // Wide cards
-    event_stream: { w: 6, h: 3 },
-    helm_history: { w: 6, h: 3 },
-    namespace_events: { w: 6, h: 3 },
-    // Medium-tall cards
-    gpu_inventory: { w: 6, h: 3 },
-    gpu_workloads: { w: 6, h: 3 },
+
+    // Extra-wide cards (8 cols) - tables with many columns
     pvc_status: { w: 8, h: 3 },
     service_status: { w: 8, h: 3 },
+    security_issues: { w: 8, h: 4 },
+    deployment_issues: { w: 8, h: 3 },
+    user_management: { w: 8, h: 4 },
+    operator_subscriptions: { w: 8, h: 3 },
+    helm_values_diff: { w: 8, h: 4 },
+    chart_versions: { w: 8, h: 3 },
+    namespace_rbac: { w: 8, h: 4 },
+    alert_rules: { w: 8, h: 4 },
+    pod_issues: { w: 8, h: 3 },
+    top_pods: { w: 8, h: 3 },
+
+    // Wide cards (6 cols) - time series, events, medium tables
+    cluster_metrics: { w: 6, h: 3 },
+    events_timeline: { w: 6, h: 3 },
+    pod_health_trend: { w: 6, h: 3 },
+    resource_trend: { w: 6, h: 3 },
+    gpu_usage_trend: { w: 6, h: 3 },
+    gpu_utilization: { w: 6, h: 3 },
+    event_stream: { w: 6, h: 4 },
+    helm_history: { w: 6, h: 3 },
+    namespace_events: { w: 6, h: 4 },
+    gpu_inventory: { w: 6, h: 3 },
+    gpu_workloads: { w: 6, h: 3 },
+    deployment_status: { w: 6, h: 3 },
+    app_status: { w: 6, h: 3 },
+    kustomization_status: { w: 6, h: 3 },
+    gitops_drift: { w: 6, h: 3 },
+    cluster_comparison: { w: 6, h: 3 },
+    cluster_costs: { w: 6, h: 3 },
+    opencost_overview: { w: 6, h: 3 },
+    kubecost_overview: { w: 6, h: 3 },
+    overlay_comparison: { w: 6, h: 3 },
+    argocd_applications: { w: 6, h: 3 },
+
+    // Standard cards (4 cols) - status, gauges, donut charts
+    cluster_health: { w: 4, h: 3 },
+    cluster_focus: { w: 4, h: 3 },
+    resource_usage: { w: 4, h: 3 },
+    resource_capacity: { w: 4, h: 3 },
+    gpu_overview: { w: 4, h: 3 },
+    gpu_status: { w: 4, h: 3 },
+    storage_overview: { w: 4, h: 3 },
+    network_overview: { w: 4, h: 3 },
+    cluster_network: { w: 4, h: 3 },
+    helm_release_status: { w: 4, h: 3 },
+    operator_status: { w: 4, h: 3 },
+    crd_health: { w: 4, h: 3 },
+    namespace_overview: { w: 4, h: 3 },
+    namespace_quotas: { w: 4, h: 3 },
+    active_alerts: { w: 4, h: 3 },
+    argocd_sync_status: { w: 4, h: 3 },
+    argocd_health: { w: 4, h: 3 },
+    opa_policies: { w: 4, h: 3 },
+    kyverno_policies: { w: 4, h: 3 },
+    deployment_progress: { w: 4, h: 3 },
+    upgrade_status: { w: 4, h: 3 },
+    compute_overview: { w: 4, h: 3 },
+    klaude_issues: { w: 4, h: 4 },
+    klaude_kubeconfig_audit: { w: 4, h: 3 },
+    klaude_health_check: { w: 4, h: 3 },
   }
-  return largeSizeCards[cardType] || { w: 4, h: 3 }
+  return cardSizes[cardType] || { w: 4, h: 3 }
 }
 
 function getDemoCards(): Card[] {
