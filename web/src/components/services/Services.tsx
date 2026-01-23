@@ -20,7 +20,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useClusters } from '../../hooks/useMCP'
+import { useClusters, useServices } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
@@ -155,6 +155,7 @@ function ServicesDragPreviewCard({ card }: { card: ServicesCard }) {
 export function Services() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
+  const { services } = useServices()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
 
   // Card state
@@ -280,6 +281,17 @@ export function Services() {
   )
   const reachableClusters = filteredClusters.filter(c => c.reachable !== false)
 
+  // Filter services by selected clusters
+  const filteredServices = services.filter(s =>
+    isAllClustersSelected || globalSelectedClusters.includes(s.cluster || '')
+  )
+
+  // Calculate service stats
+  const totalServices = filteredServices.length
+  const loadBalancers = filteredServices.filter(s => s.type === 'LoadBalancer').length
+  const nodePortServices = filteredServices.filter(s => s.type === 'NodePort').length
+  const clusterIPServices = filteredServices.filter(s => s.type === 'ClusterIP').length
+
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
@@ -287,10 +299,22 @@ export function Services() {
         return { value: reachableClusters.length, sublabel: 'clusters' }
       case 'healthy':
         return { value: reachableClusters.length, sublabel: 'with services' }
+      case 'services':
+        return { value: totalServices, sublabel: 'total services' }
+      case 'loadbalancers':
+        return { value: loadBalancers, sublabel: 'load balancers' }
+      case 'nodeport':
+        return { value: nodePortServices, sublabel: 'NodePort' }
+      case 'clusterip':
+        return { value: clusterIPServices, sublabel: 'ClusterIP' }
+      case 'ingresses':
+        return { value: 0, sublabel: 'ingresses' } // TODO: add ingress data
+      case 'endpoints':
+        return { value: totalServices, sublabel: 'endpoints' }
       default:
         return { value: 0 }
     }
-  }, [reachableClusters.length])
+  }, [reachableClusters.length, totalServices, loadBalancers, nodePortServices, clusterIPServices])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
