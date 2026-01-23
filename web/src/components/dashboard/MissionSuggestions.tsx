@@ -54,7 +54,8 @@ export function MissionSuggestions() {
   // Force dependency on snoozedMissions for reactivity
   void snoozedMissions
 
-  const handleAction = (suggestion: MissionSuggestion) => {
+  const handleAction = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+    e.stopPropagation()
     setProcessingId(suggestion.id)
     // Close dropdown immediately before action
     setExpandedId(null)
@@ -75,7 +76,8 @@ export function MissionSuggestions() {
     setProcessingId(null)
   }
 
-  const handleRepair = (suggestion: MissionSuggestion) => {
+  const handleRepair = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+    e.stopPropagation()
     setProcessingId(suggestion.id)
     // Close dropdown immediately before action
     setExpandedId(null)
@@ -170,7 +172,7 @@ export function MissionSuggestions() {
                     {/* Action buttons */}
                     <div className="flex flex-wrap gap-1.5">
                       <button
-                        onClick={() => handleAction(suggestion)}
+                        onClick={(e) => handleAction(e, suggestion)}
                         disabled={isProcessing}
                         className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
                           suggestion.priority === 'critical'
@@ -184,7 +186,7 @@ export function MissionSuggestions() {
                         {suggestion.action.label}
                       </button>
                       <button
-                        onClick={() => handleRepair(suggestion)}
+                        onClick={(e) => handleRepair(e, suggestion)}
                         disabled={isProcessing}
                         className="px-2 py-1.5 rounded text-xs font-medium bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors flex items-center gap-1"
                         title="Klaude Repair - automatically fix this issue"
