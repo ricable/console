@@ -25,7 +25,8 @@ const SORT_OPTIONS = [
 
 export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
   const { clusters: allClusters, isLoading: clustersLoading, isRefreshing: clustersRefreshing, refetch: refetchClusters, isFailed, consecutiveFailures, lastRefresh } = useClusters()
-  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || '')
+  // 'all' means show subscriptions from all clusters
+  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || 'all')
   const [sortBy, setSortBy] = useState<SortByOption>('pending')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
@@ -55,8 +56,8 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
     return result
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  // Fetch subscriptions for selected cluster
-  const { subscriptions: rawSubscriptions, isLoading: subscriptionsLoading, isRefreshing: subscriptionsRefreshing, refetch: refetchSubscriptions } = useOperatorSubscriptions(selectedCluster || undefined)
+  // Fetch subscriptions - pass undefined when 'all' to get all clusters
+  const { subscriptions: rawSubscriptions, isLoading: subscriptionsLoading, isRefreshing: subscriptionsRefreshing, refetch: refetchSubscriptions } = useOperatorSubscriptions(selectedCluster === 'all' ? undefined : selectedCluster || undefined)
 
   const isRefreshing = clustersRefreshing || subscriptionsRefreshing
   const refetch = () => {
@@ -67,6 +68,14 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
   // Filter and sort subscriptions
   const sortedSubscriptions = useMemo(() => {
     let result = [...rawSubscriptions]
+
+    // Apply global cluster filter when showing all clusters
+    if (selectedCluster === 'all' && !isAllClustersSelected) {
+      result = result.filter(sub => {
+        const clusterName = sub.cluster?.split('/')[0] || ''
+        return globalSelectedClusters.includes(clusterName) || globalSelectedClusters.includes(sub.cluster || '')
+      })
+    }
 
     // Apply local search filter
     if (localSearch.trim()) {
@@ -97,7 +106,7 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
       }
       return sortDirection === 'asc' ? compare : -compare
     })
-  }, [rawSubscriptions, sortBy, sortDirection, localSearch])
+  }, [rawSubscriptions, sortBy, sortDirection, localSearch, selectedCluster, isAllClustersSelected, globalSelectedClusters])
 
   // Use pagination hook
   const effectivePerPage = limit === 'unlimited' ? 1000 : limit
@@ -112,12 +121,14 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
   } = usePagination(sortedSubscriptions, effectivePerPage)
 
   const isLoading = clustersLoading || subscriptionsLoading
+  const showSkeleton = isLoading && rawSubscriptions.length === 0
 
-  const autoCount = rawSubscriptions.filter(s => s.installPlanApproval === 'Automatic').length
-  const manualCount = rawSubscriptions.filter(s => s.installPlanApproval === 'Manual').length
-  const pendingCount = rawSubscriptions.filter(s => s.pendingUpgrade).length
+  // Use sortedSubscriptions for total counts (after filtering, not raw data)
+  const autoCount = sortedSubscriptions.filter(s => s.installPlanApproval === 'Automatic').length
+  const manualCount = sortedSubscriptions.filter(s => s.installPlanApproval === 'Manual').length
+  const pendingCount = sortedSubscriptions.filter(s => s.pendingUpgrade).length
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <div className="h-full flex flex-col min-h-card">
         <div className="flex items-center justify-between mb-4">
@@ -173,21 +184,23 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
         onChange={(e) => setSelectedCluster(e.target.value)}
         className="w-full px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm text-foreground mb-4"
       >
-        <option value="">Select cluster...</option>
+        <option value="all">All Clusters</option>
         {clusters.map(c => (
           <option key={c.name} value={c.name}>{c.name}</option>
         ))}
       </select>
 
-      {!selectedCluster ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Select a cluster to view subscriptions
-        </div>
-      ) : (
+      {selectedCluster && (
         <>
           {/* Scope badge */}
           <div className="flex items-center gap-2 mb-4">
-            <ClusterBadge cluster={selectedCluster} />
+            {selectedCluster === 'all' ? (
+              <span className="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-400">
+                All Clusters {!isAllClustersSelected && `(${globalSelectedClusters.length} selected)`}
+              </span>
+            ) : (
+              <ClusterBadge cluster={selectedCluster} />
+            )}
           </div>
 
           {/* Local Search */}
@@ -222,13 +235,18 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
 
           {/* Subscriptions list */}
           <div className="flex-1 space-y-2 overflow-y-auto">
-            {subscriptions.map((sub, idx) => (
+            {subscriptions.map((sub) => (
               <div
-                key={idx}
+                key={`${sub.cluster || 'default'}-${sub.namespace}-${sub.name}`}
                 className={`p-3 rounded-lg ${sub.pendingUpgrade ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-secondary/30'}`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm text-foreground font-medium">{sub.name}</span>
+                  <div className="flex items-center gap-2">
+                    {sub.cluster && (
+                      <ClusterBadge cluster={sub.cluster} size="sm" />
+                    )}
+                    <span className="text-sm text-foreground font-medium">{sub.name}</span>
+                  </div>
                   <span className={`text-xs px-1.5 py-0.5 rounded ${
                     sub.installPlanApproval === 'Automatic'
                       ? 'bg-green-500/20 text-green-400'
@@ -272,7 +290,7 @@ export function OperatorSubscriptions({ config }: OperatorSubscriptionsProps) {
 
           {/* Footer */}
           <div className="mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-            {totalItems} subscriptions from operatorhubio-catalog
+            {totalItems} subscriptions {selectedCluster === 'all' ? 'across all clusters' : `on ${selectedCluster}`}
           </div>
         </>
       )}

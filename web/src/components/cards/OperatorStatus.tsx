@@ -25,7 +25,8 @@ const SORT_OPTIONS = [
 
 export function OperatorStatus({ config }: OperatorStatusProps) {
   const { clusters: allClusters, isLoading: clustersLoading, isRefreshing: clustersRefreshing, refetch: refetchClusters, isFailed, consecutiveFailures, lastRefresh } = useClusters()
-  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || '')
+  // 'all' means show operators from all clusters, '' means no selection yet
+  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || 'all')
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
@@ -56,8 +57,8 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     return result
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  // Fetch operators for selected cluster
-  const { operators: rawOperators, isLoading: operatorsLoading, isRefreshing: operatorsRefreshing, refetch: refetchOperators } = useOperators(selectedCluster || undefined)
+  // Fetch operators - pass undefined when 'all' to get all clusters
+  const { operators: rawOperators, isLoading: operatorsLoading, isRefreshing: operatorsRefreshing, refetch: refetchOperators } = useOperators(selectedCluster === 'all' ? undefined : selectedCluster || undefined)
 
   const isRefreshing = clustersRefreshing || operatorsRefreshing
   const refetch = () => {
@@ -68,6 +69,14 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
   // Apply filters and sorting to operators
   const filteredAndSorted = useMemo(() => {
     let result = rawOperators
+
+    // Apply global cluster filter when showing all clusters
+    if (selectedCluster === 'all' && !isAllClustersSelected) {
+      result = result.filter(op => {
+        const clusterName = op.cluster?.split('/')[0] || ''
+        return globalSelectedClusters.includes(clusterName) || globalSelectedClusters.includes(op.cluster || '')
+      })
+    }
 
     // Apply status filter
     result = filterByStatus(result)
@@ -114,7 +123,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     })
 
     return result
-  }, [rawOperators, filterByStatus, customFilter, localSearch, sortBy, sortDirection])
+  }, [rawOperators, filterByStatus, customFilter, localSearch, sortBy, sortDirection, selectedCluster, isAllClustersSelected, globalSelectedClusters])
 
   // Use pagination hook
   const effectivePerPage = limit === 'unlimited' ? 1000 : limit
@@ -129,6 +138,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
   } = usePagination(filteredAndSorted, effectivePerPage)
 
   const isLoading = clustersLoading || operatorsLoading
+  const showSkeleton = isLoading && rawOperators.length === 0
 
   const getStatusIcon = (status: Operator['status']) => {
     switch (status) {
@@ -150,13 +160,14 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
     }
   }
 
+  // Use filteredAndSorted for total counts (not paginated 'operators')
   const statusCounts = {
-    succeeded: operators.filter(o => o.status === 'Succeeded').length,
-    failed: operators.filter(o => o.status === 'Failed').length,
-    other: operators.filter(o => !['Succeeded', 'Failed'].includes(o.status)).length,
+    succeeded: filteredAndSorted.filter(o => o.status === 'Succeeded').length,
+    failed: filteredAndSorted.filter(o => o.status === 'Failed').length,
+    other: filteredAndSorted.filter(o => !['Succeeded', 'Failed'].includes(o.status)).length,
   }
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <div className="h-full flex flex-col min-h-card">
         <div className="flex items-center justify-between mb-4">
@@ -212,21 +223,23 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
         onChange={(e) => setSelectedCluster(e.target.value)}
         className="w-full px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm text-foreground mb-4"
       >
-        <option value="">Select cluster...</option>
+        <option value="all">All Clusters</option>
         {clusters.map(c => (
           <option key={c.name} value={c.name}>{c.name}</option>
         ))}
       </select>
 
-      {!selectedCluster ? (
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Select a cluster to view operators
-        </div>
-      ) : (
+      {selectedCluster && (
         <>
           {/* Scope badge */}
           <div className="flex items-center gap-2 mb-4">
-            <ClusterBadge cluster={selectedCluster} />
+            {selectedCluster === 'all' ? (
+              <span className="text-xs px-2 py-1 rounded-full bg-purple-500/20 text-purple-400">
+                All Clusters {!isAllClustersSelected && `(${globalSelectedClusters.length} selected)`}
+              </span>
+            ) : (
+              <ClusterBadge cluster={selectedCluster} />
+            )}
           </div>
 
           {/* Local Search */}
@@ -259,18 +272,21 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
 
           {/* Operators list */}
           <div className="flex-1 space-y-2 overflow-y-auto">
-            {operators.map((op, idx) => {
+            {operators.map((op) => {
               const StatusIcon = getStatusIcon(op.status)
               const color = getStatusColor(op.status)
 
               return (
                 <div
-                  key={idx}
+                  key={`${op.cluster || 'default'}-${op.namespace}-${op.name}`}
                   className="p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <StatusIcon className={`w-4 h-4 text-${color}-400 ${op.status === 'Installing' ? 'animate-spin' : ''}`} />
+                      {op.cluster && (
+                        <ClusterBadge cluster={op.cluster} size="sm" />
+                      )}
                       <span className="text-sm text-foreground">{op.name}</span>
                     </div>
                     <span className={`text-xs px-1.5 py-0.5 rounded bg-${color}-500/20 text-${color}-400`}>
@@ -308,7 +324,7 @@ export function OperatorStatus({ config }: OperatorStatusProps) {
 
           {/* Footer */}
           <div className="mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-            {totalItems} operators via Operator Lifecycle Manager
+            {totalItems} operators {selectedCluster === 'all' ? 'across all clusters' : `on ${selectedCluster}`}
           </div>
         </>
       )}

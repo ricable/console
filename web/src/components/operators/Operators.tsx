@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useState, useEffect, useCallback, memo, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Cog, RefreshCw, Hourglass, GripVertical, ChevronDown, ChevronRight, Plus, LayoutGrid } from 'lucide-react'
 import {
@@ -20,7 +20,7 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useClusters, useGPUNodes } from '../../hooks/useMCP'
+import { useClusters, useOperatorSubscriptions, useOperators } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
@@ -33,7 +33,6 @@ import { ConfigureCardModal } from '../dashboard/ConfigureCardModal'
 import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
-import { formatMemoryStat } from '../../lib/formatStats'
 
 interface OperatorsCard {
   id: string
@@ -156,8 +155,9 @@ function OperatorsDragPreviewCard({ card }: { card: OperatorsCard }) {
 export function Operators() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { clusters, isLoading, isRefreshing, lastUpdated, refetch } = useClusters()
-  const { nodes: gpuNodes } = useGPUNodes()
-  const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
+  const { subscriptions: operatorSubs, refetch: refetchSubs } = useOperatorSubscriptions()
+  const { operators: allOperators, refetch: refetchOps } = useOperators()
+  const { selectedClusters: globalSelectedClusters, isAllClustersSelected, filterByStatus, customFilter } = useGlobalFilters()
 
   // Card state
   const [cards, setCards] = useState<OperatorsCard[]>(() => loadOperatorsCards())
@@ -222,13 +222,19 @@ export function Operators() {
   // Auto-refresh every 30 seconds
   useEffect(() => {
     if (!autoRefresh) return
-    const interval = setInterval(() => refetch(), 30000)
+    const interval = setInterval(() => {
+      refetch()
+      refetchSubs()
+      refetchOps()
+    }, 30000)
     return () => clearInterval(interval)
-  }, [autoRefresh, refetch])
+  }, [autoRefresh, refetch, refetchSubs, refetchOps])
 
   const handleRefresh = useCallback(() => {
     refetch()
-  }, [refetch])
+    refetchSubs()
+    refetchOps()
+  }, [refetch, refetchSubs, refetchOps])
 
   const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
     const cardsToAdd: OperatorsCard[] = newCards.map(card => ({
@@ -282,39 +288,82 @@ export function Operators() {
   )
   const reachableClusters = filteredClusters.filter(c => c.reachable !== false)
 
-  // Calculate compute stats from cluster data (like other working pages)
-  const totalNodes = reachableClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0)
-  const totalCPU = reachableClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
-  const totalMemoryGB = reachableClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0)
-  const totalStorageGB = reachableClusters.reduce((sum, c) => sum + (c.storageGB || 0), 0)
-  const totalGPUs = gpuNodes
-    .filter(node => isAllClustersSelected || globalSelectedClusters.includes(node.cluster.split('/')[0]))
-    .reduce((sum, node) => sum + node.gpuCount, 0)
-  const totalPods = reachableClusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
+  // Filter operator subscriptions based on global cluster selection (for subscription-specific stats)
+  const filteredSubscriptions = useMemo(() => {
+    let result = operatorSubs.filter(op => {
+      if (isAllClustersSelected) return true
+      // Handle cluster field that might be 'clustername' or 'clustername/namespace'
+      const clusterName = op.cluster?.split('/')[0] || ''
+      return globalSelectedClusters.includes(clusterName) || globalSelectedClusters.includes(op.cluster || '')
+    })
+    // Apply custom text filter for consistency
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      result = result.filter(op =>
+        op.name.toLowerCase().includes(query) ||
+        op.namespace.toLowerCase().includes(query) ||
+        op.channel.toLowerCase().includes(query)
+      )
+    }
+    return result
+  }, [operatorSubs, isAllClustersSelected, globalSelectedClusters, customFilter])
+
+  // Filter operators (from useOperators) based on global cluster selection - matches OperatorStatus card
+  const filteredOperatorsAPI = useMemo(() => {
+    let result = allOperators.filter(op => {
+      if (isAllClustersSelected) return true
+      // Handle cluster field that might be 'clustername' or 'clustername/namespace'
+      const clusterName = op.cluster?.split('/')[0] || ''
+      return globalSelectedClusters.includes(clusterName) || globalSelectedClusters.includes(op.cluster || '')
+    })
+    // Apply status filter to match what OperatorStatus card shows
+    result = filterByStatus(result)
+    // Apply custom text filter to match what OperatorStatus card shows
+    if (customFilter.trim()) {
+      const query = customFilter.toLowerCase()
+      result = result.filter(op =>
+        op.name.toLowerCase().includes(query) ||
+        op.namespace.toLowerCase().includes(query) ||
+        op.version.toLowerCase().includes(query)
+      )
+    }
+    return result
+  }, [allOperators, isAllClustersSelected, globalSelectedClusters, filterByStatus, customFilter])
+
+  // Calculate operator stats - use filteredOperatorsAPI to match OperatorStatus card exactly
+  const totalOperators = filteredOperatorsAPI.length
+  // Running/Succeeded - matches card's "Running" count
+  const installedOperators = filteredOperatorsAPI.filter(op => op.status === 'Succeeded').length
+  // Installing - matches card's "Other" count for Installing status
+  const installingOperators = filteredOperatorsAPI.filter(op => op.status === 'Installing' || op.status === 'Upgrading').length
+  // Upgrades available from subscriptions (pendingUpgrade field)
+  const upgradesAvailable = filteredSubscriptions.filter(op => op.pendingUpgrade).length
+  // Failed - matches card's "Failed" count
+  const failingOperators = filteredOperatorsAPI.filter(op => op.status === 'Failed').length
 
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
+      case 'operators':
+        return { value: totalOperators, sublabel: 'total operators' }
+      case 'installed':
+        return { value: installedOperators, sublabel: 'installed' }
+      case 'installing':
+        return { value: installingOperators, sublabel: 'installing' }
+      case 'upgrades':
+        return { value: upgradesAvailable, sublabel: 'upgrades available' }
+      case 'subscriptions':
+        return { value: filteredSubscriptions.length, sublabel: 'subscriptions' }
+      case 'crds':
+        return { value: 0, sublabel: 'CRDs' } // Would need a CRD hook
+      case 'failing':
+        return { value: failingOperators, sublabel: 'failing' }
       case 'clusters':
         return { value: reachableClusters.length, sublabel: 'clusters' }
-      case 'healthy':
-        return { value: reachableClusters.length, sublabel: 'with OLM' }
-      case 'nodes':
-        return { value: totalNodes, sublabel: 'total nodes' }
-      case 'cpus':
-        return { value: totalCPU, sublabel: 'CPU cores' }
-      case 'memory':
-        return { value: formatMemoryStat(totalMemoryGB), sublabel: 'memory' }
-      case 'storage':
-        return { value: formatMemoryStat(totalStorageGB), sublabel: 'storage' }
-      case 'gpus':
-        return { value: totalGPUs, sublabel: 'GPUs' }
-      case 'pods':
-        return { value: totalPods, sublabel: 'pods' }
       default:
         return { value: 0 }
     }
-  }, [reachableClusters.length, totalNodes, totalCPU, totalMemoryGB, totalStorageGB, totalGPUs, totalPods])
+  }, [totalOperators, installedOperators, installingOperators, upgradesAvailable, failingOperators, reachableClusters.length, filteredSubscriptions.length])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
@@ -369,9 +418,9 @@ export function Operators() {
 
       {/* Stats Overview */}
       <StatsOverview
-        dashboardType="clusters"
+        dashboardType="operators"
         getStatValue={getStatValue}
-        hasData={reachableClusters.length > 0}
+        hasData={totalOperators > 0 || reachableClusters.length > 0}
         isLoading={isLoading}
         lastUpdated={lastUpdated}
         collapsedStorageKey="kubestellar-operators-stats-collapsed"

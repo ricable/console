@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { FileCode, CheckCircle, AlertTriangle, XCircle, Database, Search } from 'lucide-react'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
@@ -35,7 +35,8 @@ const SORT_OPTIONS = [
 
 export function CRDHealth({ config }: CRDHealthProps) {
   const { clusters: allClusters, isLoading, isRefreshing, refetch, isFailed, consecutiveFailures, lastRefresh } = useClusters()
-  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || '')
+  // 'all' means show CRDs from all clusters
+  const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || 'all')
   const [filterGroup, setFilterGroup] = useState<string>('')
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
@@ -66,34 +67,45 @@ export function CRDHealth({ config }: CRDHealthProps) {
     return result
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  // Mock CRD data - generates CRDs for each cluster
-  const allCRDs: CRD[] = useMemo(() => {
-    const baseCRDs = [
-      { name: 'certificates', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 45 },
-      { name: 'clusterissuers', group: 'cert-manager.io', version: 'v1', scope: 'Cluster' as const, status: 'Established' as const, instances: 2 },
-      { name: 'issuers', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 8 },
-      { name: 'prometheuses', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 3 },
-      { name: 'servicemonitors', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 127 },
-      { name: 'alertmanagers', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 2 },
-      { name: 'kafkas', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced' as const, status: 'Established' as const, instances: 4 },
-      { name: 'kafkatopics', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced' as const, status: 'NotEstablished' as const, instances: 0 },
-      { name: 'applications', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 56 },
-      { name: 'appprojects', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced' as const, status: 'Established' as const, instances: 5 },
+  // Generate cluster-specific CRD data
+  const getClusterCRDs = useCallback((clusterName: string): CRD[] => {
+    // Generate cluster-specific data using hash of cluster name
+    const hash = clusterName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const crdCount = 5 + (hash % 6) // 5-10 CRDs per cluster
+
+    const baseCRDs: CRD[] = [
+      { name: 'certificates', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 20 + (hash % 30), cluster: clusterName },
+      { name: 'clusterissuers', group: 'cert-manager.io', version: 'v1', scope: 'Cluster', status: 'Established', instances: 1 + (hash % 3), cluster: clusterName },
+      { name: 'issuers', group: 'cert-manager.io', version: 'v1', scope: 'Namespaced', status: hash % 7 === 0 ? 'NotEstablished' : 'Established', instances: hash % 7 === 0 ? 0 : 5 + (hash % 10), cluster: clusterName },
+      { name: 'prometheuses', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 1 + (hash % 5), cluster: clusterName },
+      { name: 'servicemonitors', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: 'Established', instances: 50 + (hash % 100), cluster: clusterName },
+      { name: 'alertmanagers', group: 'monitoring.coreos.com', version: 'v1', scope: 'Namespaced', status: hash % 5 === 0 ? 'Terminating' : 'Established', instances: 1 + (hash % 3), cluster: clusterName },
+      { name: 'kafkas', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced', status: 'Established', instances: 2 + (hash % 5), cluster: clusterName },
+      { name: 'kafkatopics', group: 'kafka.strimzi.io', version: 'v1beta2', scope: 'Namespaced', status: hash % 4 === 0 ? 'NotEstablished' : 'Established', instances: hash % 4 === 0 ? 0 : 10 + (hash % 20), cluster: clusterName },
+      { name: 'applications', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced', status: 'Established', instances: 20 + (hash % 50), cluster: clusterName },
+      { name: 'appprojects', group: 'argoproj.io', version: 'v1alpha1', scope: 'Namespaced', status: 'Established', instances: 2 + (hash % 5), cluster: clusterName },
     ]
 
-    if (selectedCluster) {
-      return baseCRDs.map(crd => ({ ...crd, cluster: selectedCluster }))
+    return baseCRDs.slice(0, crdCount)
+  }, [])
+
+  // Mock CRD data - generates CRDs for each cluster
+  const allCRDs: CRD[] = useMemo(() => {
+    if (selectedCluster && selectedCluster !== 'all') {
+      return getClusterCRDs(selectedCluster)
     }
 
-    // When no cluster selected, show CRDs from all clusters
+    // When 'all' selected, show CRDs from all clusters matching global filter
+    const clustersToShow = isAllClustersSelected
+      ? clusters
+      : clusters.filter(c => globalSelectedClusters.includes(c.name))
+
     const crdsWithClusters: CRD[] = []
-    clusters.forEach(c => {
-      baseCRDs.forEach(crd => {
-        crdsWithClusters.push({ ...crd, cluster: c.name })
-      })
+    clustersToShow.forEach(c => {
+      crdsWithClusters.push(...getClusterCRDs(c.name))
     })
     return crdsWithClusters
-  }, [selectedCluster, clusters])
+  }, [selectedCluster, clusters, isAllClustersSelected, globalSelectedClusters, getClusterCRDs])
 
   // Get unique groups
   const groups = useMemo(() => {
@@ -172,8 +184,9 @@ export function CRDHealth({ config }: CRDHealthProps) {
   const healthyCRDs = filteredAndSorted.filter(c => c.status === 'Established').length
   const unhealthyCRDs = filteredAndSorted.filter(c => c.status !== 'Established').length
   const totalInstances = filteredAndSorted.reduce((sum, c) => sum + c.instances, 0)
+  const showSkeleton = isLoading && allCRDs.length === 0
 
-  if (isLoading) {
+  if (showSkeleton) {
     return (
       <div className="h-full flex flex-col min-h-card">
         <div className="flex items-center justify-between mb-4">
@@ -224,7 +237,7 @@ export function CRDHealth({ config }: CRDHealthProps) {
         onChange={(e) => setSelectedCluster(e.target.value)}
         className="w-full px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm text-foreground mb-4"
       >
-        <option value="">Select cluster...</option>
+        <option value="all">All Clusters</option>
         {clusters.map(c => (
           <option key={c.name} value={c.name}>{c.name}</option>
         ))}
@@ -289,13 +302,13 @@ export function CRDHealth({ config }: CRDHealthProps) {
 
           {/* CRDs list */}
           <div className="flex-1 space-y-2 overflow-y-auto">
-            {crds.map((crd, idx) => {
+            {crds.map((crd) => {
               const StatusIcon = getStatusIcon(crd.status)
               const color = getStatusColor(crd.status)
 
               return (
                 <div
-                  key={idx}
+                  key={`${crd.cluster}-${crd.group}-${crd.name}`}
                   className="p-2 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors"
                 >
                   <div className="flex items-center justify-between">
@@ -337,7 +350,7 @@ export function CRDHealth({ config }: CRDHealthProps) {
 
           {/* Footer */}
           <div className="mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-            {groups.length} API groups registered
+            {groups.length} API groups {selectedCluster === 'all' ? 'across all clusters' : `on ${selectedCluster}`}
           </div>
         </>
       )}
