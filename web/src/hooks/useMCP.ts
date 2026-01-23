@@ -2955,7 +2955,19 @@ export function useSecurityIssues(cluster?: string, namespace?: string) {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ issues: SecurityIssue[] }>(`/api/mcp/security-issues?${params}`)
+      const url = `/api/mcp/security-issues?${params}`
+
+      // Use direct fetch to bypass the global circuit breaker
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const token = localStorage.getItem('token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const response = await fetch(url, { method: 'GET', headers })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { issues: SecurityIssue[] }
       setIssues(data.issues || [])
       setError(null)
       const now = new Date()
