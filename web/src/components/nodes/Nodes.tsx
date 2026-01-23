@@ -285,22 +285,41 @@ export function Nodes() {
   const totalNodes = reachableClusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0)
   const totalCPU = reachableClusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
   const totalMemoryGB = reachableClusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0)
+  const totalPods = reachableClusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
+  // GPU count from clusters that have GPU data
+  const totalGPUs = reachableClusters.reduce((sum, c) => {
+    // gpuCount may be on the cluster or we estimate from context
+    return sum + ((c as Record<string, unknown>).gpuCount as number || 0)
+  }, 0)
 
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
+      case 'nodes':
+        return { value: totalNodes, sublabel: 'total nodes' }
+      case 'cpus':
+        return { value: totalCPU, sublabel: 'CPU cores' }
+      case 'memory':
+        return { value: `${totalMemoryGB.toFixed(0)} GB`, sublabel: 'memory' }
+      case 'gpus':
+        return { value: totalGPUs, sublabel: 'GPUs' }
+      case 'tpus':
+        return { value: 0, sublabel: 'TPUs' }
+      case 'pods':
+        return { value: totalPods, sublabel: 'pods' }
+      case 'cpu_util':
+        return { value: 0, sublabel: 'utilization' }
+      case 'memory_util':
+        return { value: 0, sublabel: 'utilization' }
+      // Legacy IDs for backwards compatibility
       case 'clusters':
         return { value: reachableClusters.length, sublabel: 'clusters' }
       case 'healthy':
         return { value: totalNodes, sublabel: 'total nodes' }
-      case 'warnings':
-        return { value: totalCPU, sublabel: 'CPU cores' }
-      case 'errors':
-        return { value: `${totalMemoryGB.toFixed(0)} GB`, sublabel: 'memory' }
       default:
         return { value: 0 }
     }
-  }, [reachableClusters.length, totalNodes, totalCPU, totalMemoryGB])
+  }, [reachableClusters.length, totalNodes, totalCPU, totalMemoryGB, totalPods, totalGPUs])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
