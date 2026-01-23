@@ -47,6 +47,7 @@ export type DashboardStatsType =
   | 'cost'
   | 'alerts'
   | 'dashboard'
+  | 'operators'
 
 /**
  * Default stat blocks for the Clusters dashboard
@@ -212,6 +213,20 @@ export const DASHBOARD_STAT_BLOCKS: StatBlockConfig[] = [
 ]
 
 /**
+ * Default stat blocks for the Operators dashboard
+ */
+export const OPERATORS_STAT_BLOCKS: StatBlockConfig[] = [
+  { id: 'operators', name: 'Total', icon: 'Package', visible: true, color: 'purple' },
+  { id: 'installed', name: 'Installed', icon: 'CheckCircle2', visible: true, color: 'green' },
+  { id: 'installing', name: 'Installing', icon: 'RefreshCw', visible: true, color: 'blue' },
+  { id: 'failing', name: 'Failing', icon: 'XCircle', visible: true, color: 'red' },
+  { id: 'upgrades', name: 'Upgrades', icon: 'ArrowUpCircle', visible: true, color: 'orange' },
+  { id: 'subscriptions', name: 'Subscriptions', icon: 'Newspaper', visible: true, color: 'indigo' },
+  { id: 'crds', name: 'CRDs', icon: 'FileCode', visible: true, color: 'cyan' },
+  { id: 'clusters', name: 'Clusters', icon: 'Server', visible: true, color: 'blue' },
+]
+
+/**
  * Get default stat blocks for a dashboard type
  */
 export function getDefaultStatBlocks(dashboardType: DashboardStatsType): StatBlockConfig[] {
@@ -242,6 +257,8 @@ export function getDefaultStatBlocks(dashboardType: DashboardStatsType): StatBlo
       return ALERTS_STAT_BLOCKS
     case 'dashboard':
       return DASHBOARD_STAT_BLOCKS
+    case 'operators':
+      return OPERATORS_STAT_BLOCKS
     default:
       return []
   }
@@ -264,6 +281,8 @@ const colorClasses: Record<string, string> = {
   blue: 'text-blue-400',
   red: 'text-red-400',
   gray: 'text-gray-400',
+  indigo: 'text-indigo-400',
+  teal: 'text-teal-400',
 }
 
 // Icon emoji mapping for the config modal
@@ -303,6 +322,10 @@ const iconEmojis: Record<string, string> = {
   Activity: '📈',
   List: '📜',
   DollarSign: '💵',
+  Newspaper: '📰',
+  RefreshCw: '🔄',
+  ArrowUpCircle: '⬆️',
+  FileCode: '📄',
 }
 
 interface SortableItemProps {
