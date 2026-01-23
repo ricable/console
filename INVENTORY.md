@@ -1,14 +1,17 @@
 # KubeStellar Console - Complete Inventory
 
-Last Updated: 2026-01-22
+Last Updated: 2026-01-23
 
 ## Summary
 
 | Category | Count |
 |----------|-------|
 | Dashboard Pages | 20 (1 main + 19 dedicated) |
-| Card Types | 60 |
-| Stats Block Types | 85 (across 13 dashboard types) |
+| Card Types | 65 |
+| Cards with Drill-Down | 40 |
+| Drill-Down Views | 22 |
+| Modal Dialogs | 16 |
+| Stats Block Types | 93 (across 14 dashboard types) |
 
 ---
 
@@ -174,6 +177,19 @@ Last Updated: 2026-01-22
 | 59 | `opa_policies` | OPA Gatekeeper | status |
 | 60 | `kyverno_policies` | Kyverno Policies | status |
 
+### Category: External Integrations (2 cards)
+| # | Type | Title | Visualization |
+|---|------|-------|---------------|
+| 61 | `github_activity` | GitHub Activity | table |
+| 62 | `weather` | Weather | status |
+
+### Category: Utilities & Fun (3 cards)
+| # | Type | Title | Visualization |
+|---|------|-------|---------------|
+| 63 | `kubectl` | Kubectl Terminal | interactive |
+| 64 | `sudoku_game` | Sudoku Game | interactive |
+| 65 | `match_game` | Match Game | interactive |
+
 ---
 
 ## 3. Stats Blocks (85 Total across 13 Dashboard Types)
@@ -315,6 +331,18 @@ Last Updated: 2026-01-22
 | 84 | `namespaces` | Namespaces | FolderTree | purple |
 | 85 | `pods` | Pods | Box | cyan |
 
+### Operators Dashboard Stats (8 blocks)
+| # | ID | Name | Icon | Color |
+|---|---|------|------|-------|
+| 86 | `operators` | Total | Package | purple |
+| 87 | `installed` | Installed | CheckCircle2 | green |
+| 88 | `installing` | Installing | RefreshCw | blue |
+| 89 | `failing` | Failing | XCircle | red |
+| 90 | `upgrades` | Upgrades | ArrowUpCircle | orange |
+| 91 | `subscriptions` | Subscriptions | Newspaper | indigo |
+| 92 | `crds` | CRDs | FileCode | cyan |
+| 93 | `clusters` | Clusters | Server | blue |
+
 ---
 
 ## 4. Component Files Reference
@@ -371,7 +399,7 @@ Based on feature requests:
 
 ---
 
-## 7. Modal Dialogs (13 Total)
+## 7. Modal Dialogs (16 Total)
 
 ### Dashboard-Related Modals (6)
 | # | Name | File | Trigger | Description |
@@ -410,8 +438,158 @@ Based on feature requests:
 |---|------|------|---------|-------------|
 | 13 | SyncDialog | `gitops/SyncDialog.tsx` | GitOps sync action | Multi-phase sync workflow: Detection → Plan → Execute → Complete |
 
+### Stats Configuration Modals (1)
+| # | Name | File | Trigger | Description |
+|---|------|------|---------|-------------|
+| 14 | StatsConfigModal | `ui/StatsConfig.tsx` | Stats settings icon | Configure visible stats, drag-drop reordering |
+
+### Policy Modals (2)
+| # | Name | File | Trigger | Description |
+|---|------|------|---------|-------------|
+| 15 | PolicyDetailModal | `cards/OPAPolicies.tsx` | Click policy in OPA card | OPA policy details with violations list |
+| 16 | ViolationsModal | `cards/OPAPolicies.tsx` | Click cluster with violations | OPA Gatekeeper violations list by severity |
+
 ### Modal Features
 - All modals support ESC key to close
 - Use React portals for proper z-index layering
 - Feature blur backdrop overlays
 - Most support keyboard navigation
+
+---
+
+## 8. Drill-Down Views (22 Total)
+
+Drill-down views are displayed within `DrillDownModal` when clicking items in cards.
+
+| # | View | File | Triggered By |
+|---|------|------|--------------|
+| 1 | AlertDrillDown | `drilldown/views/AlertDrillDown.tsx` | ActiveAlerts card |
+| 2 | ArgoAppDrillDown | `drilldown/views/ArgoAppDrillDown.tsx` | ArgoCDApplications card |
+| 3 | ClusterDrillDown | `drilldown/views/ClusterDrillDown.tsx` | Cluster items in various cards |
+| 4 | ConfigMapDrillDown | `drilldown/views/ConfigMapDrillDown.tsx` | ConfigMap resources |
+| 5 | CRDDrillDown | `drilldown/views/CRDDrillDown.tsx` | CRDHealth card |
+| 6 | DeploymentDrillDown | `drilldown/views/DeploymentDrillDown.tsx` | DeploymentStatus, DeploymentIssues |
+| 7 | DriftDrillDown | `drilldown/views/DriftDrillDown.tsx` | GitOpsDrift card |
+| 8 | EventsDrillDown | `drilldown/views/EventsDrillDown.tsx` | EventStream, NamespaceEvents |
+| 9 | GPUNodeDrillDown | `drilldown/views/GPUNodeDrillDown.tsx` | GPUInventory, GPUStatus cards |
+| 10 | HelmReleaseDrillDown | `drilldown/views/HelmReleaseDrillDown.tsx` | HelmReleaseStatus, HelmHistory |
+| 11 | KustomizationDrillDown | `drilldown/views/KustomizationDrillDown.tsx` | KustomizationStatus, OverlayComparison |
+| 12 | LogsDrillDown | `drilldown/views/LogsDrillDown.tsx` | Pod logs access |
+| 13 | NamespaceDrillDown | `drilldown/views/NamespaceDrillDown.tsx` | NamespaceOverview card |
+| 14 | NodeDrillDown | `drilldown/views/NodeDrillDown.tsx` | Node items in ComputeOverview |
+| 15 | OperatorDrillDown | `drilldown/views/OperatorDrillDown.tsx` | OperatorStatus, OperatorSubscriptions |
+| 16 | PodDrillDown | `drilldown/views/PodDrillDown.tsx` | TopPods, PodIssues cards |
+| 17 | PolicyDrillDown | `drilldown/views/PolicyDrillDown.tsx` | OPAPolicies, KyvernoPolicies |
+| 18 | ReplicaSetDrillDown | `drilldown/views/ReplicaSetDrillDown.tsx` | ReplicaSet resources |
+| 19 | ResourcesDrillDown | `drilldown/views/ResourcesDrillDown.tsx` | Generic resource drill-down |
+| 20 | SecretDrillDown | `drilldown/views/SecretDrillDown.tsx` | Secret resources |
+| 21 | ServiceAccountDrillDown | `drilldown/views/ServiceAccountDrillDown.tsx` | RBAC service accounts |
+| 22 | YAMLDrillDown | `drilldown/views/YAMLDrillDown.tsx` | YAML view for any resource |
+
+---
+
+## 9. Cards with Drill-Down (40 Total)
+
+Cards that have `useDrillDownActions` hook for clickable items:
+
+| # | Card | Drill Action | Target View |
+|---|------|--------------|-------------|
+| 1 | AppStatus | drillToDeployment | DeploymentDrillDown |
+| 2 | ArgoCDApplications | drillToArgoApp | ArgoAppDrillDown |
+| 3 | ClusterComparison | drillToCluster | ClusterDrillDown |
+| 4 | ClusterCosts | drillToCost | CostDrillDown |
+| 5 | ClusterFocus | drillToCluster | ClusterDrillDown |
+| 6 | ClusterResourceTree | drillToNamespace/Pod | NamespaceDrillDown/PodDrillDown |
+| 7 | ComputeOverview | drillToNode | NodeDrillDown |
+| 8 | DeploymentIssues | drillToDeployment | DeploymentDrillDown |
+| 9 | DeploymentProgress | drillToDeployment | DeploymentDrillDown |
+| 10 | DeploymentStatus | drillToDeployment | DeploymentDrillDown |
+| 11 | EventStream | drillToEvents | EventsDrillDown |
+| 12 | GitOpsDrift | drillToDrift | DriftDrillDown |
+| 13 | GPUInventory | drillToGPUNode | GPUNodeDrillDown |
+| 14 | GPUOverview | drillToGPUNode | GPUNodeDrillDown |
+| 15 | GPUStatus | drillToCluster | ClusterDrillDown |
+| 16 | GPUWorkloads | drillToPod | PodDrillDown |
+| 17 | HelmHistory | drillToHelm | HelmReleaseDrillDown |
+| 18 | HelmReleaseStatus | drillToHelm | HelmReleaseDrillDown |
+| 19 | HelmValuesDiff | drillToHelm | HelmReleaseDrillDown |
+| 20 | KlaudeMissions | drillToMission | MissionDrillDown |
+| 21 | KubecostOverview | drillToCost | CostDrillDown |
+| 22 | KustomizationStatus | drillToKustomization | KustomizationDrillDown |
+| 23 | NamespaceEvents | drillToEvents | EventsDrillDown |
+| 24 | NamespaceOverview | drillToNamespace | NamespaceDrillDown |
+| 25 | NamespaceRBAC | drillToRBAC | ServiceAccountDrillDown |
+| 26 | NetworkOverview | drillToService | ServiceDrillDown |
+| 27 | OpenCostOverview | drillToCost | CostDrillDown |
+| 28 | OperatorStatus | drillToOperator | OperatorDrillDown |
+| 29 | OperatorSubscriptions | drillToOperator | OperatorDrillDown |
+| 30 | OverlayComparison | drillToKustomization | KustomizationDrillDown |
+| 31 | PodIssues | drillToPod | PodDrillDown |
+| 32 | PVCStatus | drillToPVC | PVCDrillDown |
+| 33 | ResourceCapacity | drillToNode | NodeDrillDown |
+| 34 | ResourceUsage | drillToNode | NodeDrillDown |
+| 35 | SecurityIssues | drillToPod | PodDrillDown |
+| 36 | ServiceStatus | drillToService | ServiceDrillDown |
+| 37 | StorageOverview | drillToPVC | PVCDrillDown |
+| 38 | TopPods | drillToPod | PodDrillDown |
+| 39 | UpgradeStatus | drillToCluster | ClusterDrillDown |
+| 40 | UserManagement | drillToRBAC | ServiceAccountDrillDown |
+
+### Cards WITHOUT Drill-Down (25 Total)
+
+Cards that don't need drill-down (utilities, charts, games, cards with custom modals):
+
+| Category | Cards |
+|----------|-------|
+| **Summary/Chart Cards** | ArgoCDHealth, ArgoCDSyncStatus, ClusterHealth, ClusterMetrics, ClusterNetwork, EventsTimeline, GPUUsageTrend, GPUUtilization, NamespaceQuotas, PodHealthTrend, ResourceTrend |
+| **Custom Modal Cards** | ActiveAlerts, AlertRules, OPAPolicies, KyvernoPolicies (have their own modals) |
+| **Utility/Game Cards** | CardChat, CardWrapper, GitHubActivity, Kubectl, MatchGame, StockMarketTicker, SudokuGame, Weather |
+| **Info Display Cards** | ChartVersions, CRDHealth |
+
+---
+
+## 10. Modal Sections (Reusable Components)
+
+Located in `src/components/modals/sections/`:
+
+| Component | File | Description |
+|-----------|------|-------------|
+| AIActionBar | `AIActionBar.tsx` | Diagnose 🩺, Repair 🔧, Ask ✨ action buttons |
+| BreadcrumbNav | `BreadcrumbNav.tsx` | Clickable navigation path for drill-down |
+| ResourceBadges | `ResourceBadges.tsx` | Cluster + resource kind badges |
+
+### Modal Hooks
+
+Located in `src/components/modals/hooks/`:
+
+| Hook | Description |
+|------|-------------|
+| useModalNavigation | ESC to close, Backspace to go back |
+| useModalAI | Klaude AI integration for modals |
+
+---
+
+## 11. DrillDown Hook Actions
+
+Available drill actions from `useDrillDownActions()`:
+
+| Action | Parameters | Description |
+|--------|------------|-------------|
+| drillToCluster | (cluster, context?) | Open cluster details |
+| drillToNamespace | (cluster, namespace, context?) | Open namespace details |
+| drillToPod | (cluster, namespace, pod, context?) | Open pod details |
+| drillToDeployment | (cluster, namespace, deployment, context?) | Open deployment details |
+| drillToService | (cluster, namespace, service, context?) | Open service details |
+| drillToNode | (cluster, node, context?) | Open node details |
+| drillToGPUNode | (cluster, node, context?) | Open GPU node details |
+| drillToHelm | (cluster, namespace, release, context?) | Open Helm release details |
+| drillToOperator | (cluster, namespace, operator, context?) | Open operator details |
+| drillToArgoApp | (cluster, namespace, app, context?) | Open ArgoCD app details |
+| drillToKustomization | (cluster, name, resource?, context?) | Open kustomization details |
+| drillToDrift | (cluster, resource, context?) | Open GitOps drift details |
+| drillToCost | (cluster, context?) | Open cost details |
+| drillToRBAC | (cluster, namespace, name, context?) | Open RBAC details |
+| drillToEvents | (cluster, namespace?, object?) | Open events view |
+| drillToPVC | (cluster, namespace, pvc, context?) | Open PVC details |
+| drillToAlert | (alertId, context?) | Open alert details |
+| drillToPolicy | (cluster, policy, context?) | Open policy details |
