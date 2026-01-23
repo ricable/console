@@ -251,7 +251,7 @@ jobs:
   update-issue-on-pr:
     if: |
       github.event_name == 'pull_request' &&
-      contains(github.event.pull_request.user.login, 'copilot-swe-agent')
+      (github.event.pull_request.user.login == 'Copilot' || contains(github.event.pull_request.user.login, 'copilot'))
     runs-on: ubuntu-latest
 
     steps:
