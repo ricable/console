@@ -38,6 +38,7 @@
     "kustomization_status": "Kustomization Status",
     "overlay_comparison": "Overlay Comparison",
     "user_management": "User Management",
+    "github_activity": "GitHub Activity",
     "kubectl": "Kubectl Terminal",
     "sudoku_game": "Sudoku Game",
     "match_game": "Match Game"
@@ -60,6 +61,7 @@
     "gpu_inventory": "GPU resources across clusters",
     "gpu_status": "GPU utilization status",
     "user_management": "Manage console and Kubernetes users",
+    "github_activity": "Monitor GitHub repository activity, PRs, issues, releases, and contributors",
     "kubectl": "Interactive kubectl terminal with AI assistance",
     "sudoku_game": "Brain-training Sudoku puzzle with multiple difficulty levels",
     "match_game": "Classic memory matching game with Kubernetes-themed cards"
