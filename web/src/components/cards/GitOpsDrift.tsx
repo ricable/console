@@ -4,6 +4,17 @@ import { useGitOpsDrifts, GitOpsDrift as GitOpsDriftType } from '../../hooks/use
 import { useGlobalFilters, type SeverityLevel } from '../../hooks/useGlobalFilters'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { RefreshButton } from '../ui/RefreshIndicator'
+import { CardControls, SortDirection } from '../ui/CardControls'
+import { Pagination, usePagination } from '../ui/Pagination'
+
+type SortByOption = 'severity' | 'type' | 'resource' | 'cluster'
+
+const SORT_OPTIONS = [
+  { value: 'severity' as const, label: 'Severity' },
+  { value: 'type' as const, label: 'Type' },
+  { value: 'resource' as const, label: 'Resource' },
+  { value: 'cluster' as const, label: 'Cluster' },
+]
 
 interface GitOpsDriftProps {
   config?: {
@@ -43,9 +54,15 @@ export function GitOpsDrift({ config }: GitOpsDriftProps) {
   const cluster = config?.cluster
   const namespace = config?.namespace
 
-  const { drifts, isLoading, isRefreshing, error, refetch, isFailed, consecutiveFailures, lastRefresh } = useGitOpsDrifts(cluster, namespace)
+  const { drifts, isLoading: isLoadingHook, isRefreshing, error, refetch, isFailed, consecutiveFailures, lastRefresh } = useGitOpsDrifts(cluster, namespace)
   const { selectedClusters, isAllClustersSelected, selectedSeverities, isAllSeveritiesSelected, customFilter } = useGlobalFilters()
   const [localSearch, setLocalSearch] = useState('')
+  const [sortBy, setSortBy] = useState<SortByOption>('severity')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [limit, setLimit] = useState<number | 'unlimited'>(5)
+
+  // Only show skeleton when no cached data exists - prevents flickering
+  const isLoading = isLoadingHook && drifts.length === 0
 
   // Map drift severity to global SeverityLevel
   const mapDriftSeverityToGlobal = (severity: 'high' | 'medium' | 'low'): SeverityLevel[] => {
@@ -96,8 +113,41 @@ export function GitOpsDrift({ config }: GitOpsDriftProps) {
       )
     }
 
-    return result
-  }, [drifts, cluster, selectedClusters, isAllClustersSelected, selectedSeverities, isAllSeveritiesSelected, customFilter, localSearch])
+    // Sort by selected field
+    const severityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 }
+    const sorted = [...result].sort((a, b) => {
+      let cmp = 0
+      switch (sortBy) {
+        case 'severity':
+          cmp = severityOrder[a.severity] - severityOrder[b.severity]
+          break
+        case 'type':
+          cmp = a.driftType.localeCompare(b.driftType)
+          break
+        case 'resource':
+          cmp = a.resource.localeCompare(b.resource)
+          break
+        case 'cluster':
+          cmp = a.cluster.localeCompare(b.cluster)
+          break
+      }
+      return sortDirection === 'asc' ? cmp : -cmp
+    })
+
+    return sorted
+  }, [drifts, cluster, selectedClusters, isAllClustersSelected, selectedSeverities, isAllSeveritiesSelected, customFilter, localSearch, sortBy, sortDirection])
+
+  // Apply pagination using usePagination hook
+  const effectivePerPage = limit === 'unlimited' ? 1000 : limit
+  const {
+    paginatedItems: displayDrifts,
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage: perPage,
+    goToPage,
+    needsPagination,
+  } = usePagination(filteredDrifts, effectivePerPage)
 
   if (isLoading && drifts.length === 0) {
     return (
@@ -140,6 +190,15 @@ export function GitOpsDrift({ config }: GitOpsDriftProps) {
               {totalDrifts} drift{totalDrifts !== 1 ? 's' : ''}
             </span>
           )}
+          <CardControls
+            limit={limit}
+            onLimitChange={setLimit}
+            sortBy={sortBy}
+            sortOptions={SORT_OPTIONS}
+            onSortChange={setSortBy}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
+          />
           <RefreshButton
             isRefreshing={isRefreshing}
             isFailed={isFailed}
@@ -176,9 +235,23 @@ export function GitOpsDrift({ config }: GitOpsDriftProps) {
         </div>
       ) : (
         <div className="flex-1 space-y-2 overflow-y-auto">
-          {filteredDrifts.map((drift, index) => (
+          {displayDrifts.map((drift, index) => (
             <DriftItem key={`${drift.cluster}-${drift.namespace}-${drift.resource}-${index}`} drift={drift} />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {needsPagination && limit !== 'unlimited' && (
+        <div className="pt-2 border-t border-border/50 mt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={perPage}
+            onPageChange={goToPage}
+            showItemsPerPage={false}
+          />
         </div>
       )}
     </div>

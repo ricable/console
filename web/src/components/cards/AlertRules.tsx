@@ -12,7 +12,8 @@ import { useAlertRules } from '../../hooks/useAlerts'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { formatCondition } from '../../types/alerts'
 import type { AlertRule, AlertSeverity } from '../../types/alerts'
-import { CardControls } from '../ui/CardControls'
+import { CardControls, SortDirection } from '../ui/CardControls'
+import { Pagination, usePagination } from '../ui/Pagination'
 import { AlertRuleEditor } from '../alerts/AlertRuleEditor'
 
 type SortField = 'name' | 'severity' | 'enabled'
@@ -24,6 +25,7 @@ export function AlertRulesCard() {
   const [editingRule, setEditingRule] = useState<AlertRule | undefined>(undefined)
   const [limit, setLimit] = useState<number | 'unlimited'>(5)
   const [sortBy, setSortBy] = useState<SortField>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [localSearch, setLocalSearch] = useState('')
 
   // Filter and sort rules
@@ -49,24 +51,33 @@ export function AlertRulesCard() {
       )
     }
 
-    return filtered.sort((a, b) => {
+    const sorted = [...filtered].sort((a, b) => {
+      let cmp = 0
       if (sortBy === 'name') {
-        return a.name.localeCompare(b.name)
+        cmp = a.name.localeCompare(b.name)
       } else if (sortBy === 'severity') {
         const severityOrder: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 }
-        return severityOrder[a.severity] - severityOrder[b.severity]
+        cmp = severityOrder[a.severity] - severityOrder[b.severity]
       } else {
         // Sort by enabled (enabled first)
-        return (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
+        cmp = (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
       }
+      return sortDirection === 'asc' ? cmp : -cmp
     })
-  }, [rules, sortBy, customFilter, localSearch])
+    return sorted
+  }, [rules, sortBy, sortDirection, customFilter, localSearch])
 
-  // Apply pagination
-  const displayedRules = useMemo(() => {
-    if (limit === 'unlimited') return sortedRules
-    return sortedRules.slice(0, limit)
-  }, [sortedRules, limit])
+  // Apply pagination using usePagination hook
+  const effectivePerPage = limit === 'unlimited' ? 1000 : limit
+  const {
+    paginatedItems: displayedRules,
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage: perPage,
+    goToPage,
+    needsPagination,
+  } = usePagination(sortedRules, effectivePerPage)
 
   // Count enabled rules
   const enabledCount = rules.filter(r => r.enabled).length
@@ -150,6 +161,8 @@ export function AlertRulesCard() {
             onLimitChange={setLimit}
             sortBy={sortBy}
             onSortChange={setSortBy}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
             sortOptions={[
               { value: 'name', label: 'Name' },
               { value: 'severity', label: 'Severity' },
@@ -271,21 +284,17 @@ export function AlertRulesCard() {
         )}
       </div>
 
-      {/* Footer */}
-      {rules.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
-          <span>
-            {limit === 'unlimited' || displayedRules.length >= sortedRules.length
-              ? `Showing all ${sortedRules.length} rules`
-              : `Showing ${displayedRules.length} of ${sortedRules.length} rules`}
-          </span>
-          <button
-            onClick={handleCreateNew}
-            className="text-purple-400 hover:text-purple-300 transition-colors flex items-center gap-1"
-          >
-            <Plus className="w-3 h-3" />
-            New Rule
-          </button>
+      {/* Pagination */}
+      {needsPagination && limit !== 'unlimited' && (
+        <div className="pt-2 border-t border-border/50 mt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={perPage}
+            onPageChange={goToPage}
+            showItemsPerPage={false}
+          />
         </div>
       )}
 

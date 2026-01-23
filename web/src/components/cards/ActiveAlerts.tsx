@@ -22,6 +22,7 @@ import { useMissions } from '../../hooks/useMissions'
 import { getSeverityIcon } from '../../types/alerts'
 import type { Alert, AlertSeverity } from '../../types/alerts'
 import { CardControls } from '../ui/CardControls'
+import { Pagination, usePagination } from '../ui/Pagination'
 
 // Format relative time
 function formatRelativeTime(dateString: string): string {
@@ -159,11 +160,17 @@ export function ActiveAlerts() {
     })
   }, [allAlertsToShow, selectedClusters, isAllClustersSelected, localClusterFilter, sortBy, selectedSeverities, isAllSeveritiesSelected, customFilter, localSearch])
 
-  // Apply pagination
-  const displayedAlerts = useMemo(() => {
-    if (limit === 'unlimited') return filteredAlerts
-    return filteredAlerts.slice(0, limit)
-  }, [filteredAlerts, limit])
+  // Apply pagination using usePagination hook
+  const effectivePerPage = limit === 'unlimited' ? 1000 : limit
+  const {
+    paginatedItems: displayedAlerts,
+    currentPage,
+    totalPages,
+    totalItems,
+    itemsPerPage: perPage,
+    goToPage,
+    needsPagination,
+  } = usePagination(filteredAlerts, effectivePerPage)
 
   const handleAlertClick = (alert: Alert) => {
     if (alert.cluster) {
@@ -454,12 +461,17 @@ export function ActiveAlerts() {
         )}
       </div>
 
-      {/* Footer */}
-      {filteredAlerts.length > 0 && (
-        <div className="mt-2 pt-2 border-t border-border/50 text-xs text-muted-foreground text-center">
-          {limit === 'unlimited' || displayedAlerts.length >= filteredAlerts.length
-            ? `Showing all ${filteredAlerts.length} alerts`
-            : `Showing ${displayedAlerts.length} of ${filteredAlerts.length} alerts`}
+      {/* Pagination */}
+      {needsPagination && limit !== 'unlimited' && (
+        <div className="pt-2 border-t border-border/50 mt-2">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            itemsPerPage={perPage}
+            onPageChange={goToPage}
+            showItemsPerPage={false}
+          />
         </div>
       )}
     </div>

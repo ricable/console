@@ -699,20 +699,20 @@ export function NamespaceQuotas({ config }: NamespaceQuotasProps) {
                 return (
                   <div key={`${quota.cluster}-${quota.namespace}-${quota.resource}-${idx}`} className={`p-3 rounded-lg bg-secondary/30 ${isFetchingData ? 'opacity-50' : ''}`}>
                     {showScope && (
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          {quota.cluster && <ClusterBadge cluster={quota.cluster} size="sm" />}
+                      <div className="flex items-center justify-between mb-2 gap-2">
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground min-w-0 overflow-hidden">
+                          {quota.cluster && <span className="flex-shrink-0"><ClusterBadge cluster={quota.cluster} size="sm" /></span>}
                           {quota.namespace && (
-                            <>
+                            <span className="flex items-center gap-1 truncate">
                               <span>/</span>
-                              <span>{quota.namespace}</span>
-                            </>
+                              <span className="truncate">{quota.namespace}</span>
+                            </span>
                           )}
                           {quota.quotaName && (
-                            <>
+                            <span className="flex items-center gap-1 truncate">
                               <span>/</span>
-                              <span className="text-yellow-400">{quota.quotaName}</span>
-                            </>
+                              <span className="text-yellow-400 truncate">{quota.quotaName}</span>
+                            </span>
                           )}
                         </div>
                         {fullQuota && (
@@ -768,13 +768,13 @@ export function NamespaceQuotas({ config }: NamespaceQuotasProps) {
                     className={`p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors ${isFetchingData ? 'opacity-50' : ''}`}
                   >
                     {showScope && (
-                      <div className="flex items-center gap-1 mb-2 text-xs text-muted-foreground">
-                        {item.cluster && <ClusterBadge cluster={item.cluster} size="sm" />}
+                      <div className="flex items-center gap-1 mb-2 text-xs text-muted-foreground min-w-0 overflow-hidden">
+                        {item.cluster && <span className="flex-shrink-0"><ClusterBadge cluster={item.cluster} size="sm" /></span>}
                         {item.namespace && (
-                          <>
+                          <span className="flex items-center gap-1 truncate">
                             <span>/</span>
-                            <span>{item.namespace}</span>
-                          </>
+                            <span className="truncate">{item.namespace}</span>
+                          </span>
                         )}
                       </div>
                     )}

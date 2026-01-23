@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { Loader2, AlertTriangle, ChevronRight, Search } from 'lucide-react'
 import { usePods } from '../../hooks/useMCP'
 import { ClusterBadge } from '../ui/ClusterBadge'
-import { CardControls } from '../ui/CardControls'
+import { CardControls, SortDirection } from '../ui/CardControls'
 import { Pagination, usePagination } from '../ui/Pagination'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
@@ -28,6 +28,7 @@ export function TopPods({ config }: TopPodsProps) {
   const cluster = config?.cluster
   const namespace = config?.namespace
   const [sortBy, setSortBy] = useState<SortByOption>(config?.sortBy || 'restarts')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [itemsPerPage, setItemsPerPage] = useState<number | 'unlimited'>(config?.limit || 5)
   const [localSearch, setLocalSearch] = useState('')
 
@@ -71,8 +72,19 @@ export function TopPods({ config }: TopPodsProps) {
       )
     }
 
-    return filtered
-  }, [rawPods, cluster, globalSelectedClusters, isAllClustersSelected, customFilter, localSearch])
+    // Sort by selected field and direction
+    const sorted = [...filtered].sort((a, b) => {
+      let result = 0
+      if (sortBy === 'restarts') {
+        result = b.restarts - a.restarts
+      } else if (sortBy === 'name') {
+        result = a.name.localeCompare(b.name)
+      }
+      return sortDirection === 'asc' ? -result : result
+    })
+
+    return sorted
+  }, [rawPods, cluster, globalSelectedClusters, isAllClustersSelected, customFilter, localSearch, sortBy, sortDirection])
 
   // Use pagination hook
   const effectivePerPage = itemsPerPage === 'unlimited' ? 1000 : itemsPerPage
@@ -117,6 +129,8 @@ export function TopPods({ config }: TopPodsProps) {
             sortBy={sortBy}
             sortOptions={SORT_OPTIONS}
             onSortChange={setSortBy}
+            sortDirection={sortDirection}
+            onSortDirectionChange={setSortDirection}
           />
           <RefreshButton
             isRefreshing={isRefreshing}

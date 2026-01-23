@@ -176,12 +176,15 @@ export function UpgradeStatus({ config: _config }: UpgradeStatusProps) {
 
   // Use a ref to track which clusters we've already fetched successfully
   const fetchedClustersRef = useRef(new Set<string>())
+  // Track clusters that failed to fetch for retry
+  const failedClustersRef = useRef(new Set<string>())
 
   // Clear fetch cache when agent reconnects (was disconnected, now connected)
   useEffect(() => {
     if (agentConnected && !prevAgentConnectedRef.current) {
       // Agent just reconnected - clear the fetch cache to re-fetch all versions
       fetchedClustersRef.current.clear()
+      failedClustersRef.current.clear()
     }
     prevAgentConnectedRef.current = agentConnected
   }, [agentConnected])
@@ -201,23 +204,38 @@ export function UpgradeStatus({ config: _config }: UpgradeStatusProps) {
       // Only fetch for healthy/reachable clusters that we haven't cached yet
       const reachableClusters = allClusters.filter(c => c.healthy !== false && c.nodeCount && c.nodeCount > 0)
 
-      // Build updates incrementally, preserving existing cached versions
+      // Determine which clusters need fetching (not cached, or previously failed)
+      const clustersToFetch = reachableClusters.filter(c =>
+        !fetchedClustersRef.current.has(c.name) || failedClustersRef.current.has(c.name)
+      )
+
+      if (clustersToFetch.length === 0) {
+        setFetchCompleted(true)
+        return
+      }
+
+      // Fetch all clusters in parallel for faster loading
+      const fetchPromises = clustersToFetch.map(async (cluster) => {
+        const version = await fetchClusterVersion(cluster.name)
+        return { name: cluster.name, version }
+      })
+
+      const results = await Promise.all(fetchPromises)
+
+      // Process results
       const newVersions: Record<string, string> = {}
       let hasNewData = false
 
-      for (const cluster of reachableClusters) {
-        // Skip if we already have a valid cached version
-        if (fetchedClustersRef.current.has(cluster.name)) {
-          continue
-        }
-
-        const version = await fetchClusterVersion(cluster.name)
+      for (const { name, version } of results) {
         if (version) {
-          newVersions[cluster.name] = version
-          fetchedClustersRef.current.add(cluster.name)
+          newVersions[name] = version
+          fetchedClustersRef.current.add(name)
+          failedClustersRef.current.delete(name)
           hasNewData = true
+        } else {
+          // Track failed clusters for retry on next cycle
+          failedClustersRef.current.add(name)
         }
-        // Don't mark as '-' immediately - let cached version persist if we have one
       }
 
       // Merge new versions with existing, preserving cache
@@ -228,6 +246,15 @@ export function UpgradeStatus({ config: _config }: UpgradeStatusProps) {
     }
 
     fetchVersions()
+
+    // Retry failed clusters every 15 seconds
+    const retryInterval = setInterval(() => {
+      if (failedClustersRef.current.size > 0 && agentConnected) {
+        fetchVersions()
+      }
+    }, 15000)
+
+    return () => clearInterval(retryInterval)
   }, [agentConnected, allClusters])
 
   const handleStartUpgrade = (clusterName: string, currentVersion: string, targetVersion: string) => {
