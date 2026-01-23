@@ -55,6 +55,18 @@ jobs:
             -X POST \
             -f content='rocket'
 
+      - name: Update labels - processing
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create labels if they don't exist
+          gh label create "ai-processing" --color "fbca04" --description "AI is currently processing this issue" 2>/dev/null || true
+          gh label create "ai-fix-requested" --color "d4c5f9" --description "AI fix has been requested" 2>/dev/null || true
+
+          # Update status: remove requested, add processing
+          gh issue edit ${{ steps.issue.outputs.number }} --remove-label "ai-fix-requested" 2>/dev/null || true
+          gh issue edit ${{ steps.issue.outputs.number }} --add-label "ai-processing"
+
       - name: Trigger Copilot to fix issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -78,10 +90,13 @@ jobs:
 
           /copilot fix this issue and create a PR"
 
-      - name: Update labels
+      - name: Update labels - copilot triggered
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue edit ${{ steps.issue.outputs.number }} --remove-label "ai-fix-requested" 2>/dev/null || true
-          gh label create "copilot-triggered" --color "6f42c1" --description "Copilot has been triggered to fix this issue" 2>/dev/null || true
-          gh issue edit ${{ steps.issue.outputs.number }} --add-label "copilot-triggered" 2>/dev/null || true
+          # Create completion label if it doesn't exist
+          gh label create "ai-awaiting-copilot" --color "6f42c1" --description "Awaiting Copilot response" 2>/dev/null || true
+
+          # Update status: remove processing, add awaiting copilot
+          gh issue edit ${{ steps.issue.outputs.number }} --remove-label "ai-processing" 2>/dev/null || true
+          gh issue edit ${{ steps.issue.outputs.number }} --add-label "ai-awaiting-copilot"
