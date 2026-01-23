@@ -102,15 +102,30 @@ jobs:
           npm install -g @anthropic-ai/claude-code
           echo "$(npm bin -g)" >> $GITHUB_PATH
 
-      - name: Create fix branch
+      - name: Setup fix branch
+        id: branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "Claude Code Bot"
           git config user.email "claude-bot@kubestellar.io"
-          # Delete existing remote branch if it exists (from previous failed runs)
-          git push origin --delete "ai-fix/issue-${{ steps.issue.outputs.number }}" 2>/dev/null || true
-          git checkout -b "ai-fix/issue-${{ steps.issue.outputs.number }}"
+          BRANCH="ai-fix/issue-${{ steps.issue.outputs.number }}"
+
+          # Check if branch exists remotely
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "Branch exists, fetching and checking out..."
+            git fetch origin "$BRANCH"
+            git checkout -b "$BRANCH" "origin/$BRANCH"
+            echo "branch_existed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Creating new branch..."
+            git checkout -b "$BRANCH"
+            echo "branch_existed=false" >> $GITHUB_OUTPUT
+          fi
+
+          # Check if PR already exists
+          PR_NUM=$(gh pr list --head "$BRANCH" --json number --jq '.[0].number' 2>/dev/null || echo "")
+          echo "existing_pr=$PR_NUM" >> $GITHUB_OUTPUT
 
       - name: Run Claude Code
         env:
@@ -186,11 +201,26 @@ jobs:
           Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>"
           git push origin "ai-fix/issue-${{ steps.issue.outputs.number }}"
 
-      - name: Create Pull Request
+      - name: Create or update Pull Request
         if: steps.check_changes.outputs.has_changes == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXISTING_PR: ${{ steps.branch.outputs.existing_pr }}
         run: |
+          # If PR already exists, just comment on it
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already exists, adding comment..."
+            gh pr comment "$EXISTING_PR" --body "🔄 **New iteration pushed!**
+
+            Claude Code has pushed additional changes based on the latest run.
+
+            View the updated diff to see what changed.
+
+            ---
+            *Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}*"
+            exit 0
+          fi
+
           # Extract Console Request ID from issue body if present
           CONSOLE_REQUEST_ID=$(echo "${{ steps.issue_details.outputs.body }}" | grep -oP 'Console Request ID:\*\* \K[0-9a-f-]{36}' || echo "")
 
@@ -231,13 +261,20 @@ jobs:
             --label "ai-generated"
 
       - name: Comment on issue - success
-        if: steps.check_changes.outputs.has_changes == 'true'
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.branch.outputs.existing_pr == ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh issue comment ${{ steps.issue.outputs.number }} --body "A fix has been generated and a pull request has been created. You will be notified when a preview deployment is ready for testing.
 
           Check the linked PR for details on the changes."
+
+      - name: Comment on issue - updated
+        if: steps.check_changes.outputs.has_changes == 'true' && steps.branch.outputs.existing_pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue comment ${{ steps.issue.outputs.number }} --body "The existing PR has been updated with new changes. Check PR #${{ steps.branch.outputs.existing_pr }} for the latest iteration."
 
       - name: Comment on issue - no changes
         if: steps.check_changes.outputs.has_changes == 'false'
