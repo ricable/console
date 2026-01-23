@@ -50,23 +50,38 @@ export function MissionSuggestions() {
   const { startMission } = useMissions()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [processingId, setProcessingId] = useState<string | null>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Force dependency on snoozedMissions for reactivity
   void snoozedMissions
 
-  // Close dropdown when clicking outside
+  // Close dropdown when clicking outside or pressing Escape
   useEffect(() => {
     if (!expandedId) return
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      // Check if click is outside the dropdown content
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setExpandedId(null)
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setExpandedId(null)
+      }
+    }
+
+    // Use setTimeout to avoid closing immediately when clicking to open
+    setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('keydown', handleEscape)
+    }, 0)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
   }, [expandedId])
 
   const handleAction = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
@@ -128,7 +143,7 @@ export function MissionSuggestions() {
   if (!hasSuggestions) return null
 
   return (
-    <div ref={containerRef} data-tour="mission-suggestions" className="mb-4">
+    <div data-tour="mission-suggestions" className="mb-4">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 text-muted-foreground mr-1">
           <Lightbulb className="w-4 h-4 text-purple-400" />
@@ -161,7 +176,10 @@ export function MissionSuggestions() {
 
               {/* Expanded dropdown */}
               {isExpanded && (
-                <div className={`absolute top-full left-0 mt-1 z-50 w-72 rounded-lg border ${style.border} ${style.bg} backdrop-blur-sm shadow-xl`}>
+                <div
+                  ref={dropdownRef}
+                  className={`absolute top-full left-0 mt-1 z-50 w-72 rounded-lg border ${style.border} ${style.bg} backdrop-blur-sm shadow-xl`}
+                >
                   <div className="p-3">
                     {/* Description */}
                     <p className="text-xs text-muted-foreground mb-2">{suggestion.description}</p>
