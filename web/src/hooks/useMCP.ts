@@ -1393,7 +1393,19 @@ export function usePods(cluster?: string, namespace?: string, sortBy: 'restarts'
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ pods: PodInfo[] }>(`/api/mcp/pods?${params}`)
+      const url = `/api/mcp/pods?${params}`
+
+      // Use direct fetch to bypass the global circuit breaker
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const token = localStorage.getItem('token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const response = await fetch(url, { method: 'GET', headers })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { pods: PodInfo[] }
       let sortedPods = data.pods || []
 
       // Sort by restarts (descending) or name
@@ -1861,7 +1873,19 @@ export function useDeployments(cluster?: string, namespace?: string) {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ deployments: Deployment[] }>(`/api/mcp/deployments?${params}`)
+      const url = `/api/mcp/deployments?${params}`
+
+      // Use direct fetch to bypass the global circuit breaker
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const token = localStorage.getItem('token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const response = await fetch(url, { method: 'GET', headers })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { deployments: Deployment[] }
       const newDeployments = data.deployments || []
       setDeployments(newDeployments)
       setError(null)
@@ -2000,7 +2024,19 @@ export function useServices(cluster?: string, namespace?: string) {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ services: Service[] }>(`/api/mcp/services?${params}`)
+      const url = `/api/mcp/services?${params}`
+
+      // Use direct fetch to bypass the global circuit breaker
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const token = localStorage.getItem('token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const response = await fetch(url, { method: 'GET', headers })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { services: Service[] }
       const newData = data.services || []
       const now = new Date()
 
@@ -2883,7 +2919,19 @@ export function useNodes(cluster?: string) {
     try {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
-      const { data } = await api.get<{ nodes: NodeInfo[] }>(`/api/mcp/nodes?${params}`)
+      const url = `/api/mcp/nodes?${params}`
+
+      // Use direct fetch to bypass the global circuit breaker
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      const token = localStorage.getItem('token')
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`
+      }
+      const response = await fetch(url, { method: 'GET', headers })
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { nodes: NodeInfo[] }
       setNodes(data.nodes || [])
       setError(null)
     } catch (err) {
