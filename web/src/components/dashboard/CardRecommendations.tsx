@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Clock, ChevronDown, X, Plus, AlertTriangle, Info, Lightbulb } from 'lucide-react'
 import { useCardRecommendations, CardRecommendation } from '../../hooks/useCardRecommendations'
 import { useSnoozedRecommendations } from '../../hooks/useSnoozedRecommendations'
@@ -32,9 +32,24 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
   const { snoozeRecommendation, isSnoozed, snoozedRecommendations } = useSnoozedRecommendations()
   const [expandedRec, setExpandedRec] = useState<string | null>(null)
   const [addingCard, setAddingCard] = useState<string | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Force dependency on snoozedRecommendations for reactivity
   void snoozedRecommendations
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    if (!expandedRec) return
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setExpandedRec(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [expandedRec])
 
   const handleAddCard = async (rec: CardRecommendation) => {
     setAddingCard(rec.id)
@@ -69,7 +84,7 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
   }
 
   return (
-    <div data-tour="recommendations" className="mb-4">
+    <div ref={containerRef} data-tour="recommendations" className="mb-4">
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-1.5 text-muted-foreground mr-1">
           <Lightbulb className="w-4 h-4 text-primary" />
