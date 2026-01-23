@@ -149,6 +149,18 @@ jobs:
       - name: Commit and push
         if: steps.check_changes.outputs.has_changes == 'true'
         run: |
+          # Restore build artifacts that shouldn't be committed
+          git checkout -- web/dist/ 2>/dev/null || true
+          git checkout -- '*.tsbuildinfo' 2>/dev/null || true
+          git checkout -- '*.lock' 2>/dev/null || true
+          git checkout -- 'package-lock.json' 2>/dev/null || true
+
+          # Check if there are still meaningful changes after excluding build artifacts
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No meaningful changes after excluding build artifacts"
+            exit 0
+          fi
+
           git add -A
           git commit -s -m "🤖 fix: Address issue #${{ steps.issue.outputs.number }}
 
