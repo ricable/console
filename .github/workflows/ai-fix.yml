@@ -145,11 +145,11 @@ jobs:
           ISSUE="${{ steps.issue.outputs.number }}"
 
           # Create completion label if it doesn't exist
-          gh label create "ai-awaiting-copilot" --repo "$REPO" --color "6f42c1" --description "Awaiting Copilot response" 2>/dev/null || true
+          gh label create "ai-awaiting-fix" --repo "$REPO" --color "6f42c1" --description "Awaiting Copilot response" 2>/dev/null || true
 
           # Update status: remove processing, add awaiting copilot
           gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-processing" 2>/dev/null || true
-          gh issue edit "$ISSUE" --repo "$REPO" --add-label "ai-awaiting-copilot"
+          gh issue edit "$ISSUE" --repo "$REPO" --add-label "ai-awaiting-fix"
 
   # Update issue labels when Copilot's PR changes state
   update-issue-on-pr:
@@ -186,7 +186,7 @@ jobs:
           gh pr edit "$PR_NUM" --repo "$REPO" --add-label "ai-generated" 2>/dev/null || true
 
           # Update issue status
-          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-copilot" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-fix" 2>/dev/null || true
           gh issue edit "$ISSUE" --repo "$REPO" --add-label "ai-pr-draft"
 
           echo "Updated issue #$ISSUE: ai-pr-draft, PR #$PR_NUM: ai-generated"
@@ -220,7 +220,7 @@ jobs:
 
           # Update issue status
           gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-pr-draft" 2>/dev/null || true
-          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-copilot" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-fix" 2>/dev/null || true
           gh issue edit "$ISSUE" --repo "$REPO" --add-label "ai-pr-ready"
 
           echo "Updated issue #$ISSUE: ai-pr-ready"
@@ -239,7 +239,7 @@ jobs:
           # Update status - remove all ai- labels and add complete
           gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-pr-ready" 2>/dev/null || true
           gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-pr-draft" 2>/dev/null || true
-          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-copilot" 2>/dev/null || true
+          gh issue edit "$ISSUE" --repo "$REPO" --remove-label "ai-awaiting-fix" 2>/dev/null || true
           gh issue edit "$ISSUE" --repo "$REPO" --add-label "ai-processing-complete"
 
           echo "Updated issue #$ISSUE: ai-processing-complete"
