@@ -26,6 +26,7 @@ export interface FeatureRequest {
   status: RequestStatus
   pr_number?: number
   pr_url?: string
+  copilot_session_url?: string
   netlify_preview_url?: string
   /** Latest comment from GitHub (used for unable_to_fix status) */
   latest_comment?: string

@@ -479,18 +479,34 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
                                   </div>
                                 </>
                               )}
-                              {/* Show PR link during AI processing (feasibility_study) */}
-                              {request.status === 'feasibility_study' && request.pr_url && (
-                                <a
-                                  href={request.pr_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs flex items-center gap-1 mt-1.5 text-purple-400 hover:text-purple-300"
-                                  onClick={e => e.stopPropagation()}
-                                >
-                                  <GitPullRequest className="w-3 h-3" />
-                                  View AI Progress - PR #{request.pr_number}
-                                </a>
+                              {/* Show PR and Copilot session links during AI processing (feasibility_study) */}
+                              {request.status === 'feasibility_study' && (
+                                <div className="flex flex-wrap gap-2 mt-1.5">
+                                  {request.pr_url && (
+                                    <a
+                                      href={request.pr_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs flex items-center gap-1 text-purple-400 hover:text-purple-300"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <GitPullRequest className="w-3 h-3" />
+                                      PR #{request.pr_number}
+                                    </a>
+                                  )}
+                                  {request.copilot_session_url && (
+                                    <a
+                                      href={request.copilot_session_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs flex items-center gap-1 text-purple-400 hover:text-purple-300"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <ExternalLink className="w-3 h-3" />
+                                      Copilot Session
+                                    </a>
+                                  )}
+                                </div>
                               )}
                               {/* Show PR link if fix is ready or complete */}
                               {(request.status === 'fix_ready' || request.status === 'fix_complete') && request.pr_url && (

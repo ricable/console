@@ -882,17 +882,17 @@ func (s *SQLiteStore) CreateFeatureRequest(request *models.FeatureRequest) error
 }
 
 func (s *SQLiteStore) GetFeatureRequest(id uuid.UUID) (*models.FeatureRequest, error) {
-	row := s.db.QueryRow(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE id = ?`, id.String())
+	row := s.db.QueryRow(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE id = ?`, id.String())
 	return s.scanFeatureRequest(row)
 }
 
 func (s *SQLiteStore) GetFeatureRequestByIssueNumber(issueNumber int) (*models.FeatureRequest, error) {
-	row := s.db.QueryRow(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE github_issue_number = ?`, issueNumber)
+	row := s.db.QueryRow(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE github_issue_number = ?`, issueNumber)
 	return s.scanFeatureRequest(row)
 }
 
 func (s *SQLiteStore) GetUserFeatureRequests(userID uuid.UUID) ([]models.FeatureRequest, error) {
-	rows, err := s.db.Query(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE user_id = ? ORDER BY created_at DESC`, userID.String())
+	rows, err := s.db.Query(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests WHERE user_id = ? ORDER BY created_at DESC`, userID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -910,7 +910,7 @@ func (s *SQLiteStore) GetUserFeatureRequests(userID uuid.UUID) ([]models.Feature
 }
 
 func (s *SQLiteStore) GetAllFeatureRequests() ([]models.FeatureRequest, error) {
-	rows, err := s.db.Query(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests ORDER BY created_at DESC`)
+	rows, err := s.db.Query(`SELECT id, user_id, title, description, request_type, github_issue_number, github_issue_url, status, pr_number, pr_url, copilot_session_url, netlify_preview_url, closed_by_user, created_at, updated_at FROM feature_requests ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -932,11 +932,11 @@ func (s *SQLiteStore) scanFeatureRequest(row *sql.Row) (*models.FeatureRequest, 
 	var idStr, userIDStr string
 	var requestType, status string
 	var issueNumber, prNumber sql.NullInt64
-	var issueURL, prURL, previewURL sql.NullString
+	var issueURL, prURL, copilotSessionURL, previewURL sql.NullString
 	var closedByUser sql.NullInt64
 	var updatedAt sql.NullTime
 
-	err := row.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &issueURL, &status, &prNumber, &prURL, &previewURL, &closedByUser, &r.CreatedAt, &updatedAt)
+	err := row.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &issueURL, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &r.CreatedAt, &updatedAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -962,6 +962,9 @@ func (s *SQLiteStore) scanFeatureRequest(row *sql.Row) (*models.FeatureRequest, 
 	if prURL.Valid {
 		r.PRURL = prURL.String
 	}
+	if copilotSessionURL.Valid {
+		r.CopilotSessionURL = copilotSessionURL.String
+	}
 	if previewURL.Valid {
 		r.NetlifyPreviewURL = previewURL.String
 	}
@@ -979,11 +982,11 @@ func (s *SQLiteStore) scanFeatureRequestRow(rows *sql.Rows) (*models.FeatureRequ
 	var idStr, userIDStr string
 	var requestType, status string
 	var issueNumber, prNumber sql.NullInt64
-	var issueURL, prURL, previewURL sql.NullString
+	var issueURL, prURL, copilotSessionURL, previewURL sql.NullString
 	var closedByUser sql.NullInt64
 	var updatedAt sql.NullTime
 
-	err := rows.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &issueURL, &status, &prNumber, &prURL, &previewURL, &closedByUser, &r.CreatedAt, &updatedAt)
+	err := rows.Scan(&idStr, &userIDStr, &r.Title, &r.Description, &requestType, &issueNumber, &issueURL, &status, &prNumber, &prURL, &copilotSessionURL, &previewURL, &closedByUser, &r.CreatedAt, &updatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -1005,6 +1008,9 @@ func (s *SQLiteStore) scanFeatureRequestRow(rows *sql.Rows) (*models.FeatureRequ
 	}
 	if prURL.Valid {
 		r.PRURL = prURL.String
+	}
+	if copilotSessionURL.Valid {
+		r.CopilotSessionURL = copilotSessionURL.String
 	}
 	if previewURL.Valid {
 		r.NetlifyPreviewURL = previewURL.String

@@ -62,6 +62,7 @@ type FeatureRequest struct {
 	Status            RequestStatus `json:"status"`
 	PRNumber          *int          `json:"pr_number,omitempty"`
 	PRURL             string        `json:"pr_url,omitempty"`
+	CopilotSessionURL string        `json:"copilot_session_url,omitempty"`
 	NetlifyPreviewURL string        `json:"netlify_preview_url,omitempty"`
 	LatestComment     string        `json:"latest_comment,omitempty"`
 	ClosedByUser      bool          `json:"closed_by_user"`
