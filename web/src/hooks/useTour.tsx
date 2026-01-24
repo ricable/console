@@ -111,7 +111,7 @@ const TOUR_STEPS: TourStep[] = [
     target: '[data-tour="feedback"]',
     title: 'Bug Reports & Feature Requests',
     content: 'Found a bug or have an idea? Click here to report issues or request new features. We track your feedback and notify you when updates are available.',
-    placement: 'bottom',
+    placement: 'left',
     highlight: true,
   },
   {
@@ -119,7 +119,7 @@ const TOUR_STEPS: TourStep[] = [
     target: '[data-tour="alerts"]',
     title: 'Alert Notifications',
     content: 'Monitor active alerts across all clusters. Click to see alert details, acknowledge them, or let Claude diagnose issues with AI-powered analysis.',
-    placement: 'bottom',
+    placement: 'left',
     highlight: true,
   },
 ]
