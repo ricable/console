@@ -24,6 +24,7 @@ import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useShowCards } from '../../hooks/useShowCards'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
+import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -168,6 +169,7 @@ function getCompliancePosture(clusterCount: number) {
 export function Compliance() {
   const location = useLocation()
   const { clusters, isLoading, refetch, lastUpdated, isRefreshing } = useClusters()
+  const { drillToPolicy } = useDrillDownActions()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
   const { showCards, expandCards } = useShowCards('kubestellar-compliance')
 
@@ -291,23 +293,39 @@ export function Compliance() {
 
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
+    const drillToFirstCluster = () => {
+      if (reachableClusters.length > 0 && reachableClusters[0]) {
+        drillToPolicy(reachableClusters[0].name, 'compliance', 'overview')
+      }
+    }
+    const drillToFailing = () => {
+      if (reachableClusters.length > 0 && reachableClusters[0]) {
+        drillToPolicy(reachableClusters[0].name, 'compliance', 'failing', { status: 'failing' })
+      }
+    }
+    const drillToCritical = () => {
+      if (reachableClusters.length > 0 && reachableClusters[0]) {
+        drillToPolicy(reachableClusters[0].name, 'compliance', 'critical', { severity: 'critical' })
+      }
+    }
+
     switch (blockId) {
       case 'score':
-        return { value: `${posture.score}%`, sublabel: 'compliance score' }
+        return { value: `${posture.score}%`, sublabel: 'compliance score', onClick: drillToFirstCluster, isClickable: reachableClusters.length > 0 }
       case 'total_checks':
-        return { value: posture.totalChecks, sublabel: 'total checks' }
+        return { value: posture.totalChecks, sublabel: 'total checks', onClick: drillToFirstCluster, isClickable: posture.totalChecks > 0 }
       case 'passing':
-        return { value: posture.passing, sublabel: 'passing' }
+        return { value: posture.passing, sublabel: 'passing', onClick: drillToFirstCluster, isClickable: posture.passing > 0 }
       case 'failing':
-        return { value: posture.failing, sublabel: 'failing' }
+        return { value: posture.failing, sublabel: 'failing', onClick: drillToFailing, isClickable: posture.failing > 0 }
       case 'warning':
-        return { value: posture.warning, sublabel: 'warnings' }
+        return { value: posture.warning, sublabel: 'warnings', onClick: drillToFailing, isClickable: posture.warning > 0 }
       case 'critical_findings':
-        return { value: posture.criticalFindings, sublabel: 'critical findings' }
+        return { value: posture.criticalFindings, sublabel: 'critical findings', onClick: drillToCritical, isClickable: posture.criticalFindings > 0 }
       default:
         return { value: 0 }
     }
-  }, [posture])
+  }, [posture, reachableClusters, drillToPolicy])
 
   // Transform card for ConfigureCardModal
   const configureCard = configuringCard ? {
