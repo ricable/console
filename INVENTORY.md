@@ -10,7 +10,7 @@ Last Updated: 2026-01-23
 | Card Types | 65 |
 | Cards with Drill-Down | 40 |
 | Drill-Down Views | 22 |
-| Modal Dialogs | 16 |
+| Modal Dialogs | 19 |
 | Stats Block Types | 93 (across 14 dashboard types) |
 
 ---
@@ -399,7 +399,7 @@ Based on feature requests:
 
 ---
 
-## 7. Modal Dialogs (16 Total)
+## 7. Modal Dialogs (19 Total)
 
 ### Dashboard-Related Modals (6)
 | # | Name | File | Trigger | Description |
@@ -448,6 +448,13 @@ Based on feature requests:
 |---|------|------|---------|-------------|
 | 15 | PolicyDetailModal | `cards/OPAPolicies.tsx` | Click policy in OPA card | OPA policy details with violations list |
 | 16 | ViolationsModal | `cards/OPAPolicies.tsx` | Click cluster with violations | OPA Gatekeeper violations list by severity |
+
+### Inline Card Modals (3)
+| # | Name | File | Trigger | Description |
+|---|------|------|---------|-------------|
+| 17 | QuotaModal | `cards/NamespaceQuotas.tsx` | Add/Edit quota button | Create or edit ResourceQuota with CPU/memory/storage limits |
+| 18 | ApiKeyPromptModal | `cards/KlaudeMissions.tsx` | AI feature without API key | Prompts user to configure Anthropic API key for AI features |
+| 19 | AlertRuleEditor | `alerts/AlertRuleEditor.tsx` | Add/Edit alert rule | Form for creating/editing Prometheus-style alert rules |
 
 ### Modal Features
 - All modals support ESC key to close
