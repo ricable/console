@@ -27,7 +27,7 @@ interface TooltipPosition {
 }
 
 const TOOLTIP_WIDTH = 320 // w-80 = 20rem = 320px
-const TOOLTIP_HEIGHT = 220 // Approximate height including all content
+const TOOLTIP_HEIGHT = 300 // Approximate height including all content (header + content + footer + keyboard hints)
 const VIEWPORT_PADDING = 16 // Minimum distance from viewport edge
 
 function getTooltipPosition(
@@ -49,9 +49,20 @@ function getTooltipPosition(
       const maxLeft = vw - TOOLTIP_WIDTH / 2 - VIEWPORT_PADDING
       left = Math.max(minLeft, Math.min(maxLeft, left))
 
-      position = {
-        bottom: vh - targetRect.top + gap,
-        left,
+      // Check if there's room above, otherwise flip to bottom
+      const spaceAbove = targetRect.top - gap - VIEWPORT_PADDING
+      const spaceBelow = vh - targetRect.bottom - gap - VIEWPORT_PADDING
+      if (spaceAbove < TOOLTIP_HEIGHT && spaceBelow > TOOLTIP_HEIGHT) {
+        // Flip to bottom
+        position = {
+          top: targetRect.bottom + gap,
+          left,
+        }
+      } else {
+        position = {
+          bottom: vh - targetRect.top + gap,
+          left,
+        }
       }
       break
     }
@@ -63,11 +74,19 @@ function getTooltipPosition(
       const maxLeft = vw - TOOLTIP_WIDTH / 2 - VIEWPORT_PADDING
       left = Math.max(minLeft, Math.min(maxLeft, left))
 
-      // Check if there's room below, otherwise flip to top
-      const spaceBelow = vh - targetRect.bottom - gap
-      if (spaceBelow < TOOLTIP_HEIGHT && targetRect.top > TOOLTIP_HEIGHT + gap) {
+      // Check if there's room below (with buffer), otherwise flip to top
+      const spaceBelow = vh - targetRect.bottom - gap - VIEWPORT_PADDING
+      const spaceAbove = targetRect.top - gap - VIEWPORT_PADDING
+      if (spaceBelow < TOOLTIP_HEIGHT && spaceAbove > TOOLTIP_HEIGHT) {
+        // Flip to top
         position = {
           bottom: vh - targetRect.top + gap,
+          left,
+        }
+      } else if (spaceBelow < TOOLTIP_HEIGHT && spaceAbove <= TOOLTIP_HEIGHT) {
+        // Neither above nor below has enough space - position so tooltip bottom is at viewport edge
+        position = {
+          top: Math.max(VIEWPORT_PADDING, vh - TOOLTIP_HEIGHT - VIEWPORT_PADDING),
           left,
         }
       } else {
@@ -81,9 +100,12 @@ function getTooltipPosition(
     case 'left': {
       // Position to the left of target, centered vertically
       let top = targetRect.top + targetRect.height / 2
-      // Clamp vertical position to keep tooltip in viewport
-      const minTop = TOOLTIP_HEIGHT / 2 + VIEWPORT_PADDING
-      const maxTop = vh - TOOLTIP_HEIGHT / 2 - VIEWPORT_PADDING
+      // More conservative clamping - account for actual rendered height being potentially larger
+      // The CSS transform -translate-y-1/2 shifts by 50% of actual element height
+      // Use a larger buffer to ensure tooltip stays in viewport
+      const effectiveHalfHeight = TOOLTIP_HEIGHT / 2 + 20 // Extra buffer for safety
+      const minTop = effectiveHalfHeight + VIEWPORT_PADDING
+      const maxTop = vh - effectiveHalfHeight - VIEWPORT_PADDING
       top = Math.max(minTop, Math.min(maxTop, top))
 
       // Check if there's room to the left, otherwise flip to right
@@ -105,9 +127,10 @@ function getTooltipPosition(
     case 'right': {
       // Position to the right of target, centered vertically
       let top = targetRect.top + targetRect.height / 2
-      // Clamp vertical position to keep tooltip in viewport
-      const minTop = TOOLTIP_HEIGHT / 2 + VIEWPORT_PADDING
-      const maxTop = vh - TOOLTIP_HEIGHT / 2 - VIEWPORT_PADDING
+      // More conservative clamping - account for actual rendered height being potentially larger
+      const effectiveHalfHeight = TOOLTIP_HEIGHT / 2 + 20 // Extra buffer for safety
+      const minTop = effectiveHalfHeight + VIEWPORT_PADDING
+      const maxTop = vh - effectiveHalfHeight - VIEWPORT_PADDING
       top = Math.max(minTop, Math.min(maxTop, top))
 
       // Check if there's room to the right, otherwise flip to left
@@ -127,15 +150,24 @@ function getTooltipPosition(
       break
     }
     default: {
-      // Default to bottom placement
+      // Default to bottom placement with same logic as 'bottom' case
       let left = targetRect.left + targetRect.width / 2
       const minLeft = TOOLTIP_WIDTH / 2 + VIEWPORT_PADDING
       const maxLeft = vw - TOOLTIP_WIDTH / 2 - VIEWPORT_PADDING
       left = Math.max(minLeft, Math.min(maxLeft, left))
 
-      position = {
-        top: targetRect.bottom + gap,
-        left,
+      const spaceBelow = vh - targetRect.bottom - gap - VIEWPORT_PADDING
+      const spaceAbove = targetRect.top - gap - VIEWPORT_PADDING
+      if (spaceBelow < TOOLTIP_HEIGHT && spaceAbove > TOOLTIP_HEIGHT) {
+        position = {
+          bottom: vh - targetRect.top + gap,
+          left,
+        }
+      } else {
+        position = {
+          top: targetRect.bottom + gap,
+          left,
+        }
       }
     }
   }
