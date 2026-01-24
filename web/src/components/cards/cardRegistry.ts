@@ -290,7 +290,7 @@ export const CARD_DEFAULT_WIDTHS: Record<string, number> = {
   cluster_focus: 8,
   cluster_costs: 8,
   cluster_network: 8,
-  cluster_locations: 6,
+  cluster_locations: 8,
   argocd_health: 6,
   opencost_overview: 8,
   kubecost_overview: 8,
