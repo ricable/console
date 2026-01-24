@@ -11,8 +11,8 @@ interface Cluster {
 interface UseLocalClusterFilterOptions {
   /** Whether to exclude unreachable clusters (default: true) */
   excludeUnreachable?: boolean
-  /** Whether to restore local filter when global filter is cleared (default: true) */
-  restoreOnGlobalClear?: boolean
+  /** Unique ID for persisting this filter to localStorage */
+  storageKey?: string
 }
 
 interface UseLocalClusterFilterReturn<T extends Cluster> {
@@ -36,55 +36,50 @@ interface UseLocalClusterFilterReturn<T extends Cluster> {
   clusterFilterRef: React.RefObject<HTMLDivElement>
   /** Whether any local filter is applied */
   hasLocalFilter: boolean
-  /** Whether the global filter is currently overriding local filter */
-  isGlobalOverride: boolean
+  /** Active local filter clusters (ones that are also in available clusters) */
+  activeLocalFilter: string[]
 }
+
+const LOCAL_FILTER_STORAGE_PREFIX = 'kubestellar-local-filter:'
 
 /**
  * Hook for managing local cluster filtering within a card.
  * Respects global cluster selection and allows further filtering within those bounds.
  *
- * When a global filter is applied, saves the local filter and clears it.
- * When the global filter is cleared, restores the previous local filter.
+ * Local filters are now persisted to localStorage and are NOT cleared when global filter changes.
+ * This allows users to maintain their card-specific filters independently of global filters.
  */
 export function useLocalClusterFilter<T extends Cluster = Cluster>(
   options: UseLocalClusterFilterOptions = {}
 ): UseLocalClusterFilterReturn<T> {
-  const { excludeUnreachable = true, restoreOnGlobalClear = true } = options
+  const { excludeUnreachable = true, storageKey } = options
   const { clusters: rawClusters } = useClusters()
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
 
-  const [localClusterFilter, setLocalClusterFilter] = useState<string[]>([])
+  // Initialize from localStorage if storageKey provided
+  const [localClusterFilter, setLocalClusterFilterState] = useState<string[]>(() => {
+    if (!storageKey) return []
+    try {
+      const stored = localStorage.getItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`)
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })
   const [showClusterFilter, setShowClusterFilter] = useState(false)
   const clusterFilterRef = useRef<HTMLDivElement>(null)
 
-  // Track previous local filter for restoration when global filter is cleared
-  const previousLocalFilterRef = useRef<string[]>([])
-  const wasGlobalFilterActiveRef = useRef(false)
-
-  // Handle global filter changes - save/restore local filter
-  useEffect(() => {
-    if (!restoreOnGlobalClear) return
-
-    const isGlobalFilterActive = !isAllClustersSelected
-
-    if (isGlobalFilterActive && !wasGlobalFilterActiveRef.current) {
-      // Global filter just became active - save current local filter
-      previousLocalFilterRef.current = localClusterFilter
-      // Clear local filter so global filter takes full effect
-      if (localClusterFilter.length > 0) {
-        setLocalClusterFilter([])
-      }
-    } else if (!isGlobalFilterActive && wasGlobalFilterActiveRef.current) {
-      // Global filter just cleared - restore previous local filter
-      if (previousLocalFilterRef.current.length > 0) {
-        setLocalClusterFilter(previousLocalFilterRef.current)
-        previousLocalFilterRef.current = []
+  // Persist to localStorage when local filter changes
+  const setLocalClusterFilter = (clusters: string[]) => {
+    setLocalClusterFilterState(clusters)
+    if (storageKey) {
+      if (clusters.length === 0) {
+        localStorage.removeItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`)
+      } else {
+        localStorage.setItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`, JSON.stringify(clusters))
       }
     }
-
-    wasGlobalFilterActiveRef.current = isGlobalFilterActive
-  }, [isAllClustersSelected, restoreOnGlobalClear, localClusterFilter])
+  }
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -109,23 +104,27 @@ export function useLocalClusterFilter<T extends Cluster = Cluster>(
     return reachableClusters.filter(c => selectedClusters.includes(c.name))
   }, [reachableClusters, selectedClusters, isAllClustersSelected])
 
+  // Compute which local filter selections are still valid (exist in available clusters)
+  const activeLocalFilter = useMemo(() => {
+    if (localClusterFilter.length === 0) return []
+    const availableNames = new Set(availableClusters.map(c => c.name))
+    return localClusterFilter.filter(name => availableNames.has(name))
+  }, [localClusterFilter, availableClusters])
+
   // Filter clusters based on global selection AND local filter
   const clusters = useMemo(() => {
-    let filtered = availableClusters
-    // Apply local cluster filter if any selected
-    if (localClusterFilter.length > 0) {
-      filtered = filtered.filter(c => localClusterFilter.includes(c.name))
-    }
-    return filtered
-  }, [availableClusters, localClusterFilter])
+    // If no local filter, show all available (already global-filtered)
+    if (activeLocalFilter.length === 0) return availableClusters
+    // Otherwise apply local filter on top
+    return availableClusters.filter(c => activeLocalFilter.includes(c.name))
+  }, [availableClusters, activeLocalFilter])
 
   const toggleClusterFilter = (clusterName: string) => {
-    setLocalClusterFilter(prev => {
-      if (prev.includes(clusterName)) {
-        return prev.filter(c => c !== clusterName)
-      }
-      return [...prev, clusterName]
-    })
+    if (localClusterFilter.includes(clusterName)) {
+      setLocalClusterFilter(localClusterFilter.filter(c => c !== clusterName))
+    } else {
+      setLocalClusterFilter([...localClusterFilter, clusterName])
+    }
   }
 
   const clearLocalFilter = () => {
@@ -143,7 +142,7 @@ export function useLocalClusterFilter<T extends Cluster = Cluster>(
     setShowClusterFilter,
     clusterFilterRef,
     hasLocalFilter: localClusterFilter.length > 0,
-    isGlobalOverride: !isAllClustersSelected && previousLocalFilterRef.current.length > 0,
+    activeLocalFilter,
   }
 }
 

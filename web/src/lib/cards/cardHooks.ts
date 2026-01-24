@@ -22,6 +22,8 @@ export interface FilterConfig<T> {
   statusField?: keyof T
   /** Additional filter predicate */
   customPredicate?: (item: T, query: string) => boolean
+  /** Unique ID for persisting local filters to localStorage */
+  storageKey?: string
 }
 
 export interface SortConfig<T, S extends string = string> {
@@ -67,11 +69,13 @@ export interface UseCardFiltersResult<T> {
   clusterFilterRef: React.RefObject<HTMLDivElement>
 }
 
+const LOCAL_FILTER_STORAGE_PREFIX = 'kubestellar-card-filter:'
+
 export function useCardFilters<T>(
   items: T[],
   config: FilterConfig<T>
 ): UseCardFiltersResult<T> {
-  const { searchFields, clusterField, statusField, customPredicate } = config
+  const { searchFields, clusterField, statusField, customPredicate, storageKey } = config
   const {
     filterByCluster,
     filterByStatus,
@@ -81,11 +85,31 @@ export function useCardFilters<T>(
   } = useGlobalFilters()
   const { clusters } = useClusters()
 
-  // Local state
+  // Local state with localStorage persistence for cluster filter
   const [search, setSearch] = useState('')
-  const [localClusterFilter, setLocalClusterFilter] = useState<string[]>([])
+  const [localClusterFilter, setLocalClusterFilterState] = useState<string[]>(() => {
+    if (!storageKey) return []
+    try {
+      const stored = localStorage.getItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`)
+      return stored ? JSON.parse(stored) : []
+    } catch {
+      return []
+    }
+  })
   const [showClusterFilter, setShowClusterFilter] = useState(false)
   const clusterFilterRef = useRef<HTMLDivElement>(null)
+
+  // Wrapper to persist to localStorage
+  const setLocalClusterFilter = useCallback((clusters: string[]) => {
+    setLocalClusterFilterState(clusters)
+    if (storageKey) {
+      if (clusters.length === 0) {
+        localStorage.removeItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`)
+      } else {
+        localStorage.setItem(`${LOCAL_FILTER_STORAGE_PREFIX}${storageKey}`, JSON.stringify(clusters))
+      }
+    }
+  }, [storageKey])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -106,17 +130,16 @@ export function useCardFilters<T>(
   }, [clusters, selectedClusters, isAllClustersSelected])
 
   const toggleClusterFilter = useCallback((clusterName: string) => {
-    setLocalClusterFilter(prev => {
-      if (prev.includes(clusterName)) {
-        return prev.filter(c => c !== clusterName)
-      }
-      return [...prev, clusterName]
-    })
-  }, [])
+    if (localClusterFilter.includes(clusterName)) {
+      setLocalClusterFilter(localClusterFilter.filter(c => c !== clusterName))
+    } else {
+      setLocalClusterFilter([...localClusterFilter, clusterName])
+    }
+  }, [localClusterFilter, setLocalClusterFilter])
 
   const clearClusterFilter = useCallback(() => {
     setLocalClusterFilter([])
-  }, [])
+  }, [setLocalClusterFilter])
 
   // Apply all filters
   const filtered = useMemo(() => {
