@@ -16,7 +16,8 @@ import (
 	"github.com/kubestellar/console/pkg/agent/protocol"
 )
 
-const Version = "0.3.4"
+// Version is set by ldflags during build
+var Version = "dev"
 
 // Config holds agent configuration
 type Config struct {
