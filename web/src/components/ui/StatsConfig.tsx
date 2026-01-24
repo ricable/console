@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Settings, X, Check, GripVertical, Eye, EyeOff } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { useState, useEffect, useMemo } from 'react'
+import { Settings, Check, GripVertical, Eye, EyeOff, Plus, Trash2, Search, ChevronRight, ChevronDown } from 'lucide-react'
+import { BaseModal } from '../../lib/modals'
 import {
   DndContext,
   closestCenter,
@@ -42,6 +42,7 @@ export type DashboardStatsType =
   | 'network'
   | 'security'
   | 'compliance'
+  | 'data-compliance'
   | 'compute'
   | 'events'
   | 'cost'
@@ -144,12 +145,50 @@ export const SECURITY_STAT_BLOCKS: StatBlockConfig[] = [
  * Default stat blocks for the Compliance dashboard
  */
 export const COMPLIANCE_STAT_BLOCKS: StatBlockConfig[] = [
+  // Overall compliance
   { id: 'score', name: 'Score', icon: 'Percent', visible: true, color: 'purple' },
   { id: 'total_checks', name: 'Total Checks', icon: 'ClipboardList', visible: true, color: 'blue' },
   { id: 'passing', name: 'Passing', icon: 'CheckCircle2', visible: true, color: 'green' },
   { id: 'failing', name: 'Failing', icon: 'XCircle', visible: true, color: 'red' },
-  { id: 'warning', name: 'Warning', icon: 'AlertTriangle', visible: true, color: 'yellow' },
-  { id: 'critical_findings', name: 'Critical', icon: 'AlertCircle', visible: true, color: 'red' },
+  // Policy enforcement tools
+  { id: 'gatekeeper_violations', name: 'Gatekeeper', icon: 'Shield', visible: true, color: 'orange' },
+  { id: 'kyverno_violations', name: 'Kyverno', icon: 'Shield', visible: true, color: 'cyan' },
+  { id: 'kubescape_score', name: 'Kubescape', icon: 'Target', visible: true, color: 'blue' },
+  // Security scanning
+  { id: 'falco_alerts', name: 'Falco Alerts', icon: 'Eye', visible: true, color: 'red' },
+  { id: 'trivy_vulns', name: 'Trivy Vulns', icon: 'Bug', visible: true, color: 'yellow' },
+  { id: 'critical_vulns', name: 'Critical CVEs', icon: 'AlertCircle', visible: true, color: 'red' },
+  { id: 'high_vulns', name: 'High CVEs', icon: 'AlertTriangle', visible: true, color: 'orange' },
+  // Framework compliance
+  { id: 'cis_score', name: 'CIS', icon: 'FileCheck', visible: false, color: 'blue' },
+  { id: 'nsa_score', name: 'NSA', icon: 'FileCheck', visible: false, color: 'purple' },
+  { id: 'pci_score', name: 'PCI-DSS', icon: 'CreditCard', visible: false, color: 'green' },
+]
+
+/**
+ * Default stat blocks for the Data Compliance dashboard
+ */
+export const DATA_COMPLIANCE_STAT_BLOCKS: StatBlockConfig[] = [
+  // Encryption
+  { id: 'encryption_score', name: 'Encryption', icon: 'Lock', visible: true, color: 'green' },
+  { id: 'encrypted_secrets', name: 'Encrypted', icon: 'Shield', visible: true, color: 'blue' },
+  { id: 'unencrypted_secrets', name: 'Unencrypted', icon: 'ShieldOff', visible: true, color: 'red' },
+  // Data residency
+  { id: 'regions_compliant', name: 'Regions', icon: 'Globe', visible: true, color: 'purple' },
+  // Access control
+  { id: 'rbac_policies', name: 'RBAC Policies', icon: 'Users', visible: false, color: 'blue' },
+  { id: 'excessive_permissions', name: 'Excessive Perms', icon: 'AlertTriangle', visible: true, color: 'orange' },
+  // PII detection
+  { id: 'pii_detected', name: 'PII Detected', icon: 'Eye', visible: true, color: 'yellow' },
+  { id: 'pii_protected', name: 'PII Protected', icon: 'EyeOff', visible: false, color: 'green' },
+  // Audit
+  { id: 'audit_enabled', name: 'Audit', icon: 'FileSearch', visible: true, color: 'blue' },
+  { id: 'retention_days', name: 'Retention', icon: 'Calendar', visible: false, color: 'purple' },
+  // Framework scores (data-focused)
+  { id: 'gdpr_score', name: 'GDPR', icon: 'FileCheck', visible: true, color: 'blue' },
+  { id: 'hipaa_score', name: 'HIPAA', icon: 'Heart', visible: true, color: 'red' },
+  { id: 'pci_score', name: 'PCI-DSS', icon: 'CreditCard', visible: false, color: 'green' },
+  { id: 'soc2_score', name: 'SOC 2', icon: 'Building', visible: false, color: 'purple' },
 ]
 
 /**
@@ -227,6 +266,36 @@ export const OPERATORS_STAT_BLOCKS: StatBlockConfig[] = [
 ]
 
 /**
+ * Master list of ALL available stat blocks across all dashboards.
+ * Users can add any of these to any dashboard.
+ */
+export const ALL_STAT_BLOCKS: StatBlockConfig[] = (() => {
+  const allBlocks = [
+    ...CLUSTERS_STAT_BLOCKS,
+    ...WORKLOADS_STAT_BLOCKS,
+    ...PODS_STAT_BLOCKS,
+    ...GITOPS_STAT_BLOCKS,
+    ...STORAGE_STAT_BLOCKS,
+    ...NETWORK_STAT_BLOCKS,
+    ...SECURITY_STAT_BLOCKS,
+    ...COMPLIANCE_STAT_BLOCKS,
+    ...COMPUTE_STAT_BLOCKS,
+    ...EVENTS_STAT_BLOCKS,
+    ...COST_STAT_BLOCKS,
+    ...ALERTS_STAT_BLOCKS,
+    ...DASHBOARD_STAT_BLOCKS,
+    ...OPERATORS_STAT_BLOCKS,
+  ]
+  // Deduplicate by id, keeping the first occurrence
+  const seen = new Set<string>()
+  return allBlocks.filter(block => {
+    if (seen.has(block.id)) return false
+    seen.add(block.id)
+    return true
+  })
+})()
+
+/**
  * Get default stat blocks for a dashboard type
  */
 export function getDefaultStatBlocks(dashboardType: DashboardStatsType): StatBlockConfig[] {
@@ -247,6 +316,8 @@ export function getDefaultStatBlocks(dashboardType: DashboardStatsType): StatBlo
       return SECURITY_STAT_BLOCKS
     case 'compliance':
       return COMPLIANCE_STAT_BLOCKS
+    case 'data-compliance':
+      return DATA_COMPLIANCE_STAT_BLOCKS
     case 'compute':
       return COMPUTE_STAT_BLOCKS
     case 'events':
@@ -326,14 +397,19 @@ const iconEmojis: Record<string, string> = {
   RefreshCw: '🔄',
   ArrowUpCircle: '⬆️',
   FileCode: '📄',
+  RotateCcw: '🔄',
+  FolderTree: '🌲',
+  Shield: '🛡️',
 }
 
 interface SortableItemProps {
   block: StatBlockConfig
   onToggleVisibility: (id: string) => void
+  onRemove?: (id: string) => void
+  isCustom?: boolean
 }
 
-function SortableItem({ block, onToggleVisibility }: SortableItemProps) {
+function SortableItem({ block, onToggleVisibility, onRemove, isCustom }: SortableItemProps) {
   const {
     attributes,
     listeners,
@@ -377,6 +453,117 @@ function SortableItem({ block, onToggleVisibility }: SortableItemProps) {
       >
         {block.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
       </button>
+      {isCustom && onRemove && (
+        <button
+          onClick={() => onRemove(block.id)}
+          className="p-1 rounded transition-colors hover:bg-red-500/20 text-muted-foreground hover:text-red-400"
+          title="Remove"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Dashboard categories with display names and icons
+ */
+const DASHBOARD_CATEGORIES: { type: DashboardStatsType; name: string; icon: string }[] = [
+  { type: 'clusters', name: 'Clusters', icon: '🖥️' },
+  { type: 'workloads', name: 'Workloads', icon: '📦' },
+  { type: 'pods', name: 'Pods', icon: '🗂️' },
+  { type: 'compute', name: 'Compute', icon: '🔲' },
+  { type: 'gitops', name: 'GitOps', icon: '🚢' },
+  { type: 'storage', name: 'Storage', icon: '💽' },
+  { type: 'network', name: 'Network', icon: '🌐' },
+  { type: 'security', name: 'Security', icon: '🛡️' },
+  { type: 'compliance', name: 'Security Posture', icon: '🔒' },
+  { type: 'data-compliance', name: 'Data Compliance', icon: '📋' },
+  { type: 'events', name: 'Events', icon: '📜' },
+  { type: 'cost', name: 'Cost', icon: '💵' },
+  { type: 'alerts', name: 'Alerts', icon: '🔴' },
+  { type: 'operators', name: 'Operators', icon: '⚙️' },
+  { type: 'dashboard', name: 'Main Dashboard', icon: '📊' },
+]
+
+/**
+ * Get stat blocks for a specific dashboard type
+ */
+function getStatBlocksForDashboard(dashboardType: DashboardStatsType): StatBlockConfig[] {
+  switch (dashboardType) {
+    case 'clusters': return CLUSTERS_STAT_BLOCKS
+    case 'workloads': return WORKLOADS_STAT_BLOCKS
+    case 'pods': return PODS_STAT_BLOCKS
+    case 'gitops': return GITOPS_STAT_BLOCKS
+    case 'storage': return STORAGE_STAT_BLOCKS
+    case 'network': return NETWORK_STAT_BLOCKS
+    case 'security': return SECURITY_STAT_BLOCKS
+    case 'compliance': return COMPLIANCE_STAT_BLOCKS
+    case 'data-compliance': return DATA_COMPLIANCE_STAT_BLOCKS
+    case 'compute': return COMPUTE_STAT_BLOCKS
+    case 'events': return EVENTS_STAT_BLOCKS
+    case 'cost': return COST_STAT_BLOCKS
+    case 'alerts': return ALERTS_STAT_BLOCKS
+    case 'dashboard': return DASHBOARD_STAT_BLOCKS
+    case 'operators': return OPERATORS_STAT_BLOCKS
+    default: return []
+  }
+}
+
+interface AvailableStatItemProps {
+  block: StatBlockConfig
+  onAdd: (block: StatBlockConfig) => void
+}
+
+function AvailableStatItem({ block, onAdd }: AvailableStatItemProps) {
+  return (
+    <button
+      onClick={() => onAdd(block)}
+      className="flex items-center gap-3 p-2 pl-8 rounded-lg hover:bg-secondary/40 transition-colors w-full text-left"
+    >
+      <div className={`w-5 h-5 ${colorClasses[block.color] || 'text-foreground'}`}>
+        <span className="text-sm">{iconEmojis[block.icon] || '📊'}</span>
+      </div>
+      <span className="flex-1 text-sm text-foreground">{block.name}</span>
+      <Plus className="w-4 h-4 text-muted-foreground" />
+    </button>
+  )
+}
+
+interface DashboardCategoryProps {
+  category: { type: DashboardStatsType; name: string; icon: string }
+  availableBlocks: StatBlockConfig[]
+  onAdd: (block: StatBlockConfig) => void
+  isExpanded: boolean
+  onToggle: () => void
+}
+
+function DashboardCategory({ category, availableBlocks, onAdd, isExpanded, onToggle }: DashboardCategoryProps) {
+  if (availableBlocks.length === 0) return null
+
+  return (
+    <div className="border-b border-border/50 last:border-b-0">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 w-full p-2 hover:bg-secondary/30 rounded-lg transition-colors"
+      >
+        {isExpanded ? (
+          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+        )}
+        <span className="text-base">{category.icon}</span>
+        <span className="flex-1 text-sm font-medium text-foreground text-left">{category.name}</span>
+        <span className="text-xs text-muted-foreground">{availableBlocks.length}</span>
+      </button>
+      {isExpanded && (
+        <div className="border-l-2 border-purple-500/30 ml-2">
+          {availableBlocks.map(block => (
+            <AvailableStatItem key={block.id} block={block} onAdd={onAdd} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -399,17 +586,73 @@ export function StatsConfigModal({
   title = 'Configure Stats',
 }: StatsConfigModalProps) {
   const [localBlocks, setLocalBlocks] = useState<StatBlockConfig[]>(blocks)
+  const [showAddPanel, setShowAddPanel] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (isOpen) {
       setLocalBlocks(blocks)
+      setShowAddPanel(false)
+      setSearchQuery('')
+      setExpandedCategories(new Set())
     }
   }, [isOpen, blocks])
+
+  const toggleCategory = (type: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(type)) {
+        next.delete(type)
+      } else {
+        next.add(type)
+      }
+      return next
+    })
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
+
+  // Get IDs of blocks in the current dashboard defaults
+  const defaultBlockIds = useMemo(() => new Set(defaultBlocks.map(b => b.id)), [defaultBlocks])
+
+  // Get current block IDs to filter out already-added stats
+  const currentBlockIds = useMemo(() => new Set(localBlocks.map(b => b.id)), [localBlocks])
+
+  // Get available stats per dashboard category, filtered by search
+  const availableStatsByCategory = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim()
+    const result: Map<DashboardStatsType, StatBlockConfig[]> = new Map()
+
+    for (const category of DASHBOARD_CATEGORIES) {
+      const blocks = getStatBlocksForDashboard(category.type)
+        .filter(block => !currentBlockIds.has(block.id))
+        .filter(block =>
+          !query ||
+          block.name.toLowerCase().includes(query) ||
+          block.id.toLowerCase().includes(query) ||
+          category.name.toLowerCase().includes(query)
+        )
+      if (blocks.length > 0) {
+        result.set(category.type, blocks)
+      }
+    }
+    return result
+  }, [currentBlockIds, searchQuery])
+
+  // Check if any stats are available
+  const hasAvailableStats = availableStatsByCategory.size > 0
+
+  // Auto-expand categories when searching
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      // Expand all categories that have matching results
+      setExpandedCategories(new Set(availableStatsByCategory.keys()))
+    }
+  }, [searchQuery, availableStatsByCategory])
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
@@ -428,6 +671,14 @@ export function StatsConfigModal({
     )
   }
 
+  const handleAddStat = (block: StatBlockConfig) => {
+    setLocalBlocks(prev => [...prev, { ...block, visible: true }])
+  }
+
+  const handleRemoveStat = (id: string) => {
+    setLocalBlocks(prev => prev.filter(b => b.id !== id))
+  }
+
   const handleSave = () => {
     onSave(localBlocks)
     onClose()
@@ -437,32 +688,19 @@ export function StatsConfigModal({
     setLocalBlocks(defaultBlocks)
   }
 
-  if (!isOpen) return null
+  return (
+    <BaseModal isOpen={isOpen} onClose={onClose} size="lg">
+      <BaseModal.Header
+        title={title}
+        description="Drag to reorder. Click the eye icon to show/hide stats."
+        icon={Settings}
+        onClose={onClose}
+        showBack={false}
+      />
 
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md mx-4 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-secondary rounded transition-colors">
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
-
-        {/* Instructions */}
-        <div className="px-4 pt-4 pb-2">
-          <p className="text-xs text-muted-foreground">
-            Drag to reorder. Click the eye icon to show/hide stats.
-          </p>
-        </div>
-
-        {/* Sortable list */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <BaseModal.Content className="max-h-[65vh]">
+        {/* Current Stats */}
+        <div className="space-y-2">
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
@@ -474,39 +712,95 @@ export function StatsConfigModal({
                   key={block.id}
                   block={block}
                   onToggleVisibility={toggleVisibility}
+                  onRemove={handleRemoveStat}
+                  isCustom={!defaultBlockIds.has(block.id)}
                 />
               ))}
             </SortableContext>
           </DndContext>
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-border">
-          <button
-            onClick={handleReset}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Reset to Default
-          </button>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
-            >
-              <Check className="w-4 h-4" />
-              Save
-            </button>
+        {/* Add Stats Panel */}
+        {showAddPanel ? (
+          <div className="mt-4 pt-4 border-t border-border">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search all available stats..."
+                  className="w-full pl-9 pr-3 py-2 bg-secondary/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
+                  autoFocus
+                />
+              </div>
+              <button
+                onClick={() => setShowAddPanel(false)}
+                className="text-sm text-muted-foreground hover:text-foreground"
+              >
+                Done
+              </button>
+            </div>
+            <div className="space-y-0 min-h-48 max-h-80 overflow-y-auto border border-border/50 rounded-lg">
+              {hasAvailableStats ? (
+                DASHBOARD_CATEGORIES.map(category => {
+                  const categoryBlocks = availableStatsByCategory.get(category.type)
+                  if (!categoryBlocks || categoryBlocks.length === 0) return null
+                  return (
+                    <DashboardCategory
+                      key={category.type}
+                      category={category}
+                      availableBlocks={categoryBlocks}
+                      onAdd={handleAddStat}
+                      isExpanded={expandedCategories.has(category.type)}
+                      onToggle={() => toggleCategory(category.type)}
+                    />
+                  )
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  {searchQuery ? 'No stats match your search' : 'All stats are already added'}
+                </p>
+              )}
+            </div>
           </div>
+        ) : (
+          <button
+            onClick={() => setShowAddPanel(true)}
+            className="mt-4 w-full flex items-center justify-center gap-2 py-2 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-purple-500/50 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add stat from other dashboards
+          </button>
+        )}
+      </BaseModal.Content>
+
+      <BaseModal.Footer>
+        <button
+          onClick={handleReset}
+          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Reset to Default
+        </button>
+        <div className="flex-1" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
+          >
+            <Check className="w-4 h-4" />
+            Save
+          </button>
         </div>
-      </div>
-    </div>,
-    document.body
+      </BaseModal.Footer>
+    </BaseModal>
   )
 }
 

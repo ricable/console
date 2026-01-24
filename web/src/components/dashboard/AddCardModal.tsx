@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
-import { X, Sparkles, Plus, Loader2, LayoutGrid, Search } from 'lucide-react'
+import { useState } from 'react'
+import { Sparkles, Plus, Loader2, LayoutGrid, Search } from 'lucide-react'
+import { BaseModal } from '../../lib/modals'
 
 // Card catalog - all available cards organized by category
 const CARD_CATALOG = {
@@ -90,16 +91,49 @@ const CARD_CATALOG = {
     { type: 'opencost_overview', title: 'OpenCost', description: 'Cost allocation by namespace using OpenCost (demo)', visualization: 'bar' },
     { type: 'kubecost_overview', title: 'Kubecost', description: 'Cost optimization and savings recommendations (demo)', visualization: 'bar' },
   ],
-  'Policy Management': [
+  'Security Posture': [
     { type: 'opa_policies', title: 'OPA Gatekeeper', description: 'Policy enforcement with OPA Gatekeeper - shows installed status per cluster', visualization: 'status' },
-    { type: 'kyverno_policies', title: 'Kyverno Policies', description: 'Kubernetes-native policy management with Kyverno (demo)', visualization: 'status' },
+    { type: 'kyverno_policies', title: 'Kyverno Policies', description: 'Kubernetes-native policy management with Kyverno', visualization: 'status' },
+    { type: 'falco_alerts', title: 'Falco Alerts', description: 'Runtime security monitoring - syscall anomalies, container escapes, privilege escalation', visualization: 'events' },
+    { type: 'trivy_scan', title: 'Trivy Scanner', description: 'Vulnerability scanning for container images, IaC, and secrets', visualization: 'table' },
+    { type: 'kubescape_scan', title: 'Kubescape', description: 'Security posture management and NSA/CISA hardening compliance', visualization: 'status' },
+    { type: 'policy_violations', title: 'Policy Violations', description: 'Aggregated policy violations across all enforcement tools', visualization: 'table' },
+    { type: 'compliance_score', title: 'Compliance Score', description: 'Overall compliance posture with drill-down by framework (CIS, NSA, PCI-DSS)', visualization: 'gauge' },
+  ],
+  'Data Compliance': [
+    { type: 'vault_secrets', title: 'HashiCorp Vault', description: 'Secrets management, dynamic credentials, and encryption-as-a-service', visualization: 'status' },
+    { type: 'external_secrets', title: 'External Secrets', description: 'Sync secrets from external providers (AWS, Azure, GCP, Vault)', visualization: 'status' },
+    { type: 'cert_manager', title: 'Cert-Manager', description: 'TLS certificate lifecycle management with automatic renewal', visualization: 'status' },
+    { type: 'namespace_rbac', title: 'Access Controls', description: 'RBAC policies and permission auditing per namespace', visualization: 'table' },
+  ],
+  'Workload Detection': [
+    { type: 'prow_jobs', title: 'Prow Jobs', description: 'Prow CI/CD job status - presubmit, postsubmit, and periodic jobs', visualization: 'table' },
+    { type: 'prow_status', title: 'Prow Status', description: 'Prow controller health and job queue metrics', visualization: 'status' },
+    { type: 'prow_history', title: 'Prow History', description: 'Recent Prow job runs with pass/fail trends', visualization: 'events' },
+    { type: 'llm_inference', title: 'LLM Inference', description: 'vLLM, LLM-d, and TGI inference server status', visualization: 'status' },
+    { type: 'llm_models', title: 'LLM Models', description: 'Deployed language models with memory and GPU allocation', visualization: 'table' },
+    { type: 'ml_jobs', title: 'ML Training Jobs', description: 'Kubeflow, Ray, or custom ML training job status', visualization: 'table' },
+    { type: 'ml_notebooks', title: 'Jupyter Notebooks', description: 'Running Jupyter notebook servers and resource usage', visualization: 'table' },
+  ],
+  'Arcade': [
+    { type: 'kube_man', title: 'Kube-Man', description: 'Classic Pac-Man arcade game - eat dots and avoid ghosts in the cluster maze', visualization: 'status' },
+    { type: 'kube_kong', title: 'Kube Kong', description: 'Donkey Kong-style platformer - climb the infrastructure and rescue the deployment', visualization: 'status' },
+    { type: 'node_invaders', title: 'Node Invaders', description: 'Space Invaders-style shooter - defend your cluster from invading nodes', visualization: 'status' },
+    { type: 'pod_pitfall', title: 'Pod Pitfall', description: 'Pitfall-style adventure - swing on vines and collect treasures in the jungle', visualization: 'status' },
+    { type: 'container_tetris', title: 'Container Tetris', description: 'Classic Tetris game - stack falling containers and clear lines', visualization: 'status' },
+    { type: 'flappy_pod', title: 'Flappy Pod', description: 'Navigate your pod through node walls - click or press Space to fly', visualization: 'status' },
+    { type: 'pod_sweeper', title: 'Pod Sweeper', description: 'Minesweeper-style game - find the corrupted pods without hitting them', visualization: 'status' },
+    { type: 'game_2048', title: 'Kube 2048', description: 'Merge pods to reach 2048 - swipe or use arrow keys', visualization: 'status' },
+    { type: 'checkers', title: 'AI Checkers', description: 'Play checkers against a snarky pirate AI - pods vs nodes', visualization: 'status' },
+    { type: 'solitaire', title: 'Kube Solitaire', description: 'Classic Klondike solitaire with Kubernetes-themed suits', visualization: 'status' },
+    { type: 'match_game', title: 'Kube Match', description: 'Memory matching game with Kubernetes-themed cards', visualization: 'status' },
+    { type: 'kubedle', title: 'Kubedle', description: 'Wordle-style word guessing game with Kubernetes terms', visualization: 'status' },
+    { type: 'sudoku_game', title: 'Sudoku', description: 'Brain-training Sudoku puzzle with multiple difficulty levels, hints, and timer', visualization: 'status' },
   ],
   'Misc': [
     { type: 'weather', title: 'Weather', description: 'Weather conditions with multi-day forecasts and animated backgrounds', visualization: 'status' },
     { type: 'github_activity', title: 'GitHub Activity', description: 'Monitor GitHub repository activity - PRs, issues, releases, and contributors', visualization: 'table' },
     { type: 'kubectl', title: 'Kubectl', description: 'Interactive kubectl terminal with AI assistance, YAML editor, and command history', visualization: 'table' },
-    { type: 'sudoku_game', title: 'Sudoku Game', description: 'Brain-training Sudoku puzzle with multiple difficulty levels, hints, and timer', visualization: 'status' },
-    { type: 'match_game', title: 'Match Game', description: 'Classic memory matching game with Kubernetes-themed cards', visualization: 'status' },
     { type: 'stock_market_ticker', title: 'Stock Market Ticker', description: 'Track multiple stocks with real-time sparkline charts and iPhone-style design', visualization: 'timeseries' },
   ],
 } as const
@@ -698,32 +732,6 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(Object.keys(CARD_CATALOG)))
   const [hoveredCard, setHoveredCard] = useState<HoveredCard | null>(null)
 
-  // ESC to close
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
-
-  // Lock body scroll when modal is open
-  useEffect(() => {
-    if (isOpen) {
-      const originalOverflow = document.body.style.overflow
-      document.body.style.overflow = 'hidden'
-      return () => {
-        document.body.style.overflow = originalOverflow
-      }
-    }
-  }, [isOpen])
-
   const handleGenerate = async () => {
     if (!query.trim()) return
 
@@ -822,60 +830,27 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
     setSelectedBrowseCards(new Set())
   }
 
-  if (!isOpen) return null
+  const tabs = [
+    { id: 'browse', label: 'Browse Cards', icon: LayoutGrid },
+    { id: 'ai', label: 'AI Suggestions', icon: Sparkles },
+  ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-        onClick={onClose}
+    <BaseModal isOpen={isOpen} onClose={onClose} size="xl">
+      <BaseModal.Header
+        title="Add Cards"
+        icon={Plus}
+        onClose={onClose}
+        showBack={false}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-6xl mx-4 bg-card border border-border rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Plus className="w-5 h-5 text-purple-400" />
-            <h2 className="text-lg font-semibold text-foreground">Add Cards</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-secondary rounded transition-colors"
-          >
-            <X className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
+      <BaseModal.Tabs
+        tabs={tabs}
+        activeTab={activeTab}
+        onTabChange={(tab) => setActiveTab(tab as 'ai' | 'browse')}
+      />
 
-        {/* Tabs */}
-        <div className="flex border-b border-border">
-          <button
-            onClick={() => setActiveTab('browse')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              activeTab === 'browse'
-                ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/5'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            Browse Cards
-          </button>
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              activeTab === 'ai'
-                ? 'text-purple-400 border-b-2 border-purple-400 bg-purple-500/5'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <Sparkles className="w-4 h-4" />
-            AI Suggestions
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-4 flex-1 overflow-y-auto">
+      <BaseModal.Content className="max-h-[60vh]">
           {/* Browse Tab */}
           {activeTab === 'browse' && (
             <div className="flex gap-4">
@@ -1175,11 +1150,13 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
           )}
           </>
           )}
-        </div>
+      </BaseModal.Content>
 
-        {/* Footer - AI tab */}
-        {activeTab === 'ai' && suggestions.length > 0 && (
-          <div className="flex items-center justify-end gap-3 p-4 border-t border-border">
+      {/* Footer - AI tab */}
+      {activeTab === 'ai' && suggestions.length > 0 && (
+        <BaseModal.Footer>
+          <div className="flex-1" />
+          <div className="flex items-center gap-3">
             <button
               onClick={onClose}
               className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
@@ -1195,8 +1172,8 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
               Add {selectedCards.size} Card{selectedCards.size !== 1 ? 's' : ''}
             </button>
           </div>
-        )}
-      </div>
-    </div>
+        </BaseModal.Footer>
+      )}
+    </BaseModal>
   )
 }

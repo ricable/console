@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { HardDrive, CheckCircle, AlertTriangle, Clock, Search, ChevronRight } from 'lucide-react'
-import { usePVCs, useClusters } from '../../hooks/useMCP'
+import { HardDrive, CheckCircle, AlertTriangle, Clock, Search, ChevronRight, AlertCircle } from 'lucide-react'
+import { usePVCs, type PVC } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
-import { useGlobalFilters } from '../../hooks/useGlobalFilters'
+import { useSingleSelectCluster } from '../../lib/cards'
 import { CardControls, SortDirection } from '../ui/CardControls'
 import { Pagination, usePagination } from '../ui/Pagination'
 import { RefreshButton } from '../ui/RefreshIndicator'
@@ -59,62 +59,26 @@ function getStatusColor(status: string) {
 
 export function PVCStatus() {
   const { pvcs, isLoading, isRefreshing, error, refetch, isFailed, consecutiveFailures, lastRefresh } = usePVCs()
-  const { clusters } = useClusters()
-  const { selectedClusters, isAllClustersSelected, filterByStatus, customFilter } = useGlobalFilters()
   const { drillToPVC } = useDrillDownActions()
-  const [selectedCluster, setSelectedCluster] = useState<string>('')
+
+  // Use shared single-select cluster hook
+  const {
+    selectedCluster,
+    setSelectedCluster,
+    availableClusters: filteredClusters,
+    isOutsideGlobalFilter,
+    filtered: filteredPVCs,
+    search: localSearch,
+    setSearch: setLocalSearch,
+  } = useSingleSelectCluster<PVC>(pvcs, {
+    storageKey: 'pvc-status',
+    clusterField: 'cluster',
+    searchFields: ['name', 'namespace', 'cluster', 'storageClass'],
+  })
+
   const [sortBy, setSortBy] = useState<SortByOption>('status')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [limit, setLimit] = useState<number | 'unlimited'>(10)
-  const [localSearch, setLocalSearch] = useState('')
-
-  // Filter clusters based on global selection
-  const filteredClusters = useMemo(() => {
-    if (isAllClustersSelected) return clusters
-    return clusters.filter(c => selectedClusters.includes(c.name))
-  }, [clusters, selectedClusters, isAllClustersSelected])
-
-  // Apply global filters
-  const filteredPVCs = useMemo(() => {
-    let result = pvcs
-
-    // Filter by cluster selection (global)
-    if (!isAllClustersSelected) {
-      result = result.filter(p => p.cluster && selectedClusters.includes(p.cluster))
-    }
-
-    // Filter by local cluster selection
-    if (selectedCluster) {
-      result = result.filter(p => p.cluster === selectedCluster)
-    }
-
-    // Apply global status filter
-    result = filterByStatus(result)
-
-    // Apply custom text filter (global)
-    if (customFilter.trim()) {
-      const query = customFilter.toLowerCase()
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(query) ||
-        (p.namespace?.toLowerCase() || '').includes(query) ||
-        (p.cluster?.toLowerCase() || '').includes(query) ||
-        (p.storageClass?.toLowerCase() || '').includes(query)
-      )
-    }
-
-    // Apply local search filter
-    if (localSearch.trim()) {
-      const query = localSearch.toLowerCase()
-      result = result.filter(p =>
-        p.name.toLowerCase().includes(query) ||
-        (p.namespace?.toLowerCase() || '').includes(query) ||
-        (p.cluster?.toLowerCase() || '').includes(query) ||
-        (p.storageClass?.toLowerCase() || '').includes(query)
-      )
-    }
-
-    return result
-  }, [pvcs, selectedClusters, isAllClustersSelected, selectedCluster, filterByStatus, customFilter, localSearch])
 
   // Sort PVCs
   const sortedPVCs = useMemo(() => {
@@ -209,13 +173,25 @@ export function PVCStatus() {
         <select
           value={selectedCluster}
           onChange={(e) => setSelectedCluster(e.target.value)}
-          className="w-full px-3 py-1.5 rounded-lg bg-secondary border border-border text-sm text-foreground"
+          className={`w-full px-3 py-1.5 rounded-lg bg-secondary border text-sm text-foreground ${
+            isOutsideGlobalFilter ? 'border-orange-500/50' : 'border-border'
+          }`}
         >
           <option value="">All clusters</option>
           {filteredClusters.map(c => (
             <option key={c.name} value={c.name}>{c.name}</option>
           ))}
+          {/* Show the selected cluster even if outside global filter */}
+          {isOutsideGlobalFilter && selectedCluster && (
+            <option value={selectedCluster}>{selectedCluster} (filtered out)</option>
+          )}
         </select>
+        {isOutsideGlobalFilter && (
+          <div className="flex items-center gap-1 mt-1 text-xs text-orange-400">
+            <AlertCircle className="w-3 h-3" />
+            <span>Selection outside global filter</span>
+          </div>
+        )}
       </div>
 
       {/* Local Search */}

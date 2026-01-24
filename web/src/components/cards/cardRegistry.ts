@@ -70,6 +70,10 @@ import { KubecostOverview } from './KubecostOverview'
 // Policy management cards
 import { OPAPolicies } from './OPAPolicies'
 import { KyvernoPolicies } from './KyvernoPolicies'
+// Compliance tool cards
+import { FalcoAlerts, TrivyScan, KubescapeScan, PolicyViolations, ComplianceScore } from './ComplianceCards'
+// Data compliance tool cards
+import { VaultSecrets, ExternalSecrets, CertManager } from './DataComplianceCards'
 // Weather card
 import { Weather } from './Weather'
 // GitHub Activity Monitoring card
@@ -78,10 +82,32 @@ import { GitHubActivity } from './GitHubActivity'
 import { Kubectl } from './Kubectl'
 // Sudoku game card
 import { SudokuGame } from './SudokuGame'
-// Match Game card
+// Kube Match card
 import { MatchGame } from './MatchGame'
+// Kube Solitaire card
+import { Solitaire } from './Solitaire'
+// AI Checkers card
+import { Checkers } from './Checkers'
+// Kube 2048 card
+import { Game2048 } from './Game2048'
 // Stock Market Ticker card
 import { StockMarketTicker } from './StockMarketTicker'
+// Kubedle card
+import { Kubedle } from './Kubedle'
+// Pod Sweeper card
+import { PodSweeper } from './PodSweeper'
+// Container Tetris card
+import { ContainerTetris } from './ContainerTetris'
+// Flappy Pod card
+import { FlappyPod } from './FlappyPod'
+// Kube-Man (Pac-Man) card
+import { KubeMan } from './KubeMan'
+// Kube Kong (Donkey Kong) card
+import { KubeKong } from './KubeKong'
+// Pod Pitfall card
+import { PodPitfall } from './PodPitfall'
+// Node Invaders (Space Invaders) card
+import { NodeInvaders } from './NodeInvaders'
 
 // Type for card component props
 export type CardComponentProps = { config?: Record<string, unknown> }
@@ -168,6 +194,16 @@ export const CARD_COMPONENTS: Record<string, CardComponent> = {
   // Policy management cards
   opa_policies: OPAPolicies,
   kyverno_policies: KyvernoPolicies,
+  // Compliance tool cards
+  falco_alerts: FalcoAlerts,
+  trivy_scan: TrivyScan,
+  kubescape_scan: KubescapeScan,
+  policy_violations: PolicyViolations,
+  compliance_score: ComplianceScore,
+  // Data compliance tool cards
+  vault_secrets: VaultSecrets,
+  external_secrets: ExternalSecrets,
+  cert_manager: CertManager,
   // Weather card
   weather: Weather,
   // GitHub Activity Monitoring card
@@ -176,10 +212,30 @@ export const CARD_COMPONENTS: Record<string, CardComponent> = {
   kubectl: Kubectl,
   // Sudoku game card
   sudoku_game: SudokuGame,
-  // Match Game card
+  // Kube Match card
   match_game: MatchGame,
+  // Kube Solitaire card
+  solitaire: Solitaire,
+  // AI Checkers card
+  checkers: Checkers,
+  // Kube 2048 card
+  game_2048: Game2048,
   // Stock Market Ticker card
   stock_market_ticker: StockMarketTicker,
+  // Kubedle card
+  kubedle: Kubedle,
+  // Pod Sweeper card
+  pod_sweeper: PodSweeper,
+  // Container Tetris card
+  container_tetris: ContainerTetris,
+  // Flappy Pod card
+  flappy_pod: FlappyPod,
+  // Kube-Man (Pac-Man) card
+  kube_man: KubeMan,
+  // Classic arcade games
+  kube_kong: KubeKong,
+  pod_pitfall: PodPitfall,
+  node_invaders: NodeInvaders,
 
   // Aliases - map catalog types to existing components with similar functionality
   gpu_list: GPUInventory,
@@ -213,6 +269,16 @@ export const DEMO_DATA_CARDS = new Set([
   'kubecost_overview',
   // Policy management - kyverno is demo-only
   'kyverno_policies',
+  // Security posture cards - demo until tools are detected
+  'falco_alerts',
+  'trivy_scan',
+  'kubescape_scan',
+  'policy_violations',
+  'compliance_score',
+  // Data compliance cards - demo until tools are detected
+  'vault_secrets',
+  'external_secrets',
+  'cert_manager',
 ])
 
 /**
@@ -259,6 +325,14 @@ export const CARD_DEFAULT_WIDTHS: Record<string, number> = {
   gpu_workloads: 6,
   opa_policies: 6,
   kyverno_policies: 6,
+  falco_alerts: 4,
+  trivy_scan: 4,
+  kubescape_scan: 4,
+  policy_violations: 6,
+  compliance_score: 4,
+  vault_secrets: 4,
+  external_secrets: 4,
+  cert_manager: 4,
   klaude_issues: 6,
   klaude_kubeconfig_audit: 6,
   klaude_health_check: 6,
@@ -271,10 +345,24 @@ export const CARD_DEFAULT_WIDTHS: Record<string, number> = {
   kubectl: 8,
   // Sudoku game card
   sudoku_game: 6,
-  // Match Game card
+  // Kube Match card
   match_game: 6,
   // Stock Market Ticker
   stock_market_ticker: 6,
+  // Kubedle
+  kubedle: 6,
+  // Pod Sweeper
+  pod_sweeper: 6,
+  // Container Tetris
+  container_tetris: 6,
+  // Flappy Pod
+  flappy_pod: 6,
+  // Kube-Man
+  kube_man: 6,
+  // Classic arcade games
+  kube_kong: 6,
+  pod_pitfall: 6,
+  node_invaders: 6,
 
   // Wide cards (7-8 columns) - charts and trends
   pod_health_trend: 8,

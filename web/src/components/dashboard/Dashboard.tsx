@@ -37,11 +37,13 @@ import { ConfigureCardModal } from './ConfigureCardModal'
 import { CardRecommendations } from './CardRecommendations'
 import { MissionSuggestions } from './MissionSuggestions'
 import { TemplatesModal } from './TemplatesModal'
+import { CreateDashboardModal } from './CreateDashboardModal'
 import { FloatingDashboardActions } from './FloatingDashboardActions'
 import { DashboardTemplate } from './templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { useDashboardReset } from '../../hooks/useDashboardReset'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
+import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
 
 // Module-level cache for dashboard data (survives navigation)
 interface CachedDashboard {
@@ -95,6 +97,7 @@ export function Dashboard() {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [_dragOverDashboard, setDragOverDashboard] = useState<string | null>(null)
+  const [isCreateDashboardOpen, setIsCreateDashboardOpen] = useState(false)
 
   // Get context for modals that can be triggered from sidebar
   const {
@@ -127,14 +130,17 @@ export function Dashboard() {
     cards: localCards,
   })
 
+  // Universal stats for cross-dashboard stat blocks
+  const { getStatValue: getUniversalStatValue } = useUniversalStats()
+
   // Stats calculations for StatsOverview
   const healthyClusters = clusters.filter(c => c.healthy).length
   const unhealthyClusters = clusters.filter(c => !c.healthy).length
   const totalPods = clusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
   const totalNodes = clusters.reduce((sum, c) => sum + (c.nodeCount || 0), 0)
 
-  // Stats value getter for the configurable StatsOverview component
-  const getStatValue = useCallback((blockId: string): StatBlockValue => {
+  // Dashboard-specific stats value getter
+  const getDashboardStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
       case 'clusters':
         return { value: clusters.length, sublabel: 'total clusters', onClick: () => drillToAllClusters(), isClickable: clusters.length > 0 }
@@ -149,9 +155,15 @@ export function Dashboard() {
       case 'pods':
         return { value: totalPods, sublabel: 'pods', onClick: () => drillToAllPods(), isClickable: totalPods > 0 }
       default:
-        return { value: 0 }
+        return { value: '-' }
     }
   }, [clusters, healthyClusters, unhealthyClusters, totalNodes, totalPods, drillToAllClusters, drillToAllNodes, drillToAllPods])
+
+  // Merged getter: dashboard-specific values first, then universal fallback
+  const getStatValue = useCallback(
+    (blockId: string) => createMergedStatValueGetter(getDashboardStatValue, getUniversalStatValue)(blockId),
+    [getDashboardStatValue, getUniversalStatValue]
+  )
 
   // Auto-refresh state (persisted in localStorage)
   const [autoRefresh, setAutoRefresh] = useState(() => {
@@ -250,11 +262,37 @@ export function Dashboard() {
     setDragOverDashboard(null)
   }
 
-  const handleCreateDashboard = async () => {
+  const handleCreateDashboard = () => {
+    setIsCreateDashboardOpen(true)
+  }
+
+  const handleCreateDashboardConfirm = async (name: string, template?: DashboardTemplate) => {
     try {
-      const name = `Dashboard ${dashboards.length + 1}`
       const newDashboard = await createDashboard(name)
-      showToast(`Created "${newDashboard.name}"`, 'success')
+
+      // If a template was selected, apply template cards to the new dashboard
+      if (template && newDashboard.id) {
+        const templateCards = template.cards.map((tc, index) => ({
+          id: `template-${Date.now()}-${index}`,
+          card_type: tc.card_type,
+          config: tc.config || {},
+          position: { x: 0, y: 0, w: tc.position.w, h: tc.position.h },
+          title: tc.title,
+        }))
+
+        // Persist template cards to the new dashboard
+        for (const card of templateCards) {
+          try {
+            await api.post(`/api/dashboards/${newDashboard.id}/cards`, card)
+          } catch (error) {
+            console.error('Failed to add template card:', error)
+          }
+        }
+
+        showToast(`Created "${newDashboard.name}" with ${templateCards.length} cards from "${template.name}"`, 'success')
+      } else {
+        showToast(`Created "${newDashboard.name}"`, 'success')
+      }
     } catch (error) {
       console.error('Failed to create dashboard:', error)
       showToast('Failed to create dashboard', 'error')
@@ -820,6 +858,14 @@ export function Dashboard() {
         isOpen={isTemplatesModalOpen}
         onClose={closeTemplatesModal}
         onApplyTemplate={handleApplyTemplate}
+      />
+
+      {/* Create Dashboard Modal */}
+      <CreateDashboardModal
+        isOpen={isCreateDashboardOpen}
+        onClose={() => setIsCreateDashboardOpen(false)}
+        onCreate={handleCreateDashboardConfirm}
+        existingNames={dashboards.map(d => d.name)}
       />
     </div>
   )

@@ -1,6 +1,7 @@
-import { ReactNode, useState, useEffect, useCallback, useRef } from 'react'
+import { ReactNode, useState, useEffect, useCallback, useRef, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
-import { Maximize2, Minimize2, MoreVertical, Clock, X, Settings, Replace, Trash2, MessageCircle, RefreshCw, MoveHorizontal, ChevronRight, ChevronDown } from 'lucide-react'
+import { Maximize2, MoreVertical, Clock, Settings, Replace, Trash2, MessageCircle, RefreshCw, MoveHorizontal, ChevronRight, ChevronDown } from 'lucide-react'
+import { BaseModal } from '../../lib/modals'
 import { cn } from '../../lib/cn'
 import { useCardCollapse } from '../../lib/cards'
 import { useSnoozedCards } from '../../hooks/useSnoozedCards'
@@ -35,6 +36,34 @@ const WIDTH_OPTIONS = [
   { value: 12, label: 'Full', description: 'Full width' },
 ]
 
+// Cards that need extra-large expanded modal (for maps, complex visualizations, etc.)
+// These use 95vh height and 7xl width instead of the default 80vh/4xl
+const LARGE_EXPANDED_CARDS = new Set([
+  'cluster_comparison',
+  'cluster_resource_tree',
+  'match_game',
+])
+
+// Cards that should be nearly fullscreen when expanded (maps, large visualizations, games)
+const FULLSCREEN_EXPANDED_CARDS = new Set([
+  'cluster_locations',
+  'sudoku_game', // Games need fullscreen for the grid to fill properly
+])
+
+// Context to expose card expanded state to children
+interface CardExpandedContextType {
+  isExpanded: boolean
+}
+const CardExpandedContext = createContext<CardExpandedContextType>({ isExpanded: false })
+
+/** Hook for child components to know if their parent card is expanded */
+export function useCardExpanded() {
+  return useContext(CardExpandedContext)
+}
+
+/** Flash type for significant data changes */
+export type CardFlashType = 'none' | 'info' | 'warning' | 'error'
+
 interface CardWrapperProps {
   cardId?: string
   cardType: string
@@ -57,6 +86,8 @@ interface CardWrapperProps {
   cardWidth?: number
   /** Whether the card is collapsed (showing only header) */
   isCollapsed?: boolean
+  /** Flash animation type when significant data changes occur */
+  flashType?: CardFlashType
   /** Callback when collapsed state changes */
   onCollapsedChange?: (collapsed: boolean) => void
   onSwap?: (newType: string) => void
@@ -146,6 +177,21 @@ const CARD_TITLES: Record<string, string> = {
   
   // Stock Market Ticker
   stock_market_ticker: 'Stock Market Ticker',
+
+  // Games
+  sudoku_game: 'Sudoku Game',
+  match_game: 'Kube Match',
+  solitaire: 'Kube Solitaire',
+  checkers: 'AI Checkers',
+  game_2048: 'Kube 2048',
+  kubedle: 'Kubedle',
+  pod_sweeper: 'Pod Sweeper',
+  container_tetris: 'Container Tetris',
+  flappy_pod: 'Flappy Pod',
+  kube_man: 'Kube-Man',
+  kube_kong: 'Kube Kong',
+  pod_pitfall: 'Pod Pitfall',
+  node_invaders: 'Node Invaders',
 }
 
 export function CardWrapper({
@@ -163,6 +209,7 @@ export function CardWrapper({
   consecutiveFailures,
   cardWidth,
   isCollapsed: externalCollapsed,
+  flashType = 'none',
   onCollapsedChange,
   onSwap,
   onSwapCancel,
@@ -176,6 +223,27 @@ export function CardWrapper({
   children,
 }: CardWrapperProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  // Track animation key to re-trigger flash animation
+  const [flashKey, setFlashKey] = useState(0)
+  const prevFlashType = useRef(flashType)
+
+  // Re-trigger animation when flashType changes to a non-none value
+  useEffect(() => {
+    if (flashType !== 'none' && flashType !== prevFlashType.current) {
+      setFlashKey(k => k + 1)
+    }
+    prevFlashType.current = flashType
+  }, [flashType])
+
+  // Get flash animation class based on type
+  const getFlashClass = () => {
+    switch (flashType) {
+      case 'info': return 'animate-card-flash'
+      case 'warning': return 'animate-card-flash-warning'
+      case 'error': return 'animate-card-flash-error'
+      default: return ''
+    }
+  }
 
   // Use the shared collapse hook with localStorage persistence
   // cardId is required for persistence; fall back to cardType if not provided
@@ -209,7 +277,7 @@ export function CardWrapper({
   // Use external messages if provided, otherwise use local state
   const messages = externalMessages ?? localMessages
 
-  const title = customTitle || CARD_TITLES[cardType] || cardType
+  const title = CARD_TITLES[cardType] || customTitle || cardType
   const newTitle = pendingSwap?.newTitle || CARD_TITLES[pendingSwap?.newType || ''] || pendingSwap?.newType
 
   // Countdown timer for pending swap
@@ -310,19 +378,22 @@ export function CardWrapper({
   void setLocalMessages
 
   return (
-    <>
-      {/* Main card */}
-      <div
-        data-tour="card"
-        className={cn(
-          'glass rounded-xl overflow-hidden card-hover',
-          'flex flex-col transition-all duration-200',
-          isCollapsed ? 'h-auto' : 'h-full',
-          (isDemoMode || isDemoData) && '!border-2 !border-yellow-500/50'
-        )}
-        onMouseEnter={() => setShowSummary(true)}
-        onMouseLeave={() => setShowSummary(false)}
-      >
+    <CardExpandedContext.Provider value={{ isExpanded }}>
+      <>
+        {/* Main card */}
+        <div
+          key={flashKey}
+          data-tour="card"
+          className={cn(
+            'glass rounded-xl overflow-hidden card-hover',
+            'flex flex-col transition-all duration-200',
+            isCollapsed ? 'h-auto' : 'h-full',
+            (isDemoMode || isDemoData) && '!border-2 !border-yellow-500/50',
+            getFlashClass()
+          )}
+          onMouseEnter={() => setShowSummary(true)}
+          onMouseLeave={() => setShowSummary(false)}
+        >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
           <div className="flex items-center gap-2">
@@ -546,22 +617,29 @@ export function CardWrapper({
       </div>
 
       {/* Expanded modal */}
-      {isExpanded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-8 bg-black/80">
-          <div className="w-full max-w-4xl max-h-[80vh] glass rounded-2xl overflow-hidden animate-fade-in-up">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-              <h3 className="text-lg font-medium text-foreground">{title}</h3>
-              <button
-                onClick={() => setIsExpanded(false)}
-                className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-6 overflow-auto max-h-[calc(80vh-80px)]">{children}</div>
-          </div>
-        </div>
-      )}
-    </>
+      <BaseModal
+        isOpen={isExpanded}
+        onClose={() => setIsExpanded(false)}
+        size={FULLSCREEN_EXPANDED_CARDS.has(cardType) ? 'full' : LARGE_EXPANDED_CARDS.has(cardType) ? 'xl' : 'lg'}
+      >
+        <BaseModal.Header
+          title={title}
+          icon={Maximize2}
+          onClose={() => setIsExpanded(false)}
+          showBack={false}
+        />
+        <BaseModal.Content className={cn(
+          'overflow-auto flex flex-col',
+          FULLSCREEN_EXPANDED_CARDS.has(cardType)
+            ? 'h-[calc(98vh-80px)]'
+            : LARGE_EXPANDED_CARDS.has(cardType)
+              ? 'h-[calc(95vh-80px)]'
+              : 'max-h-[calc(80vh-80px)]'
+        )}>
+          {children}
+        </BaseModal.Content>
+      </BaseModal>
+      </>
+    </CardExpandedContext.Provider>
   )
 }

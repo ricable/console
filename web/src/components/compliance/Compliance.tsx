@@ -1,29 +1,19 @@
-import { useState, useEffect, useCallback, memo } from 'react'
+import { useEffect, useCallback, memo } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Shield, RefreshCw, Hourglass, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
   DragOverlay,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
-import { useShowCards } from '../../hooks/useShowCards'
-import { useDashboardReset } from '../../hooks/useDashboardReset'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
@@ -34,14 +24,7 @@ import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
-
-interface ComplianceCard {
-  id: string
-  card_type: string
-  config: Record<string, unknown>
-  title?: string
-  position?: { w: number; h: number }
-}
+import { useDashboard, DashboardCard } from '../../lib/dashboards'
 
 // Width class lookup for Tailwind (dynamic classes don't work)
 const WIDTH_CLASSES: Record<number, string> = {
@@ -59,7 +42,7 @@ const WIDTH_CLASSES: Record<number, string> = {
 
 // Sortable Card Component
 interface SortableCardProps {
-  card: ComplianceCard
+  card: DashboardCard
   onRemove: () => void
   onConfigure: () => void
   onWidthChange: (width: number) => void
@@ -119,7 +102,7 @@ const SortableCard = memo(function SortableCard({
 })
 
 // Drag preview component
-function DragPreviewCard({ card }: { card: ComplianceCard }) {
+function DragPreviewCard({ card }: { card: DashboardCard }) {
   const CardComponent = CARD_COMPONENTS[card.card_type]
   if (!CardComponent) return null
 
@@ -138,12 +121,14 @@ function DragPreviewCard({ card }: { card: ComplianceCard }) {
   )
 }
 
+const COMPLIANCE_CARDS_KEY = 'compliance-dashboard-cards'
+
 // Default cards for the Compliance dashboard
-const DEFAULT_COMPLIANCE_CARDS: ComplianceCard[] = [
-  { id: 'compliance-1', card_type: 'opa_policies', config: {}, position: { w: 6, h: 4 } },
-  { id: 'compliance-2', card_type: 'kyverno_policies', config: {}, position: { w: 6, h: 4 } },
-  { id: 'compliance-3', card_type: 'security_issues', config: {}, position: { w: 6, h: 4 } },
-  { id: 'compliance-4', card_type: 'namespace_rbac', config: {}, position: { w: 6, h: 4 } },
+const DEFAULT_COMPLIANCE_CARDS = [
+  { type: 'opa_policies', title: 'OPA Gatekeeper', position: { w: 4, h: 3 } },
+  { type: 'kyverno_policies', title: 'Kyverno Policies', position: { w: 4, h: 3 } },
+  { type: 'security_issues', title: 'Security Issues', position: { w: 8, h: 4 } },
+  { type: 'namespace_rbac', title: 'Namespace RBAC', position: { w: 6, h: 4 } },
 ]
 
 // Mock compliance posture data
@@ -163,6 +148,17 @@ function getCompliancePosture(clusterCount: number) {
     highFindings: Math.floor(clusterCount * 5.1),
     mediumFindings: Math.floor(clusterCount * 8.7),
     lowFindings: Math.floor(clusterCount * 12.4),
+    // Tool-specific metrics
+    gatekeeperViolations: Math.floor(clusterCount * 3.2),
+    kyvernoViolations: Math.floor(clusterCount * 2.8),
+    kubescapeScore: 78 + Math.floor(Math.random() * 10),
+    falcoAlerts: Math.floor(clusterCount * 1.5),
+    trivyVulns: Math.floor(clusterCount * 12),
+    criticalCVEs: Math.floor(clusterCount * 1.8),
+    highCVEs: Math.floor(clusterCount * 4.2),
+    cisScore: 82 + Math.floor(Math.random() * 8),
+    nsaScore: 76 + Math.floor(Math.random() * 12),
+    pciScore: 71 + Math.floor(Math.random() * 15),
   }
 }
 
@@ -171,108 +167,70 @@ export function Compliance() {
   const { clusters, isLoading, refetch, lastUpdated, isRefreshing } = useClusters()
   const { drillToPolicy: _drillToPolicy, drillToAllSecurity } = useDrillDownActions()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
-  const { showCards, expandCards } = useShowCards('kubestellar-compliance')
 
-  const [cards, setCards] = useState<ComplianceCard[]>(() => {
-    const saved = localStorage.getItem('compliance-dashboard-cards')
-    return saved ? JSON.parse(saved) : DEFAULT_COMPLIANCE_CARDS
-  })
-
-  // Reset hook for dashboard
-  const { reset, isCustomized } = useDashboardReset({
-    storageKey: 'compliance-dashboard-cards',
-    defaultCards: DEFAULT_COMPLIANCE_CARDS,
-    setCards,
+  // Use the shared dashboard hook for cards, DnD, modals, auto-refresh
+  const {
     cards,
+    setCards,
+    addCards,
+    removeCard,
+    configureCard,
+    updateCardWidth,
+    reset,
+    isCustomized,
+    showAddCard,
+    setShowAddCard,
+    showTemplates,
+    setShowTemplates,
+    configuringCard,
+    setConfiguringCard,
+    openConfigureCard,
+    showCards,
+    expandCards,
+    dnd: { sensors, activeId, handleDragStart, handleDragEnd },
+    autoRefresh,
+    setAutoRefresh,
+  } = useDashboard({
+    storageKey: COMPLIANCE_CARDS_KEY,
+    defaultCards: DEFAULT_COMPLIANCE_CARDS,
+    onRefresh: refetch,
   })
-
-  const [showAddCard, setShowAddCard] = useState(false)
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [configuringCard, setConfiguringCard] = useState<ComplianceCard | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
-  const [activeId, setActiveId] = useState<string | null>(null)
-
-  // Save cards to localStorage
-  useEffect(() => {
-    localStorage.setItem('compliance-dashboard-cards', JSON.stringify(cards))
-  }, [cards])
-
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  )
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
-  }, [])
-
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
-
-    if (over && active.id !== over.id) {
-      setCards(prev => {
-        const oldIndex = prev.findIndex(c => c.id === active.id)
-        const newIndex = prev.findIndex(c => c.id === over.id)
-        return arrayMove(prev, oldIndex, newIndex)
-      })
-    }
-  }, [])
 
   // Trigger refresh when navigating to this page
   useEffect(() => {
     refetch()
   }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return
-    const interval = setInterval(() => refetch(), 30000)
-    return () => clearInterval(interval)
-  }, [autoRefresh, refetch])
-
   const handleRefresh = useCallback(() => {
     refetch()
   }, [refetch])
 
   const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
-    const cardsToAdd: ComplianceCard[] = newCards.map(card => ({
-      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      card_type: card.type,
-      config: card.config,
-      title: card.title,
-    }))
-    setCards(prev => [...prev, ...cardsToAdd])
+    addCards(newCards)
     expandCards()
     setShowAddCard(false)
-  }, [expandCards])
+  }, [addCards, expandCards, setShowAddCard])
 
   const handleRemoveCard = useCallback((cardId: string) => {
-    setCards(prev => prev.filter(c => c.id !== cardId))
-  }, [])
+    removeCard(cardId)
+  }, [removeCard])
 
   const handleConfigureCard = useCallback((cardId: string) => {
-    const card = cards.find(c => c.id === cardId)
-    if (card) setConfiguringCard(card)
-  }, [cards])
+    openConfigureCard(cardId, cards)
+  }, [openConfigureCard, cards])
 
   const handleSaveCardConfig = useCallback((cardId: string, config: Record<string, unknown>) => {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, config } : c
-    ))
+    configureCard(cardId, config)
     setConfiguringCard(null)
-  }, [])
+  }, [configureCard, setConfiguringCard])
 
   const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, position: { ...(c.position || { w: 6, h: 2 }), w: newWidth } } : c
-    ))
-  }, [])
+    updateCardWidth(cardId, newWidth)
+  }, [updateCardWidth])
 
   const applyTemplate = useCallback((template: DashboardTemplate) => {
-    const newCards: ComplianceCard[] = template.cards.map(card => ({
-      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const newCards = template.cards.map((card, i) => ({
+      id: `card-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
       card_type: card.card_type,
       config: card.config || {},
       title: card.title,
@@ -280,7 +238,7 @@ export function Compliance() {
     setCards(newCards)
     expandCards()
     setShowTemplates(false)
-  }, [expandCards])
+  }, [setCards, expandCards, setShowTemplates])
 
   // Filter clusters based on global selection
   const filteredClusters = clusters.filter(c =>
@@ -294,6 +252,7 @@ export function Compliance() {
   // Stats value getter for the configurable StatsOverview component
   const getStatValue = useCallback((blockId: string): StatBlockValue => {
     switch (blockId) {
+      // Overall compliance
       case 'score':
         return { value: `${posture.score}%`, sublabel: 'compliance score', onClick: () => drillToAllSecurity(), isClickable: reachableClusters.length > 0 }
       case 'total_checks':
@@ -306,13 +265,40 @@ export function Compliance() {
         return { value: posture.warning, sublabel: 'warnings', onClick: () => drillToAllSecurity('warning'), isClickable: posture.warning > 0 }
       case 'critical_findings':
         return { value: posture.criticalFindings, sublabel: 'critical findings', onClick: () => drillToAllSecurity('critical'), isClickable: posture.criticalFindings > 0 }
+
+      // Policy enforcement tools
+      case 'gatekeeper_violations':
+        return { value: posture.gatekeeperViolations, sublabel: 'Gatekeeper violations', isClickable: false }
+      case 'kyverno_violations':
+        return { value: posture.kyvernoViolations, sublabel: 'Kyverno violations', isClickable: false }
+      case 'kubescape_score':
+        return { value: `${posture.kubescapeScore}%`, sublabel: 'Kubescape score', isClickable: false }
+
+      // Security scanning
+      case 'falco_alerts':
+        return { value: posture.falcoAlerts, sublabel: 'Falco alerts', isClickable: false }
+      case 'trivy_vulns':
+        return { value: posture.trivyVulns, sublabel: 'Trivy vulnerabilities', isClickable: false }
+      case 'critical_vulns':
+        return { value: posture.criticalCVEs, sublabel: 'critical CVEs', isClickable: false }
+      case 'high_vulns':
+        return { value: posture.highCVEs, sublabel: 'high CVEs', isClickable: false }
+
+      // Framework compliance
+      case 'cis_score':
+        return { value: `${posture.cisScore}%`, sublabel: 'CIS benchmark', isClickable: false }
+      case 'nsa_score':
+        return { value: `${posture.nsaScore}%`, sublabel: 'NSA hardening', isClickable: false }
+      case 'pci_score':
+        return { value: `${posture.pciScore}%`, sublabel: 'PCI-DSS', isClickable: false }
+
       default:
-        return { value: 0 }
+        return { value: '-' }
     }
   }, [posture, reachableClusters, drillToAllSecurity])
 
   // Transform card for ConfigureCardModal
-  const configureCard = configuringCard ? {
+  const configureCardData = configuringCard ? {
     id: configuringCard.id,
     card_type: configuringCard.card_type,
     config: configuringCard.config,
@@ -328,9 +314,9 @@ export function Compliance() {
             <div>
               <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
                 <Shield className="w-6 h-6 text-purple-400" />
-                Compliance
+                Security Posture
               </h1>
-              <p className="text-muted-foreground">Security posture and policy compliance across clusters</p>
+              <p className="text-muted-foreground">Security scanning, vulnerability assessment, and policy enforcement</p>
             </div>
             {isRefreshing && (
               <span className="flex items-center gap-1 text-xs text-amber-400 animate-pulse" title="Updating...">
@@ -409,7 +395,7 @@ export function Compliance() {
       <FloatingDashboardActions
         onAddCard={() => setShowAddCard(true)}
         onOpenTemplates={() => setShowTemplates(true)}
-        onReset={reset}
+        onResetToDefaults={reset}
         isCustomized={isCustomized}
       />
 
@@ -431,11 +417,9 @@ export function Compliance() {
       {/* Configure Card Modal */}
       <ConfigureCardModal
         isOpen={!!configuringCard}
-        card={configureCard}
+        card={configureCardData}
         onClose={() => setConfiguringCard(null)}
-        onSave={(cardId, config) => {
-          handleSaveCardConfig(cardId, config)
-        }}
+        onSave={handleSaveCardConfig}
       />
     </div>
   )

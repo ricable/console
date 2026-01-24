@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import {
-  X,
   Plus,
   Trash2,
   GripVertical,
@@ -35,6 +34,7 @@ import { useSidebarConfig, AVAILABLE_ICONS, SidebarItem } from '../../hooks/useS
 import { useDashboards, Dashboard } from '../../hooks/useDashboards'
 import { DASHBOARD_TEMPLATES, TEMPLATE_CATEGORIES } from '../dashboard/templates'
 import { cn } from '../../lib/cn'
+import { BaseModal } from '../../lib/modals'
 import * as Icons from 'lucide-react'
 
 const CARD_TYPE_LABELS: Record<string, string> = {
@@ -135,7 +135,8 @@ const KNOWN_ROUTES: KnownRoute[] = [
   { href: '/gitops', name: 'GitOps', description: 'ArgoCD, Flux, Helm releases, and deployment drift detection', icon: 'GitBranch', category: 'Core Dashboards' },
   { href: '/alerts', name: 'Alerts', description: 'Active alerts, rule management, and AI-powered diagnostics', icon: 'Bell', category: 'Core Dashboards' },
   { href: '/cost', name: 'Cost Management', description: 'Resource costs, allocation tracking, and optimization recommendations', icon: 'DollarSign', category: 'Core Dashboards' },
-  { href: '/compliance', name: 'Compliance', description: 'Security posture, policy compliance, and audit readiness across clusters', icon: 'ShieldCheck', category: 'Core Dashboards' },
+  { href: '/security-posture', name: 'Security Posture', description: 'Security scanning, vulnerability assessment, and policy enforcement', icon: 'ShieldCheck', category: 'Core Dashboards' },
+  { href: '/data-compliance', name: 'Data Compliance', description: 'GDPR, HIPAA, PCI-DSS, and SOC 2 data protection compliance', icon: 'Database', category: 'Core Dashboards' },
   { href: '/gpu-reservations', name: 'GPU Reservations', description: 'Schedule and manage GPU reservations with calendar and quota management', icon: 'Zap', category: 'Core Dashboards' },
   { href: '/storage', name: 'Storage', description: 'Persistent volumes, storage classes, and capacity management', icon: 'HardDrive', category: 'Core Dashboards' },
   { href: '/network', name: 'Network', description: 'Network policies, ingress, and service mesh configuration', icon: 'Network', category: 'Core Dashboards' },
@@ -231,23 +232,6 @@ export function SidebarCustomizer({ isOpen, onClose }: SidebarCustomizerProps) {
     }
   }, [isOpen, getAllDashboardsWithCards])
 
-  // ESC to close
-  useEffect(() => {
-    if (!isOpen) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
-      if (e.key === 'Escape') {
-        e.preventDefault()
-        onClose()
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
-
   const handleAddItem = () => {
     if (!newItemName || !newItemHref) return
 
@@ -339,24 +323,16 @@ export function SidebarCustomizer({ isOpen, onClose }: SidebarCustomizerProps) {
   )
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-      <div className="w-full max-w-2xl max-h-[80vh] glass rounded-2xl overflow-hidden animate-fade-in-up">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
-          <div>
-            <h2 className="text-lg font-medium text-foreground">Customize Sidebar</h2>
-            <p className="text-sm text-muted-foreground">Add, remove, or reorder menu items</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <BaseModal isOpen={isOpen} onClose={onClose} size="lg">
+      <BaseModal.Header
+        title="Customize Sidebar"
+        description="Add, remove, or reorder menu items"
+        icon={LayoutDashboard}
+        onClose={onClose}
+        showBack={false}
+      />
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(80vh-140px)]">
+      <BaseModal.Content className="max-h-[60vh]">
           {/* Quick Actions */}
           <div className="flex gap-2 mb-6">
             <button
@@ -424,11 +400,14 @@ export function SidebarCustomizer({ isOpen, onClose }: SidebarCustomizerProps) {
                   </button>
 
                   {showRouteDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1 py-2 rounded-lg bg-card border border-border shadow-xl z-50 max-h-[300px] overflow-y-auto">
+                    <div
+                      className="absolute top-full left-0 right-0 mt-1 py-2 rounded-lg bg-card border border-border shadow-xl z-50 max-h-[300px] overflow-y-auto overscroll-contain"
+                      onWheel={(e) => e.stopPropagation()}
+                    >
                       {/* Known routes grouped by category */}
                       {ROUTE_CATEGORIES.map(category => (
                         <div key={category}>
-                          <div className="px-3 py-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wider bg-secondary/30 sticky top-0">
+                          <div className="px-3 py-1.5 text-xs text-muted-foreground font-medium uppercase tracking-wider bg-card sticky top-0 z-10">
                             {category}
                           </div>
                           {KNOWN_ROUTES.filter(r => r.category === category).map(route => {
@@ -739,18 +718,17 @@ export function SidebarCustomizer({ isOpen, onClose }: SidebarCustomizerProps) {
               </button>
             </div>
           </div>
-        </div>
+      </BaseModal.Content>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-border/50">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600"
-          >
-            Done
-          </button>
-        </div>
-      </div>
-    </div>
+      <BaseModal.Footer>
+        <div className="flex-1" />
+        <button
+          onClick={onClose}
+          className="px-4 py-2 rounded-lg bg-purple-500 text-white hover:bg-purple-600"
+        >
+          Done
+        </button>
+      </BaseModal.Footer>
+    </BaseModal>
   )
 }

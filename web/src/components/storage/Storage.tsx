@@ -1,30 +1,21 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { useSearchParams, useLocation } from 'react-router-dom'
-import { HardDrive, Database, Plus, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Hourglass, X, ExternalLink, GripVertical } from 'lucide-react'
+import { HardDrive, Database, Plus, LayoutGrid, ChevronDown, ChevronRight, RefreshCw, Hourglass, ExternalLink, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
   DragOverlay,
 } from '@dnd-kit/core'
 import {
-  arrayMove,
   SortableContext,
-  sortableKeyboardCoordinates,
   useSortable,
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { BaseModal } from '../../lib/modals'
 import { useClusters, usePVCs, PVC } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
-import { useShowCards } from '../../hooks/useShowCards'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
-import { useDashboardReset } from '../../hooks/useDashboardReset'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS, getDefaultCardWidth } from '../cards/cardRegistry'
@@ -35,6 +26,7 @@ import { FloatingDashboardActions } from '../dashboard/FloatingDashboardActions'
 import { DashboardTemplate } from '../dashboard/templates'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { formatCardTitle } from '../../lib/formatCardTitle'
+import { useDashboard, DashboardCard } from '../../lib/dashboards'
 
 // PVC List Modal
 interface PVCListModalProps {
@@ -48,18 +40,6 @@ interface PVCListModalProps {
 
 function PVCListModal({ isOpen, onClose, pvcs, title, statusFilter = 'all', onSelectPVC }: PVCListModalProps) {
   const [searchQuery, setSearchQuery] = useState('')
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-    }
-    if (isOpen) {
-      window.addEventListener('keydown', handleKeyDown)
-      return () => window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [isOpen, onClose])
-
-  if (!isOpen) return null
 
   // Filter by status and search query
   const filteredPVCs = pvcs.filter(pvc => {
@@ -86,118 +66,81 @@ function PVCListModal({ isOpen, onClose, pvcs, title, statusFilter = 'all', onSe
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative glass rounded-lg w-[800px] max-h-[80vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-3">
-            <Database className={`w-5 h-5 ${statusFilter === 'Bound' ? 'text-green-400' : statusFilter === 'Pending' ? 'text-yellow-400' : 'text-blue-400'}`} />
-            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
-            <span className="px-2 py-0.5 text-xs rounded-full bg-secondary text-muted-foreground">
-              {filteredPVCs.length} PVC{filteredPVCs.length !== 1 ? 's' : ''}
-            </span>
+    <BaseModal isOpen={isOpen} onClose={onClose} size="lg">
+      <BaseModal.Header
+        title={title}
+        description={`${filteredPVCs.length} PVC${filteredPVCs.length !== 1 ? 's' : ''}`}
+        icon={Database}
+        onClose={onClose}
+        showBack={false}
+      />
+
+      {/* Search */}
+      <div className="px-6 py-4 border-b border-border">
+        <input
+          type="text"
+          placeholder="Search by name, namespace, cluster, or storage class..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
+        />
+      </div>
+
+      <BaseModal.Content className="max-h-[60vh]">
+        {filteredPVCs.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No PVCs found matching the criteria
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="p-4 border-b border-border">
-          <input
-            type="text"
-            placeholder="Search by name, namespace, cluster, or storage class..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-3 py-2 rounded-lg bg-secondary/50 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
-          />
-        </div>
-
-        {/* PVC List */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {filteredPVCs.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No PVCs found matching the criteria
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredPVCs.map((pvc, idx) => (
-                <div
-                  key={`${pvc.cluster}-${pvc.namespace}-${pvc.name}-${idx}`}
-                  onClick={() => onSelectPVC(pvc.cluster || 'default', pvc.namespace, pvc.name)}
-                  className="glass p-3 rounded-lg cursor-pointer hover:bg-secondary/50 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Database className="w-4 h-4 text-muted-foreground" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-foreground">{pvc.name}</span>
-                          <span className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(pvc.status)}`}>
-                            {pvc.status}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                          <span>Namespace: {pvc.namespace}</span>
-                          {pvc.storageClass && <span>• Storage Class: {pvc.storageClass}</span>}
-                          {pvc.capacity && <span>• {pvc.capacity}</span>}
-                        </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredPVCs.map((pvc, idx) => (
+              <div
+                key={`${pvc.cluster}-${pvc.namespace}-${pvc.name}-${idx}`}
+                onClick={() => onSelectPVC(pvc.cluster || 'default', pvc.namespace, pvc.name)}
+                className="glass p-3 rounded-lg cursor-pointer hover:bg-secondary/50 transition-colors"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Database className="w-4 h-4 text-muted-foreground" />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{pvc.name}</span>
+                        <span className={`px-1.5 py-0.5 text-xs rounded ${getStatusColor(pvc.status)}`}>
+                          {pvc.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        <span>Namespace: {pvc.namespace}</span>
+                        {pvc.storageClass && <span>• Storage Class: {pvc.storageClass}</span>}
+                        {pvc.capacity && <span>• {pvc.capacity}</span>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {pvc.cluster && <ClusterBadge cluster={pvc.cluster} size="sm" />}
-                      <ExternalLink className="w-4 h-4 text-muted-foreground" />
-                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {pvc.cluster && <ClusterBadge cluster={pvc.cluster} size="sm" />}
+                    <ExternalLink className="w-4 h-4 text-muted-foreground" />
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </BaseModal.Content>
+    </BaseModal>
   )
-}
-
-interface StorageCard {
-  id: string
-  card_type: string
-  config: Record<string, unknown>
-  title?: string
-  position?: { w: number; h: number }
 }
 
 const STORAGE_CARDS_KEY = 'kubestellar-storage-cards'
 
 // Default cards for the storage dashboard
-const DEFAULT_STORAGE_CARDS: StorageCard[] = [
-  { id: 'default-storage-overview', card_type: 'storage_overview', title: 'Storage Overview', config: {}, position: { w: 4, h: 3 } },
-  { id: 'default-pvc-status', card_type: 'pvc_status', title: 'PVC Status', config: {}, position: { w: 8, h: 3 } },
+const DEFAULT_STORAGE_CARDS = [
+  { type: 'storage_overview', title: 'Storage Overview', position: { w: 4, h: 3 } },
+  { type: 'pvc_status', title: 'PVC Status', position: { w: 8, h: 3 } },
 ]
-
-function loadStorageCards(): StorageCard[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_CARDS_KEY)
-    if (stored) {
-      return JSON.parse(stored)
-    }
-  } catch {
-    // Fall through to return defaults
-  }
-  return DEFAULT_STORAGE_CARDS
-}
-
-function saveStorageCards(cards: StorageCard[]) {
-  localStorage.setItem(STORAGE_CARDS_KEY, JSON.stringify(cards))
-}
 
 // Sortable card component with drag handle
 interface SortableStorageCardProps {
-  card: StorageCard
+  card: DashboardCard
   onConfigure: () => void
   onRemove: () => void
   onWidthChange: (newWidth: number) => void
@@ -264,7 +207,7 @@ const SortableStorageCard = memo(function SortableStorageCard({
 })
 
 // Drag preview for overlay
-function StorageDragPreviewCard({ card }: { card: StorageCard }) {
+function StorageDragPreviewCard({ card }: { card: DashboardCard }) {
   const cardWidth = card.position?.w || 4
   return (
     <div
@@ -292,66 +235,43 @@ export function Storage() {
   const { pvcs } = usePVCs()
   const { drillToPVC, drillToResources } = useDrillDownActions()
 
-  // Card state
-  const [cards, setCards] = useState<StorageCard[]>(() => loadStorageCards())
-  // Stats collapsed state is now managed by StatsOverview component
-  const { showCards, setShowCards, expandCards } = useShowCards('kubestellar-storage')
-  const [showAddCard, setShowAddCard] = useState(false)
-
-  // Reset functionality using shared hook
-  const { isCustomized, setCustomized, reset } = useDashboardReset({
+  // Use the shared dashboard hook for cards, DnD, modals, auto-refresh
+  const {
+    cards,
+    setCards,
+    addCards,
+    removeCard,
+    configureCard,
+    updateCardWidth,
+    reset,
+    isCustomized,
+    showAddCard,
+    setShowAddCard,
+    showTemplates,
+    setShowTemplates,
+    configuringCard,
+    setConfiguringCard,
+    openConfigureCard,
+    showCards,
+    setShowCards,
+    expandCards,
+    dnd: { sensors, activeId, handleDragStart, handleDragEnd },
+    autoRefresh,
+    setAutoRefresh,
+  } = useDashboard({
     storageKey: STORAGE_CARDS_KEY,
     defaultCards: DEFAULT_STORAGE_CARDS,
-    setCards,
-    cards,
+    onRefresh: refetch,
   })
-  const [showTemplates, setShowTemplates] = useState(false)
-  const [configuringCard, setConfiguringCard] = useState<StorageCard | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+
   // PVC List Modal state
   const [showPVCModal, setShowPVCModal] = useState(false)
   const [pvcModalFilter, setPVCModalFilter] = useState<'Bound' | 'Pending' | 'all'>('all')
-  const [activeId, setActiveId] = useState<string | null>(null)
-
-  // Drag and drop sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
-
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveId(event.active.id as string)
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event
-    setActiveId(null)
-
-    if (over && active.id !== over.id) {
-      setCards((items) => {
-        const oldIndex = items.findIndex((item) => item.id === active.id)
-        const newIndex = items.findIndex((item) => item.id === over.id)
-        return arrayMove(items, oldIndex, newIndex)
-      })
-    }
-  }
 
   // Combined loading/refreshing states (useClusters has shared cache so data persists)
   const isFetching = isLoading || isRefreshing
   // Only show skeletons when we have no data yet
   const showSkeletons = clusters.length === 0 && isLoading
-
-  // Save cards to localStorage when they change (mark as customized)
-  useEffect(() => {
-    saveStorageCards(cards)
-    setCustomized(true)
-  }, [cards, setCustomized])
 
   // Handle addCard URL param - open modal and clear param
   useEffect(() => {
@@ -359,69 +279,53 @@ export function Storage() {
       setShowAddCard(true)
       setSearchParams({}, { replace: true })
     }
-  }, [searchParams, setSearchParams])
+  }, [searchParams, setSearchParams, setShowAddCard])
 
   // Trigger refresh when navigating to this page (location.key changes on each navigation)
   useEffect(() => {
     refetch()
   }, [location.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh) return
-
-    const interval = setInterval(() => {
-      refetch()
-    }, 30000)
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, refetch])
-
   const handleRefresh = useCallback(() => {
     refetch()
   }, [refetch])
 
   const handleAddCards = useCallback((newCards: Array<{ type: string; title: string; config: Record<string, unknown> }>) => {
-    const cardsToAdd: StorageCard[] = newCards.map(card => ({
-      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      card_type: card.type,
-      config: card.config,
+    // Custom handling for storage cards with special widths
+    const cardsToAdd = newCards.map(card => ({
+      type: card.type,
       title: card.title,
+      config: card.config,
       position: {
         w: getDefaultCardWidth(card.type),
         h: card.type === 'cluster_resource_tree' ? 5 : 3,
       },
     }))
-    setCards(prev => [...prev, ...cardsToAdd])
+    addCards(cardsToAdd)
     expandCards()
     setShowAddCard(false)
-  }, [expandCards])
+  }, [addCards, expandCards, setShowAddCard])
 
   const handleRemoveCard = useCallback((cardId: string) => {
-    setCards(prev => prev.filter(c => c.id !== cardId))
-  }, [])
+    removeCard(cardId)
+  }, [removeCard])
 
   const handleConfigureCard = useCallback((cardId: string) => {
-    const card = cards.find(c => c.id === cardId)
-    if (card) setConfiguringCard(card)
-  }, [cards])
+    openConfigureCard(cardId, cards)
+  }, [openConfigureCard, cards])
 
   const handleSaveCardConfig = useCallback((cardId: string, config: Record<string, unknown>) => {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, config } : c
-    ))
+    configureCard(cardId, config)
     setConfiguringCard(null)
-  }, [])
+  }, [configureCard, setConfiguringCard])
 
   const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
-    setCards(prev => prev.map(c =>
-      c.id === cardId ? { ...c, position: { ...(c.position || { w: 4, h: 2 }), w: newWidth } } : c
-    ))
-  }, [])
+    updateCardWidth(cardId, newWidth)
+  }, [updateCardWidth])
 
   const applyTemplate = useCallback((template: DashboardTemplate) => {
-    const newCards: StorageCard[] = template.cards.map(card => ({
-      id: `card-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    const newCards = template.cards.map((card, i) => ({
+      id: `card-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
       card_type: card.card_type,
       config: card.config || {},
       title: card.title,
@@ -429,7 +333,7 @@ export function Storage() {
     setCards(newCards)
     expandCards()
     setShowTemplates(false)
-  }, [])
+  }, [setCards, expandCards, setShowTemplates])
 
   // Filter clusters based on global selection
   const filteredClusters = clusters.filter(c =>
@@ -535,7 +439,7 @@ export function Storage() {
   }, [stats, hasDataToShow, formatStorage, formatStatValue, drillToResources, setPVCModalFilter, setShowPVCModal])
 
   // Transform card for ConfigureCardModal
-  const configureCard = configuringCard ? {
+  const configureCardData = configuringCard ? {
     id: configuringCard.id,
     card_type: configuringCard.card_type,
     config: configuringCard.config,
@@ -667,7 +571,7 @@ export function Storage() {
       <FloatingDashboardActions
         onAddCard={() => setShowAddCard(true)}
         onOpenTemplates={() => setShowTemplates(true)}
-        onReset={reset}
+        onResetToDefaults={reset}
         isCustomized={isCustomized}
       />
 
@@ -689,7 +593,7 @@ export function Storage() {
       {/* Configure Card Modal */}
       <ConfigureCardModal
         isOpen={!!configuringCard}
-        card={configureCard}
+        card={configureCardData}
         onClose={() => setConfiguringCard(null)}
         onSave={handleSaveCardConfig}
       />
