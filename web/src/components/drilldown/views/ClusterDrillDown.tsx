@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ChevronRight, ChevronDown, Server, Box, Layers, Database, Network, HardDrive, Search, AlertTriangle, XCircle } from 'lucide-react'
-import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes, useNodes, useNamespaces, useDeployments, useServices, usePVCs } from '../../../hooks/useMCP'
+import { useClusterHealth, usePodIssues, useDeploymentIssues, useGPUNodes, useNodes, useNamespaces, useDeployments, useServices, usePVCs, useEvents } from '../../../hooks/useMCP'
 import { useDrillDownActions } from '../../../hooks/useDrillDown'
 import { StatusIndicator } from '../../charts/StatusIndicator'
 import { Gauge } from '../../charts/Gauge'
@@ -22,7 +22,17 @@ export function ClusterDrillDown({ data }: Props) {
   const [activeLens, setActiveLens] = useState<TreeLens>('all')
   const [showResourceTree, setShowResourceTree] = useState(false)
 
-  const { health, isLoading } = useClusterHealth(clusterName)
+  // Safeguard timeout to prevent infinite loading - show content after 5 seconds max
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false)
+  useEffect(() => {
+    setLoadingTimedOut(false) // Reset on cluster change
+    const timer = setTimeout(() => setLoadingTimedOut(true), 5000)
+    return () => clearTimeout(timer)
+  }, [clusterName])
+
+  const { health, isLoading: healthLoading } = useClusterHealth(clusterName)
+  // Only show loading spinner if health is loading AND we haven't timed out
+  const isLoading = healthLoading && !loadingTimedOut
   const { issues: podIssues } = usePodIssues(clusterName)
   const { issues: deploymentIssues } = useDeploymentIssues()
   const { nodes: allGPUNodes } = useGPUNodes()
@@ -31,6 +41,7 @@ export function ClusterDrillDown({ data }: Props) {
   const { deployments: allDeployments } = useDeployments(clusterName)
   const { services: allServices } = useServices(clusterName)
   const { pvcs: allPVCs } = usePVCs(clusterName)
+  const { events: clusterEvents, isLoading: eventsLoading } = useEvents(clusterName, undefined, 10)
 
   // Toggle section expansion
   const toggleSection = (section: string) => {
@@ -100,8 +111,13 @@ export function ClusterDrillDown({ data }: Props) {
       ns = ns.filter(n => n.toLowerCase().includes(searchFilter.toLowerCase()))
     }
     // Filter out system namespaces unless explicitly searching
+    // But keep them if that's all we have
     if (!searchFilter) {
-      ns = ns.filter(n => !n.startsWith('kube-') && n !== 'default')
+      const nonSystemNs = ns.filter(n => !n.startsWith('kube-') && n !== 'default')
+      // Only filter if we have non-system namespaces, otherwise show all
+      if (nonSystemNs.length > 0) {
+        ns = nonSystemNs
+      }
     }
     return ns
   }, [allNamespaces, searchFilter])
@@ -166,8 +182,40 @@ export function ClusterDrillDown({ data }: Props) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-6 animate-pulse">
+        {/* Skeleton: Overview Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="p-4 rounded-lg bg-card/50 border border-border">
+              <div className="h-4 w-16 bg-secondary rounded mb-2" />
+              <div className="h-8 w-20 bg-secondary rounded" />
+              <div className="h-3 w-12 bg-secondary/50 rounded mt-2" />
+            </div>
+          ))}
+        </div>
+
+        {/* Skeleton: Quick Actions */}
+        <div className="flex gap-2">
+          <div className="h-9 w-28 bg-secondary rounded-lg" />
+        </div>
+
+        {/* Skeleton: Issues Section */}
+        <div>
+          <div className="h-6 w-32 bg-secondary rounded mb-4" />
+          <div className="space-y-2">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="p-3 rounded-lg bg-card/30 border border-border">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <div className="h-4 w-40 bg-secondary rounded" />
+                    <div className="h-3 w-24 bg-secondary/50 rounded" />
+                  </div>
+                  <div className="h-6 w-16 bg-secondary rounded" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -181,11 +229,21 @@ export function ClusterDrillDown({ data }: Props) {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="p-4 rounded-lg bg-card/50 border border-border">
           <div className="flex items-center gap-2 mb-2">
-            <StatusIndicator status={health?.reachable === false ? 'unreachable' : health?.healthy ? 'healthy' : 'error'} />
+            {/* Derive health status from actual data: all nodes ready = healthy */}
+            <StatusIndicator status={
+              health?.reachable === false ? 'unreachable' :
+              // If we have node data, derive healthy from readyNodes vs nodeCount
+              (health?.nodeCount && health.nodeCount > 0)
+                ? (health.readyNodes === health.nodeCount ? 'healthy' : 'warning')
+                : (health?.healthy ? 'healthy' : 'error')
+            } />
             <span className="text-sm text-muted-foreground">Status</span>
           </div>
           <div className="text-2xl font-bold text-foreground">
-            {health?.reachable === false ? 'Offline' : health?.healthy ? 'Healthy' : 'Unhealthy'}
+            {health?.reachable === false ? 'Offline' :
+              (health?.nodeCount && health.nodeCount > 0)
+                ? (health.readyNodes === health.nodeCount ? 'Healthy' : 'Degraded')
+                : (health?.healthy ? 'Healthy' : 'Unknown')}
           </div>
         </div>
 
@@ -225,14 +283,61 @@ export function ClusterDrillDown({ data }: Props) {
         </div>
       )}
 
-      {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => drillToEvents(clusterName)}
-          className="px-4 py-2 rounded-lg bg-card/50 border border-border text-sm text-foreground hover:bg-card transition-colors"
-        >
-          View Events
-        </button>
+      {/* Recent Events Section */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-lg font-semibold text-foreground">Recent Events</h3>
+          <button
+            onClick={() => drillToEvents(clusterName)}
+            className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
+          >
+            View All →
+          </button>
+        </div>
+        {eventsLoading ? (
+          <div className="space-y-2 animate-pulse">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="p-3 rounded-lg bg-card/30 border border-border">
+                <div className="h-4 w-32 bg-secondary rounded mb-2" />
+                <div className="h-3 w-full bg-secondary/50 rounded" />
+              </div>
+            ))}
+          </div>
+        ) : clusterEvents.length === 0 ? (
+          <div className="p-4 rounded-lg bg-card/30 border border-border text-center text-muted-foreground text-sm">
+            No recent events
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {clusterEvents.slice(0, 5).map((event, i) => (
+              <div
+                key={i}
+                className={`p-3 rounded-lg border-l-4 cursor-pointer hover:bg-card/50 transition-colors ${
+                  event.type === 'Warning'
+                    ? 'bg-yellow-500/10 border-l-yellow-500'
+                    : 'bg-card/30 border-l-green-500'
+                }`}
+                onClick={() => drillToEvents(clusterName)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <StatusIndicator status={event.type === 'Warning' ? 'warning' : 'healthy'} size="sm" />
+                    <span className="font-medium text-foreground text-sm">{event.reason}</span>
+                  </div>
+                  {event.count > 1 && (
+                    <span className="text-xs px-2 py-0.5 rounded bg-card text-muted-foreground">
+                      x{event.count}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1 truncate">
+                  {event.namespace}/{event.object}
+                </div>
+                <p className="text-xs text-foreground mt-1 line-clamp-1">{event.message}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Issues Section */}
@@ -445,7 +550,12 @@ export function ClusterDrillDown({ data }: Props) {
                   {expandedSections.has('cluster') ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   <Server className="w-4 h-4 text-cyan-400" />
                   <span className="font-medium text-foreground">{clusterName}</span>
-                  <StatusIndicator status={health?.healthy ? 'healthy' : 'error'} />
+                  <StatusIndicator status={
+                    health?.reachable === false ? 'unreachable' :
+                    (health?.nodeCount && health.nodeCount > 0)
+                      ? (health.readyNodes === health.nodeCount ? 'healthy' : 'warning')
+                      : (health?.healthy ? 'healthy' : 'error')
+                  } />
                 </div>
 
                 {expandedSections.has('cluster') && (

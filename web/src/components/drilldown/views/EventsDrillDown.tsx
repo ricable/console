@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react'
+import { useMemo, useState, useEffect, useCallback, useRef } from 'react'
 import { AlertCircle, RefreshCw, Terminal, Copy, CheckCircle } from 'lucide-react'
 import { StatusIndicator } from '../../charts/StatusIndicator'
 
@@ -54,10 +54,15 @@ export function EventsDrillDown({ data }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Pagination constants (UI controls will be added in task #8)
+  const currentPage = 1
+  const pageSize = 20
 
   // Fetch events from local agent (no auth required)
-  const refetch = useCallback(async () => {
-    setIsLoading(true)
+  const refetch = useCallback(async (silent = false) => {
+    if (!silent) setIsLoading(true)
     setError(null)
     try {
       // Use local agent - for node events, check default namespace with higher limit
@@ -88,14 +93,35 @@ export function EventsDrillDown({ data }: Props) {
     }
   }, [clusterShort, namespace, objectName])
 
+  // Initial fetch and auto-refresh every 30 seconds
   useEffect(() => {
     refetch()
+    refreshIntervalRef.current = setInterval(() => refetch(true), 30000)
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current)
+    }
   }, [refetch])
 
-  const filteredEvents = useMemo(() => {
-    if (!objectName) return events
-    return events.filter(e => e.object.toLowerCase().includes(objectName.toLowerCase()))
-  }, [events, objectName])
+  // Filter by object name, sort by lastSeen, and paginate
+  const { filteredEvents } = useMemo(() => {
+    let result = events
+
+    // Filter by object name if specified
+    if (objectName) {
+      result = result.filter(e => e.object.toLowerCase().includes(objectName.toLowerCase()))
+    }
+
+    // Sort by lastSeen (descending)
+    result = [...result].sort((a, b) => {
+      return new Date(b.lastSeen || 0).getTime() - new Date(a.lastSeen || 0).getTime()
+    })
+
+    // Paginate
+    const start = (currentPage - 1) * pageSize
+    result = result.slice(start, start + pageSize)
+
+    return { filteredEvents: result }
+  }, [events, objectName, currentPage])
 
   const copyCommand = () => {
     const cmd = objectName

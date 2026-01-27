@@ -1712,10 +1712,12 @@ export function Clusters() {
     // Note: Don't filter by "loading" state to avoid hiding clusters during refresh
     // Unreachable = reachable explicitly false or connection errors or no nodes
     const unreachable = globalFilteredClusters.filter(c => isClusterUnreachable(c)).length
-    // Healthy = not unreachable and healthy flag is true
-    const healthy = globalFilteredClusters.filter(c => !isClusterUnreachable(c) && c.healthy === true).length
-    // Unhealthy = not unreachable and healthy flag is false (or undefined which means not yet healthy)
-    const unhealthy = globalFilteredClusters.filter(c => !isClusterUnreachable(c) && c.healthy === false).length
+    // Helper: A cluster is healthy if it has nodes OR if healthy flag is explicitly true
+    const isHealthy = (c: ClusterInfo) => (c.nodeCount && c.nodeCount > 0) || c.healthy === true
+    // Healthy = not unreachable and (has nodes OR healthy flag)
+    const healthy = globalFilteredClusters.filter(c => !isClusterUnreachable(c) && isHealthy(c)).length
+    // Unhealthy = not unreachable and not healthy
+    const unhealthy = globalFilteredClusters.filter(c => !isClusterUnreachable(c) && !isHealthy(c)).length
     // Loading = initial load only (no data yet), not during refresh
     const loadingCount = globalFilteredClusters.filter(c =>
       c.nodeCount === undefined && c.reachable === undefined

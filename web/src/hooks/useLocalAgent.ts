@@ -304,13 +304,15 @@ export function isAgentConnected(): boolean {
 
 /**
  * Check if the agent is known to be unavailable (from non-hook code)
- * Returns true unless the agent is confirmed connected/degraded
- * This is conservative - we don't try the agent unless we know it's available
+ * Returns true only if we've confirmed the agent is disconnected
+ * During 'connecting' state, we return false to allow hooks to try the agent
+ * (they have their own timeouts for handling failures)
  */
 export function isAgentUnavailable(): boolean {
   const state = agentManager.getState()
-  // Only return false (agent available) if we've confirmed connection
-  return state.status !== 'connected' && state.status !== 'degraded'
+  // Only skip agent if we've confirmed it's disconnected
+  // During 'connecting' or 'connected' or 'degraded', allow agent attempts
+  return state.status === 'disconnected'
 }
 
 // ============================================================================

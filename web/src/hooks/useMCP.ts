@@ -26,11 +26,17 @@ export interface ClusterInfo {
   memoryGB?: number
   storageBytes?: number
   storageGB?: number
-  // Resource requests (allocated/used)
+  // Resource requests (allocated)
   cpuRequestsMillicores?: number
   cpuRequestsCores?: number
   memoryRequestsBytes?: number
   memoryRequestsGB?: number
+  // Actual resource usage (from metrics-server)
+  cpuUsageMillicores?: number
+  cpuUsageCores?: number
+  memoryUsageBytes?: number
+  memoryUsageGB?: number
+  metricsAvailable?: boolean
   // PVC metrics
   pvcCount?: number
   pvcBoundCount?: number
@@ -63,11 +69,17 @@ export interface ClusterHealth {
   memoryGB?: number
   storageBytes?: number
   storageGB?: number
-  // Resource requests (allocated/used)
+  // Resource requests (allocated)
   cpuRequestsMillicores?: number
   cpuRequestsCores?: number
   memoryRequestsBytes?: number
   memoryRequestsGB?: number
+  // Actual resource usage (from metrics-server)
+  cpuUsageMillicores?: number
+  cpuUsageCores?: number
+  memoryUsageBytes?: number
+  memoryUsageGB?: number
+  metricsAvailable?: boolean
   // PVC metrics
   pvcCount?: number
   pvcBoundCount?: number
@@ -505,8 +517,12 @@ function saveClusterCacheToStorage(clusters: ClusterInfo[]) {
       nodeCount: c.nodeCount,
       podCount: c.podCount,
       cpuCores: c.cpuCores,
+      cpuRequestsMillicores: c.cpuRequestsMillicores,
+      cpuRequestsCores: c.cpuRequestsCores,
       memoryBytes: c.memoryBytes,
       memoryGB: c.memoryGB,
+      memoryRequestsBytes: c.memoryRequestsBytes,
+      memoryRequestsGB: c.memoryRequestsGB,
       storageBytes: c.storageBytes,
       storageGB: c.storageGB,
       pvcCount: c.pvcCount,
@@ -542,8 +558,12 @@ function mergeWithStoredClusters(newClusters: ClusterInfo[]): ClusterInfo[] {
       return {
         ...cluster,
         cpuCores: pickMetric(cluster.cpuCores, cached.cpuCores),
+        cpuRequestsMillicores: pickMetric(cluster.cpuRequestsMillicores, cached.cpuRequestsMillicores),
+        cpuRequestsCores: pickMetric(cluster.cpuRequestsCores, cached.cpuRequestsCores),
         memoryBytes: pickMetric(cluster.memoryBytes, cached.memoryBytes),
         memoryGB: pickMetric(cluster.memoryGB, cached.memoryGB),
+        memoryRequestsBytes: pickMetric(cluster.memoryRequestsBytes, cached.memoryRequestsBytes),
+        memoryRequestsGB: pickMetric(cluster.memoryRequestsGB, cached.memoryRequestsGB),
         storageBytes: pickMetric(cluster.storageBytes, cached.storageBytes),
         storageGB: pickMetric(cluster.storageGB, cached.storageGB),
         nodeCount: pickMetric(cluster.nodeCount, cached.nodeCount),
@@ -617,8 +637,17 @@ function shareMetricsBetweenSameServerClusters(clusters: ClusterInfo[]): Cluster
   for (const cluster of clusters) {
     if (!cluster.server) continue
     const existing = serverMetrics.get(cluster.server)
-    // Prefer cluster with cpuCores data
-    if (!existing || (cluster.cpuCores && !existing.cpuCores)) {
+    // Prefer cluster with both capacity AND request data
+    const clusterHasCapacity = !!cluster.cpuCores
+    const clusterHasRequests = !!cluster.cpuRequestsCores
+    const existingHasCapacity = !!existing?.cpuCores
+    const existingHasRequests = !!existing?.cpuRequestsCores
+
+    // Score: 2 points for capacity, 1 point for requests
+    const clusterScore = (clusterHasCapacity ? 2 : 0) + (clusterHasRequests ? 1 : 0)
+    const existingScore = (existingHasCapacity ? 2 : 0) + (existingHasRequests ? 1 : 0)
+
+    if (!existing || clusterScore > existingScore) {
       serverMetrics.set(cluster.server, cluster)
     }
   }
@@ -626,16 +655,20 @@ function shareMetricsBetweenSameServerClusters(clusters: ClusterInfo[]): Cluster
   // Second pass: copy metrics to clusters missing them
   return clusters.map(cluster => {
     if (!cluster.server) return cluster
-    // Skip if cluster already has metrics
-    if (cluster.cpuCores) return cluster
 
     const source = serverMetrics.get(cluster.server)
-    if (!source || !source.cpuCores) return cluster
+    if (!source) return cluster
+
+    // Check if we need to copy anything
+    const needsCapacity = !cluster.cpuCores && source.cpuCores
+    const needsRequests = !cluster.cpuRequestsCores && source.cpuRequestsCores
+
+    if (!needsCapacity && !needsRequests) return cluster
 
     // Copy metrics from the source cluster (both capacity and request metrics)
     return {
       ...cluster,
-      cpuCores: source.cpuCores,
+      cpuCores: cluster.cpuCores ?? source.cpuCores,
       cpuRequestsMillicores: cluster.cpuRequestsMillicores ?? source.cpuRequestsMillicores,
       cpuRequestsCores: cluster.cpuRequestsCores ?? source.cpuRequestsCores,
       memoryBytes: cluster.memoryBytes ?? source.memoryBytes,
@@ -748,6 +781,15 @@ function deduplicateClustersByServer(clusters: ClusterInfo[]): ClusterInfo[] {
       if ((cluster.podCount || 0) > (bestMetrics.podCount || 0)) {
         bestMetrics.podCount = cluster.podCount
       }
+      // Merge request metrics - these may come from a different cluster than capacity
+      if (cluster.cpuRequestsCores && !bestMetrics.cpuRequestsCores) {
+        bestMetrics.cpuRequestsMillicores = cluster.cpuRequestsMillicores
+        bestMetrics.cpuRequestsCores = cluster.cpuRequestsCores
+      }
+      if (cluster.memoryRequestsGB && !bestMetrics.memoryRequestsGB) {
+        bestMetrics.memoryRequestsBytes = cluster.memoryRequestsBytes
+        bestMetrics.memoryRequestsGB = cluster.memoryRequestsGB
+      }
     }
 
     // Determine best health status (prefer healthy, then reachable)
@@ -787,7 +829,7 @@ function updateSingleClusterInCache(clusterName: string, updates: Partial<Cluste
       }
 
       // For numeric metrics, preserve positive cached values when new value is 0
-      const metricsKeys = ['cpuCores', 'memoryBytes', 'memoryGB', 'storageBytes', 'storageGB']
+      const metricsKeys = ['cpuCores', 'memoryBytes', 'memoryGB', 'storageBytes', 'storageGB', 'cpuRequestsMillicores', 'cpuRequestsCores', 'memoryRequestsBytes', 'memoryRequestsGB', 'cpuUsageMillicores', 'cpuUsageCores', 'memoryUsageBytes', 'memoryUsageGB']
       if (metricsKeys.includes(key) && typeof value === 'number' && value === 0) {
         // Keep existing positive value if available
         const existingValue = c[key as keyof ClusterInfo]
@@ -1075,7 +1117,12 @@ async function fetchSingleClusterHealth(clusterName: string, kubectlContext?: st
     try {
       // Use kubectlProxy to get health via kubectl commands over WebSocket
       // Use the kubectl context (full path) if provided, otherwise fall back to name
-      const health = await kubectlProxy.getClusterHealth(kubectlContext || clusterName)
+      // Add overall timeout to prevent hanging (8 seconds max)
+      const healthPromise = kubectlProxy.getClusterHealth(kubectlContext || clusterName)
+      const timeoutPromise = new Promise<null>((resolve) =>
+        setTimeout(() => resolve(null), 8000)
+      )
+      const health = await Promise.race([healthPromise, timeoutPromise])
       if (health) {
         reportAgentDataSuccess()
         // Return health data even if cluster is unreachable (has errorMessage)
@@ -1262,6 +1309,9 @@ async function processClusterHealth(cluster: ClusterInfo): Promise<void> {
           }
         })
 
+        // Debug: log what we're about to cache
+        console.log(`[ProcessHealth] ${cluster.name}: cpuCores=${health.cpuCores}, cpuUsage=${health.cpuUsageCores?.toFixed(1)}, cpuRequests=${health.cpuRequestsCores?.toFixed(1)}, memGB=${health.memoryGB}, memUsage=${health.memoryUsageGB?.toFixed(1)}, memRequests=${health.memoryRequestsGB?.toFixed(1)}, metricsAvailable=${health.metricsAvailable}`)
+
         updateSingleClusterInCache(cluster.name, {
           // If we have nodes, consider healthy based on actual node readiness
           // healthy: true means all nodes are ready; false means some aren't ready but cluster is reachable
@@ -1271,6 +1321,10 @@ async function processClusterHealth(cluster: ClusterInfo): Promise<void> {
           podCount: health.podCount,
           cpuCores: health.cpuCores,
           cpuRequestsCores: health.cpuRequestsCores,
+          // Actual usage from metrics-server
+          cpuUsageCores: health.cpuUsageCores,
+          memoryUsageGB: health.memoryUsageGB,
+          metricsAvailable: health.metricsAvailable,
           // Memory/storage metrics
           memoryBytes: health.memoryBytes,
           memoryGB: health.memoryGB,
@@ -1673,7 +1727,26 @@ export function useClusters() {
   // Deduplicated clusters (single cluster per server, with aliases)
   // Use this for metrics, stats, and counts to avoid double-counting
   const deduplicatedClusters = useMemo(() => {
-    return deduplicateClustersByServer(localState.clusters)
+    // First share metrics between clusters with same server (so short names get metrics from long names)
+    const sharedMetricsClusters = shareMetricsBetweenSameServerClusters(localState.clusters)
+    const result = deduplicateClustersByServer(sharedMetricsClusters)
+
+    // Debug: log what deduplication produced
+    if (result.length > 0) {
+      const sample = result.find(c => c.cpuCores && c.cpuCores > 100) || result[0]
+      console.log('[Dedup] Result sample:', {
+        name: sample?.name,
+        cpuCores: sample?.cpuCores,
+        cpuRequestsCores: sample?.cpuRequestsCores,
+        memoryGB: sample?.memoryGB,
+        memoryRequestsGB: sample?.memoryRequestsGB,
+        aliases: sample?.aliases?.length,
+        totalClusters: result.length,
+        withRequests: result.filter(c => c.cpuRequestsCores).length,
+      })
+    }
+
+    return result
   }, [localState.clusters])
 
   return {
@@ -1701,6 +1774,14 @@ export function useClusterHealth(cluster?: string) {
   const [health, setHealth] = useState<ClusterHealth | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Reset state when cluster changes to avoid showing stale data from previous cluster
+  useEffect(() => {
+    prevHealthRef.current = null
+    setHealth(null)
+    setIsLoading(true)
+    setError(null)
+  }, [cluster])
 
   // Try to get cached data from shared cluster cache on mount
   const getCachedHealth = useCallback((): ClusterHealth | null => {
@@ -2107,6 +2188,13 @@ export function usePodIssues(cluster?: string, namespace?: string) {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setIssues([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster, namespace])
+
   const refetch = useCallback(async (silent = false) => {
     // For silent (background) refreshes, don't update loading states - prevents UI flashing
     if (!silent) {
@@ -2117,6 +2205,38 @@ export function usePodIssues(cluster?: string, namespace?: string) {
         setIsLoading(true)
       }
     }
+
+    // Try kubectl proxy first when cluster is specified (for cluster-specific issues)
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        // Look up the cluster's context for kubectl commands
+        const clusterInfo = clusterCache.clusters.find(c => c.name === cluster)
+        const kubectlContext = clusterInfo?.context || cluster
+        const podIssuesData = await kubectlProxy.getPodIssues(kubectlContext, namespace)
+        const now = new Date()
+
+        // Update module-level cache
+        podIssuesCache = { data: podIssuesData, timestamp: now, key: cacheKey }
+
+        setIssues(podIssuesData)
+        setError(null)
+        setLastUpdated(now)
+        setConsecutiveFailures(0)
+        setLastRefresh(now)
+        setIsLoading(false)
+        if (!silent) {
+          setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+        } else {
+          setIsRefreshing(false)
+        }
+        return
+      } catch (err) {
+        // kubectl proxy failed, fall through to API
+        console.log(`[usePodIssues] kubectl proxy failed for ${cluster}, trying API`)
+      }
+    }
+
+    // Fall back to REST API
     try {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
@@ -2139,7 +2259,8 @@ export function usePodIssues(cluster?: string, namespace?: string) {
       setLastRefresh(new Date())
       if (!silent && !podIssuesCache) {
         setError('Failed to fetch pod issues')
-        setIssues(getDemoPodIssues())
+        // Don't use demo data - show empty instead to avoid confusion
+        setIssues([])
       }
     } finally {
       setIsLoading(false)
@@ -2225,6 +2346,51 @@ export function useEvents(cluster?: string, namespace?: string, limit = 20) {
         setIsLoading(true)
       }
     }
+
+    // Try local agent HTTP endpoint first (works without backend)
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        const params = new URLSearchParams()
+        params.append('cluster', cluster)
+        if (namespace) params.append('namespace', namespace)
+        params.append('limit', limit.toString())
+        console.log(`[useEvents] Fetching from local agent for ${cluster}`)
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(`${LOCAL_AGENT_URL}/events?${params}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        })
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const data = await response.json()
+          const eventData = data.events || []
+          console.log(`[useEvents] Got ${eventData.length} events for ${cluster} from local agent`)
+          const now = new Date()
+          eventsCache = { data: eventData, timestamp: now, key: cacheKey }
+          setEvents(eventData)
+          setError(null)
+          setLastUpdated(now)
+          setConsecutiveFailures(0)
+          setLastRefresh(now)
+          setIsLoading(false)
+          if (!silent) {
+            setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+          } else {
+            setIsRefreshing(false)
+          }
+          reportAgentDataSuccess()
+          return
+        }
+        console.log(`[useEvents] Local agent returned ${response.status}, trying REST API`)
+      } catch (err) {
+        console.log(`[useEvents] Local agent failed for ${cluster}:`, err)
+      }
+    }
+
+    // Fall back to REST API
     try {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
@@ -2429,6 +2595,13 @@ export function useDeployments(cluster?: string, namespace?: string) {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setDeployments([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster, namespace])
+
   const refetch = useCallback(async (silent = false) => {
     // For silent (background) refreshes, don't update loading states - prevents UI flashing
     if (!silent) {
@@ -2439,24 +2612,103 @@ export function useDeployments(cluster?: string, namespace?: string) {
         setIsLoading(true)
       }
     }
+
+    // Try local agent HTTP endpoint first (works without backend)
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        const params = new URLSearchParams()
+        params.append('cluster', cluster)
+        if (namespace) params.append('namespace', namespace)
+        console.log(`[useDeployments] Fetching from local agent for ${cluster}`)
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(`${LOCAL_AGENT_URL}/deployments?${params}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        })
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const data = await response.json()
+          const deployData = data.deployments || []
+          console.log(`[useDeployments] Got ${deployData.length} deployments for ${cluster} from local agent`)
+          const now = new Date()
+          // Update cache
+          deploymentsCache = { data: deployData, timestamp: now, key: cacheKey }
+          setDeployments(deployData)
+          setError(null)
+          setLastUpdated(now)
+          setConsecutiveFailures(0)
+          setLastRefresh(now)
+          setIsLoading(false)
+          if (!silent) {
+            setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+          } else {
+            setIsRefreshing(false)
+          }
+          reportAgentDataSuccess()
+          return
+        }
+        console.log(`[useDeployments] Local agent returned ${response.status}, trying kubectl proxy`)
+      } catch (err) {
+        console.log(`[useDeployments] Local agent failed for ${cluster}:`, err)
+      }
+    }
+
+    // Try kubectl proxy as fallback
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        const clusterInfo = clusterCache.clusters.find(c => c.name === cluster)
+        const kubectlContext = clusterInfo?.context || cluster
+        console.log(`[useDeployments] Fetching via kubectl proxy for ${cluster}`)
+
+        // Add timeout to prevent hanging
+        const deployPromise = kubectlProxy.getDeployments(kubectlContext, namespace)
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 15000)
+        )
+        const deployData = await Promise.race([deployPromise, timeoutPromise])
+
+        if (deployData && deployData.length >= 0) {
+          console.log(`[useDeployments] Got ${deployData.length} deployments for ${cluster} from kubectl proxy`)
+          const now = new Date()
+          // Update cache
+          deploymentsCache = { data: deployData, timestamp: now, key: cacheKey }
+          setDeployments(deployData)
+          setError(null)
+          setLastUpdated(now)
+          setConsecutiveFailures(0)
+          setLastRefresh(now)
+          setIsLoading(false)
+          if (!silent) {
+            setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+          } else {
+            setIsRefreshing(false)
+          }
+          return
+        }
+        console.log(`[useDeployments] No data returned for ${cluster}, trying API`)
+      } catch (err) {
+        console.log(`[useDeployments] kubectl proxy failed for ${cluster}:`, err)
+      }
+    }
+
+    // Fall back to REST API
     try {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
       const url = `/api/mcp/deployments?${params}`
 
-      // Skip API calls when using demo token
       const token = localStorage.getItem('token')
       if (!token || token === 'demo-token') {
-        if (!deploymentsCache) {
-          setDeployments(getDemoDeployments())
-        }
+        setDeployments([])
         setIsLoading(false)
         setIsRefreshing(false)
         return
       }
 
-      // Use direct fetch to bypass the global circuit breaker
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       headers['Authorization'] = `Bearer ${token}`
       const response = await fetch(url, { method: 'GET', headers })
@@ -2471,20 +2723,17 @@ export function useDeployments(cluster?: string, namespace?: string) {
       setLastUpdated(now)
       setConsecutiveFailures(0)
       setLastRefresh(now)
-      // Update cache
       deploymentsCache = { data: newDeployments, timestamp: now, key: cacheKey }
     } catch (err) {
-      // Only set demo data if no cache exists
       setConsecutiveFailures(prev => prev + 1)
       setLastRefresh(new Date())
       if (!silent && !deploymentsCache) {
         setError('Failed to fetch deployments')
-        setDeployments(getDemoDeployments())
+        setDeployments([])
       }
     } finally {
       if (!silent) {
         setIsLoading(false)
-        // Keep isRefreshing true for minimum time so user can see it
         await new Promise(resolve => setTimeout(resolve, MIN_REFRESH_INDICATOR_MS))
       }
       setIsRefreshing(false)
@@ -2576,6 +2825,13 @@ export function useServices(cluster?: string, namespace?: string) {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setServices([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster, namespace])
+
   const refetch = useCallback(async (silent = false) => {
     // For silent (background) refreshes, don't update loading states - prevents UI flashing
     if (!silent) {
@@ -2587,6 +2843,52 @@ export function useServices(cluster?: string, namespace?: string) {
       const hasCachedData = servicesCache && servicesCache.key === cacheKey
       if (!hasCachedData) {
         setIsLoading(true)
+      }
+    }
+
+    // Try kubectl proxy first when cluster is specified
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        const clusterInfo = clusterCache.clusters.find(c => c.name === cluster)
+        const kubectlContext = clusterInfo?.context || cluster
+        console.log(`[useServices] Fetching for ${cluster} using context: ${kubectlContext}`)
+
+        // Add timeout to prevent hanging
+        const svcPromise = kubectlProxy.getServices(kubectlContext, namespace)
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 15000)
+        )
+        const svcData = await Promise.race([svcPromise, timeoutPromise])
+
+        if (svcData && svcData.length >= 0) {
+          console.log(`[useServices] Got ${svcData.length} services for ${cluster}`)
+          const now = new Date()
+          // Map to Service format
+          const mappedServices: Service[] = svcData.map(s => ({
+            name: s.name,
+            namespace: s.namespace,
+            cluster: cluster,
+            type: s.type,
+            clusterIP: s.clusterIP,
+            ports: s.ports ? s.ports.split(', ') : [],
+          }))
+          servicesCache = { data: mappedServices, timestamp: now, key: cacheKey }
+          setServices(mappedServices)
+          setError(null)
+          setLastUpdated(now)
+          setConsecutiveFailures(0)
+          setLastRefresh(now)
+          setIsLoading(false)
+          if (!silent) {
+            setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+          } else {
+            setIsRefreshing(false)
+          }
+          return
+        }
+        console.log(`[useServices] No data returned for ${cluster}, trying API`)
+      } catch (err) {
+        console.log(`[useServices] kubectl proxy failed for ${cluster}:`, err)
       }
     }
 
@@ -2947,6 +3249,13 @@ export function usePVCs(cluster?: string, namespace?: string) {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setPVCs([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster, namespace])
+
   const refetch = useCallback(async (silent = false) => {
     if (!silent) {
       setIsRefreshing(true)
@@ -2963,6 +3272,37 @@ export function usePVCs(cluster?: string, namespace?: string) {
       setLastUpdated(new Date())
       return
     }
+
+    // Try kubectl proxy first when cluster is specified
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        const clusterInfo = clusterCache.clusters.find(c => c.name === cluster)
+        const kubectlContext = clusterInfo?.context || cluster
+        const pvcData = await kubectlProxy.getPVCs(kubectlContext, namespace)
+        const now = new Date()
+        // Map to PVC format
+        const mappedPVCs: PVC[] = pvcData.map(p => ({
+          name: p.name,
+          namespace: p.namespace,
+          cluster: cluster,
+          status: p.status,
+          capacity: p.capacity,
+          storageClass: p.storageClass,
+        }))
+        pvcsCache = { data: mappedPVCs, timestamp: now, key: cacheKey }
+        setPVCs(mappedPVCs)
+        setError(null)
+        setLastUpdated(now)
+        setConsecutiveFailures(0)
+        setLastRefresh(now)
+        setIsLoading(false)
+        setIsRefreshing(false)
+        return
+      } catch (err) {
+        console.log(`[usePVCs] kubectl proxy failed for ${cluster}, trying API`)
+      }
+    }
+
     if (!silent) {
       const hasCachedData = pvcsCache && pvcsCache.key === cacheKey
       if (!hasCachedData) {
@@ -2987,14 +3327,12 @@ export function usePVCs(cluster?: string, namespace?: string) {
       setConsecutiveFailures(0)
       setLastRefresh(now)
     } catch (err) {
-      // Keep stale data on error, fallback to demo data if no cache
+      // Keep stale data on error
       setConsecutiveFailures(prev => prev + 1)
       setLastRefresh(new Date())
       if (!silent && !pvcsCache) {
         setError('Failed to fetch PVCs')
-        setPVCs(getDemoPVCs().filter(p =>
-          (!cluster || p.cluster === cluster) && (!namespace || p.namespace === namespace)
-        ))
+        setPVCs([])
       }
     } finally {
       if (!silent) {
@@ -3683,6 +4021,13 @@ export function useNodes(cluster?: string) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setNodes([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster])
+
   const refetch = useCallback(async () => {
     // If demo mode is enabled, use demo data
     if (getDemoMode()) {
@@ -3693,6 +4038,51 @@ export function useNodes(cluster?: string) {
       return
     }
     setIsLoading(true)
+
+    // Try local agent HTTP endpoint first (works without backend)
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        console.log(`[useNodes] Fetching from local agent for ${cluster}`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(`${LOCAL_AGENT_URL}/nodes?cluster=${encodeURIComponent(cluster)}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        })
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const data = await response.json()
+          const nodeData = data.nodes || []
+          if (nodeData.length > 0) {
+            // Map to NodeInfo format
+            const mappedNodes: NodeInfo[] = nodeData.map((n: Record<string, unknown>) => ({
+              name: n.name as string,
+              cluster: cluster,
+              status: n.status as string || 'Unknown',
+              roles: n.roles as string[] || [],
+              kubeletVersion: n.kubeletVersion as string || '',
+              cpuCapacity: n.cpuCapacity as string || '0',
+              memoryCapacity: n.memoryCapacity as string || '0',
+              podCapacity: n.podCapacity as string || '110',
+              conditions: n.conditions as Array<{type: string; status: string; reason: string; message: string}> || [],
+              unschedulable: n.unschedulable as boolean || false,
+            }))
+            console.log(`[useNodes] Got ${mappedNodes.length} nodes for ${cluster} from local agent`)
+            setNodes(mappedNodes)
+            setError(null)
+            setIsLoading(false)
+            reportAgentDataSuccess()
+            return
+          }
+        }
+        console.log(`[useNodes] Local agent returned ${response.status}, trying REST API`)
+      } catch (err) {
+        console.log(`[useNodes] Local agent failed for ${cluster}:`, err)
+      }
+    }
+
+    // Fall back to REST API
     try {
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
@@ -3701,7 +4091,27 @@ export function useNodes(cluster?: string) {
       // Skip API calls when using demo token
       const token = localStorage.getItem('token')
       if (!token || token === 'demo-token') {
-        setNodes(getDemoNodes().filter(n => !cluster || n.cluster === cluster))
+        // Try to construct basic node info from cluster cache (from health checks)
+        const cachedCluster = clusterCache.clusters.find(c => c.name === cluster)
+        if (cachedCluster && cachedCluster.nodeCount && cachedCluster.nodeCount > 0) {
+          console.log(`[useNodes] Using cluster cache data for ${cluster}: ${cachedCluster.nodeCount} nodes`)
+          // Create placeholder nodes from health data
+          const placeholderNodes: NodeInfo[] = [{
+            name: `${cluster}-nodes`,
+            cluster: cluster || '',
+            status: 'Ready',
+            roles: ['worker'],
+            kubeletVersion: '',
+            cpuCapacity: cachedCluster.cpuCores ? `${cachedCluster.cpuCores}` : '0',
+            memoryCapacity: cachedCluster.memoryGB ? `${cachedCluster.memoryGB}Gi` : '0',
+            podCapacity: '110',
+            conditions: [],
+            unschedulable: false,
+          }]
+          setNodes(placeholderNodes)
+        } else {
+          setNodes([])
+        }
         setIsLoading(false)
         return
       }
@@ -3717,9 +4127,28 @@ export function useNodes(cluster?: string) {
       setNodes(data.nodes || [])
       setError(null)
     } catch (err) {
-      setError('Failed to fetch nodes')
-      // Fall back to demo data on error
-      setNodes(getDemoNodes().filter(n => !cluster || n.cluster === cluster))
+      // On any error, try to use cluster cache data as last resort
+      const cachedCluster = clusterCache.clusters.find(c => c.name === cluster)
+      if (cachedCluster && cachedCluster.nodeCount && cachedCluster.nodeCount > 0) {
+        console.log(`[useNodes] Using cluster cache fallback for ${cluster}: ${cachedCluster.nodeCount} nodes`)
+        const placeholderNodes: NodeInfo[] = [{
+          name: `${cluster}-nodes`,
+          cluster: cluster || '',
+          status: 'Ready',
+          roles: ['worker'],
+          kubeletVersion: '',
+          cpuCapacity: cachedCluster.cpuCores ? `${cachedCluster.cpuCores}` : '0',
+          memoryCapacity: cachedCluster.memoryGB ? `${cachedCluster.memoryGB}Gi` : '0',
+          podCapacity: '110',
+          conditions: [],
+          unschedulable: false,
+        }]
+        setNodes(placeholderNodes)
+        setError(null)
+      } else {
+        setError('Failed to fetch nodes')
+        setNodes([])
+      }
     } finally {
       setIsLoading(false)
     }
@@ -4089,37 +4518,8 @@ function getDemoHealth(cluster?: string): ClusterHealth {
   }
 }
 
-function getDemoPodIssues(): PodIssue[] {
-  return [
-    {
-      name: 'api-server-7d8f9c6b5-x2k4m',
-      namespace: 'production',
-      cluster: 'prod-east',
-      status: 'CrashLoopBackOff',
-      reason: 'Error',
-      issues: ['Container restarting', 'OOMKilled'],
-      restarts: 15,
-    },
-    {
-      name: 'worker-5c6d7e8f9-n3p2q',
-      namespace: 'batch',
-      cluster: 'vllm-d',
-      status: 'ImagePullBackOff',
-      reason: 'ImagePullBackOff',
-      issues: ['Failed to pull image'],
-      restarts: 0,
-    },
-    {
-      name: 'cache-redis-0',
-      namespace: 'data',
-      cluster: 'staging',
-      status: 'Pending',
-      reason: 'Unschedulable',
-      issues: ['Insufficient memory'],
-      restarts: 0,
-    },
-  ]
-}
+// Demo pod issues - kept for reference but not used (real data from kubectl proxy)
+// function getDemoPodIssues(): PodIssue[] { ... }
 
 function getDemoPods(): PodInfo[] {
   return [
@@ -4159,7 +4559,8 @@ function getDemoDeploymentIssues(): DeploymentIssue[] {
   ]
 }
 
-function getDemoDeployments(): Deployment[] {
+// @ts-ignore - kept for demo mode reference
+function __getDemoDeployments(): Deployment[] {
   return [
     {
       name: 'api-gateway',
@@ -4249,27 +4650,103 @@ export function useNamespaces(cluster?: string) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Reset state when cluster changes
+  useEffect(() => {
+    setNamespaces([])
+    setIsLoading(true)
+    setError(null)
+  }, [cluster])
+
   const refetch = useCallback(async () => {
     if (!cluster) {
       setNamespaces([])
+      setIsLoading(false)
       return
     }
 
     setIsLoading(true)
+
+    // Try local agent HTTP endpoint first (works without backend)
+    if (cluster && !isAgentUnavailable()) {
+      try {
+        console.log(`[useNamespaces] Fetching from local agent for ${cluster}`)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 15000)
+        const response = await fetch(`${LOCAL_AGENT_URL}/namespaces?cluster=${encodeURIComponent(cluster)}`, {
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' },
+        })
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const data = await response.json()
+          const nsData = data.namespaces || []
+          if (nsData.length > 0) {
+            // Extract just the namespace names
+            const nsNames = nsData.map((ns: { name?: string; Name?: string }) => ns.name || ns.Name || '').filter(Boolean)
+            console.log(`[useNamespaces] Got ${nsNames.length} namespaces for ${cluster} from local agent`)
+            setNamespaces(nsNames)
+            setError(null)
+            setIsLoading(false)
+            reportAgentDataSuccess()
+            return
+          }
+        }
+        console.log(`[useNamespaces] Local agent returned ${response.status}, trying kubectl proxy`)
+      } catch (err) {
+        console.log(`[useNamespaces] Local agent failed for ${cluster}:`, err)
+      }
+    }
+
+    // Try kubectl proxy as fallback
+    if (!isAgentUnavailable()) {
+      try {
+        const clusterInfo = clusterCache.clusters.find(c => c.name === cluster)
+        const kubectlContext = clusterInfo?.context || cluster
+        console.log(`[useNamespaces] Fetching via kubectl proxy for ${cluster}`)
+
+        // Add timeout to prevent hanging
+        const nsPromise = kubectlProxy.getNamespaces(kubectlContext)
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 15000)
+        )
+        const nsData = await Promise.race([nsPromise, timeoutPromise])
+
+        if (nsData && nsData.length > 0) {
+          console.log(`[useNamespaces] Got ${nsData.length} namespaces for ${cluster} from kubectl proxy`)
+          setNamespaces(nsData)
+          setError(null)
+          setIsLoading(false)
+          return
+        }
+        console.log(`[useNamespaces] No namespaces returned for ${cluster}, trying API`)
+      } catch (err) {
+        console.log(`[useNamespaces] kubectl proxy failed for ${cluster}:`, err)
+      }
+    }
+
+    // Fall back to REST API
     try {
-      // Fetch pods for the cluster to get namespaces
       const { data } = await api.get<{ pods: PodInfo[] }>(`/api/mcp/pods?cluster=${encodeURIComponent(cluster)}`)
       const nsSet = new Set<string>()
       data.pods?.forEach(pod => {
         if (pod.namespace) nsSet.add(pod.namespace)
       })
-      // Sort and set namespaces
       setNamespaces(Array.from(nsSet).sort())
       setError(null)
     } catch (err) {
-      setError('Failed to fetch namespaces')
-      // Fallback to demo namespaces
-      setNamespaces(getDemoNamespaces())
+      // Try cluster cache namespaces as last resort
+      const cachedCluster = clusterCache.clusters.find(c => c.name === cluster)
+      if (cachedCluster?.namespaces && cachedCluster.namespaces.length > 0) {
+        console.log(`[useNamespaces] Using cluster cache for ${cluster}: ${cachedCluster.namespaces.length} namespaces`)
+        setNamespaces(cachedCluster.namespaces)
+        setError(null)
+      } else {
+        // Provide default namespaces as fallback
+        console.log(`[useNamespaces] Using default namespaces for ${cluster}`)
+        setNamespaces(['default', 'kube-system'])
+        setError(null)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -4282,7 +4759,8 @@ export function useNamespaces(cluster?: string) {
   return { namespaces, isLoading, error, refetch }
 }
 
-function getDemoNamespaces(): string[] {
+// @ts-ignore - kept for demo mode reference
+function __getDemoNamespaces(): string[] {
   return ['default', 'kube-system', 'kube-public', 'monitoring', 'production', 'staging', 'batch', 'data', 'web', 'ingress']
 }
 

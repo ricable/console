@@ -6,6 +6,23 @@ import { StatusIndicator } from '../../charts/StatusIndicator'
 import { isClusterUnreachable, isClusterLoading } from '../utils'
 import { CloudProviderIcon, detectCloudProvider, getProviderLabel, getProviderColor, getConsoleUrl } from '../../ui/CloudProviderIcon'
 
+// Helper to derive health status from cluster data
+// If we have node data and the cluster is reachable, consider it healthy
+// This prevents false "unhealthy" states during health check delays
+function isClusterHealthy(cluster: ClusterInfo): boolean {
+  // If unreachable, not healthy
+  if (cluster.reachable === false) {
+    return false
+  }
+  // If we have nodes (cluster is working), consider healthy
+  // The health check may take time to update, so be optimistic with working clusters
+  if (cluster.nodeCount !== undefined && cluster.nodeCount > 0) {
+    return true
+  }
+  // No node data yet - use healthy flag
+  return cluster.healthy === true
+}
+
 interface GPUInfo {
   total: number
   allocated: number
@@ -92,8 +109,8 @@ const FullClusterCard = memo(function FullClusterCard({
                 <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center" title="Offline - check network connection">
                   <WifiOff className="w-4 h-4 text-yellow-400" />
                 </div>
-              ) : cluster.healthy === false ? (
-                <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center" title="Unhealthy - cluster has issues">
+              ) : !isClusterHealthy(cluster) ? (
+                <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center" title="Degraded - some nodes not ready">
                   <AlertCircle className="w-4 h-4 text-orange-400" />
                 </div>
               ) : (
@@ -273,7 +290,7 @@ const ListClusterCard = memo(function ListClusterCard({
               <div className="w-6 h-6 rounded-full bg-yellow-500/20 flex items-center justify-center" title="Offline">
                 <WifiOff className="w-3 h-3 text-yellow-400" />
               </div>
-            ) : cluster.healthy === false ? (
+            ) : !isClusterHealthy(cluster) ? (
               <div className="w-6 h-6 rounded-full bg-orange-500/20 flex items-center justify-center" title="Unhealthy">
                 <AlertCircle className="w-3 h-3 text-orange-400" />
               </div>
@@ -404,7 +421,7 @@ const CompactClusterCard = memo(function CompactClusterCard({
         <div className="flex items-center gap-2 mb-2">
           {unreachable ? (
             <WifiOff className="w-3 h-3 text-yellow-400" />
-          ) : cluster.healthy === false ? (
+          ) : !isClusterHealthy(cluster) ? (
             <AlertCircle className="w-3 h-3 text-orange-400" />
           ) : (
             <div className="w-2 h-2 rounded-full bg-green-400" />

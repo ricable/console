@@ -172,10 +172,17 @@ export function ClusterHealth() {
     return c.nodeCount === undefined && c.reachable === undefined
   }
 
+  // Helper to determine if cluster is healthy
+  // A cluster is healthy if it has nodes OR if the healthy flag is explicitly true
+  const isClusterHealthy = (c: ClusterInfo) => {
+    if (c.nodeCount && c.nodeCount > 0) return true
+    return c.healthy === true
+  }
+
   // Stats: exclude loading clusters from unhealthy/unreachable counts
-  const healthyClusters = filteredForStats.filter((c) => !isClusterLoading(c) && c.healthy).length
-  const unreachableClusters = filteredForStats.filter((c) => !isClusterLoading(c) && !c.healthy && isUnreachable(c)).length
-  const unhealthyClusters = filteredForStats.filter((c) => !isClusterLoading(c) && !c.healthy && !isUnreachable(c)).length
+  const healthyClusters = filteredForStats.filter((c) => !isClusterLoading(c) && isClusterHealthy(c)).length
+  const unreachableClusters = filteredForStats.filter((c) => !isClusterLoading(c) && !isClusterHealthy(c) && isUnreachable(c)).length
+  const unhealthyClusters = filteredForStats.filter((c) => !isClusterLoading(c) && !isClusterHealthy(c) && !isUnreachable(c)).length
   const totalNodes = filteredForStats.reduce((sum, c) => sum + (c.nodeCount || 0), 0)
   const totalCPUs = filteredForStats.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
   const totalPods = filteredForStats.reduce((sum, c) => sum + (c.podCount || 0), 0)
