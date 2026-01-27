@@ -27,6 +27,15 @@
       "tags": ["ai-mission", "monitoring", "gpu", "nodes"]
     },
     {
+      "id": "test-offline-detection",
+      "subject": "Test offline detection mission card",
+      "description": "Verify the new KlaudeOfflineDetectionCard works correctly: 1) Card appears in dashboard, 2) Shows green 'All Healthy' when no issues, 3) Detects nodes with NotReady status, 4) Detects GPU nodes with 0 GPUs, 5) 'Analyze Issues' button starts AI mission correctly, 6) Drill-down links work.",
+      "status": "pending",
+      "priority": "high",
+      "created": "2026-01-27",
+      "tags": ["testing", "verification", "ai-mission", "gpu", "nodes"]
+    },
+    {
       "id": "resource-usage-similar",
       "subject": "Why is resource usage card similar across clusters?",
       "description": "Investigate why the resource usage card shows similar values across different clusters. This could be a bug with data fetching, caching, or the card displaying the same data source for all clusters instead of cluster-specific metrics.",
