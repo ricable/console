@@ -419,7 +419,6 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
     localClusterFilter,
     toggleClusterFilter,
     clearClusterFilter,
-    availableClusters,
     showClusterFilter,
     setShowClusterFilter,
     clusterFilterRef,
@@ -439,13 +438,13 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
   const statusesRef = useRef(statuses)
   statusesRef.current = statuses
 
+  // Track if we're currently checking to prevent duplicate runs
+  const isCheckingRef = useRef(false)
+
   // Filter clusters
   // IMPORTANT: Don't filter by healthy status - the agent can reach clusters that browser health checks can't
   // The OPA card uses kubectl via the agent, not browser-based API calls
   const filteredClusters = useMemo(() => {
-    console.log('[OPA Filter] effectiveClusters:', effectiveClusters.map(c => c.name))
-    console.log('[OPA Filter] localClusterFilter:', localClusterFilter)
-
     // Start with effective clusters (agent clusters if shared state is empty)
     let result = effectiveClusters
 
@@ -457,7 +456,6 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
     // Apply local cluster filter
     if (localClusterFilter.length > 0) {
       result = result.filter(c => localClusterFilter.includes(c.name))
-      console.log('[OPA Filter] After local filter:', result.map(c => c.name))
     }
     // Apply local search
     if (localSearch.trim()) {
@@ -468,15 +466,15 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
     return [...result].sort((a, b) => a.name.localeCompare(b.name))
   }, [effectiveClusters, isAllClustersSelected, selectedClusters, localClusterFilter, localSearch])
 
-  // Check Gatekeeper on filtered clusters - sequentially to avoid overwhelming kubectlProxy queue
+  // Check Gatekeeper on filtered clusters
   const checkAllClusters = useCallback(async () => {
-    console.log('[OPA] checkAllClusters called, filteredClusters:', filteredClusters.map(c => c.name))
     if (filteredClusters.length === 0) return
+    if (isCheckingRef.current) return // Prevent duplicate runs
 
+    isCheckingRef.current = true
     setIsRefreshing(true)
 
     try {
-      // Start with existing statuses (stale-while-revalidate pattern)
       const newStatuses: Record<string, GatekeeperStatus> = { ...statusesRef.current }
 
       // Check clusters sequentially to avoid overwhelming the kubectlProxy queue
@@ -484,23 +482,24 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
         try {
           const status = await checkGatekeeperStatus(cluster.name)
           newStatuses[cluster.name] = status
-          // Update UI progressively as each cluster completes
-          setStatuses({ ...newStatuses })
         } catch (err) {
           console.error('[OPA] Error checking', cluster.name, err)
           newStatuses[cluster.name] = { cluster: cluster.name, installed: false, loading: false, error: String(err) }
-          setStatuses({ ...newStatuses })
         }
       }
+
+      // Update all statuses at once to avoid multiple re-renders
+      setStatuses(newStatuses)
     } finally {
       setIsRefreshing(false)
       setHasChecked(true)
+      isCheckingRef.current = false
     }
   }, [filteredClusters])
 
+  // Initial check - only run once when we have clusters and haven't checked yet
   useEffect(() => {
-    console.log('[OPA] Effect: hasChecked=', hasChecked, 'filteredClusters=', filteredClusters.length)
-    if (!hasChecked && filteredClusters.length > 0) {
+    if (!hasChecked && filteredClusters.length > 0 && !isCheckingRef.current) {
       checkAllClusters()
     }
   }, [hasChecked, filteredClusters.length, checkAllClusters])
