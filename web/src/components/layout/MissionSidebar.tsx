@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import {
   X,
@@ -24,12 +24,19 @@ import {
   ThumbsUp,
   ThumbsDown,
   Maximize2,
+  Minimize2,
   Settings,
+  Minus,
+  Plus,
+  Type,
+  Download,
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import { useMissions, Mission, MissionStatus } from '../../hooks/useMissions'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useMissions, Mission, MissionStatus, MissionMessage } from '../../hooks/useMissions'
 import { cn } from '../../lib/cn'
 import { AgentSelector } from '../agent/AgentSelector'
 import { AgentBadge, AgentIcon } from '../agent/AgentIcon'
@@ -92,11 +99,12 @@ const TYPE_ICONS: Record<Mission['type'], typeof ArrowUpCircle> = {
   custom: Sparkles,
 }
 
-function MissionListItem({ mission, isActive, onClick, onDismiss, isCollapsed, onToggleCollapse }: {
+function MissionListItem({ mission, isActive, onClick, onDismiss, onExpand, isCollapsed, onToggleCollapse }: {
   mission: Mission
   isActive: boolean
   onClick: () => void
   onDismiss: () => void
+  onExpand: () => void
   isCollapsed: boolean
   onToggleCollapse: () => void
 }) {
@@ -137,6 +145,13 @@ function MissionListItem({ mission, isActive, onClick, onDismiss, isCollapsed, o
           <span className="text-sm font-medium text-foreground truncate">{mission.title}</span>
         </button>
         <button
+          onClick={(e) => { e.stopPropagation(); onExpand() }}
+          className="p-0.5 hover:bg-secondary/50 rounded transition-colors flex-shrink-0"
+          title="Open full screen"
+        >
+          <Maximize2 className="w-3.5 h-3.5 text-muted-foreground" />
+        </button>
+        <button
           onClick={(e) => { e.stopPropagation(); onDismiss() }}
           className="p-0.5 hover:bg-red-500/20 rounded transition-colors flex-shrink-0"
           title="Delete mission"
@@ -152,17 +167,210 @@ function MissionListItem({ mission, isActive, onClick, onDismiss, isCollapsed, o
           className="w-full text-left px-3 pb-3 pt-1 pl-10"
         >
           <p className="text-xs text-muted-foreground truncate">{mission.description}</p>
-          {mission.cluster && (
-            <span className="text-xs text-purple-400 mt-1 inline-block">@{mission.cluster}</span>
-          )}
+          <div className="flex items-center gap-2 mt-1">
+            {mission.cluster && (
+              <span className="text-xs text-purple-400">@{mission.cluster}</span>
+            )}
+            <span className="text-[10px] text-muted-foreground/70">
+              {mission.createdAt.toLocaleDateString()} {mission.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </span>
+          </div>
         </button>
       )}
     </div>
   )
 }
 
-function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFullScreen?: boolean }) {
-  const { sendMessage, cancelMission, rateMission, setActiveMission, selectedAgent } = useMissions()
+type FontSize = 'sm' | 'base' | 'lg'
+const FONT_SIZE_CLASSES: Record<FontSize, string> = {
+  sm: 'text-xs prose-sm',
+  base: 'text-sm prose-sm',
+  lg: 'text-base prose-base'
+}
+
+// Detect if message content indicates agent is working on something
+function detectWorkingIndicator(content: string): string | null {
+  const patterns = [
+    { regex: /I'll\s+(check|look|analyze|investigate|examine|review|search|find|get|fetch|run|execute)/i, action: 'Working' },
+    { regex: /Let me\s+(check|look|analyze|investigate|examine|review|search|find|get|fetch|run|execute|try)/i, action: 'Working' },
+    { regex: /I('m| am)\s+(going to|now|currently)\s+(check|look|analyze|investigate|examine|review|search|find|get|fetch|run|execute)/i, action: 'Working' },
+    { regex: /I('m| am)\s+(checking|looking|analyzing|investigating|examining|reviewing|searching|finding|getting|fetching|running|executing|attempting)/i, action: 'In progress' },
+    { regex: /working on/i, action: 'Working' },
+    { regex: /one moment/i, action: 'Working' },
+    { regex: /give me a (moment|second|minute)/i, action: 'Working' },
+    { regex: /stand by/i, action: 'Working' },
+    { regex: /please wait/i, action: 'Executing' },
+    { regex: /attempting to execute/i, action: 'Executing' },
+  ]
+
+  for (const { regex, action } of patterns) {
+    if (regex.test(content)) {
+      return action
+    }
+  }
+  return null
+}
+
+// Memoized message component to prevent re-renders on scroll
+interface MessageProps {
+  msg: MissionMessage
+  missionAgent?: string
+  isFullScreen: boolean
+  fontSize: FontSize
+  isLastAssistantMessage?: boolean
+  missionStatus?: string
+}
+
+const MemoizedMessage = memo(function MemoizedMessage({ msg, missionAgent, isFullScreen, fontSize, isLastAssistantMessage, missionStatus }: MessageProps) {
+  // Memoize the parsed content to avoid re-parsing on every render
+  const parsedContent = useMemo(() => {
+    if (msg.role !== 'assistant') return null
+    return extractInputRequestParagraph(msg.content)
+  }, [msg.content, msg.role])
+
+  // Memoize markdown components
+  const markdownComponents = useMemo(() => ({
+    code({ className, children, ...props }: { className?: string; children?: React.ReactNode }) {
+      const match = /language-(\w+)/.exec(className || '')
+      const isInline = !match && !className
+      return isInline ? (
+        <code className={className} {...props}>{children}</code>
+      ) : (
+        <SyntaxHighlighter
+          style={oneDark}
+          language={match?.[1] || 'text'}
+          PreTag="div"
+          customStyle={{ margin: 0, borderRadius: '0.375rem', fontSize: fontSize === 'lg' ? '0.875rem' : '0.75rem' }}
+        >
+          {String(children).replace(/\n$/, '')}
+        </SyntaxHighlighter>
+      )
+    },
+    a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+      if (href?.startsWith('/')) {
+        return (
+          <Link to={href} className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 rounded text-xs font-medium transition-colors no-underline">
+            <Settings className="w-3 h-3" />{children}
+          </Link>
+        )
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">{children}</a>
+    },
+    h1: ({ children }: { children?: React.ReactNode }) => <h1 className="mt-6 mb-3 pt-3 border-t border-border/30 first:border-t-0 first:pt-0 first:mt-0 text-xl font-bold">{children}</h1>,
+    h2: ({ children }: { children?: React.ReactNode }) => <h2 className="mt-6 mb-3 pt-3 border-t border-border/30 first:border-t-0 first:pt-0 first:mt-0 text-lg font-bold">{children}</h2>,
+    h3: ({ children }: { children?: React.ReactNode }) => <h3 className="mt-5 mb-2 pt-2 border-t border-border/20 first:border-t-0 first:pt-0 first:mt-0 text-base font-semibold">{children}</h3>,
+    h4: ({ children }: { children?: React.ReactNode }) => <h4 className="mt-4 mb-2 font-semibold">{children}</h4>,
+    h5: ({ children }: { children?: React.ReactNode }) => <h5 className="mt-4 mb-2 font-medium">{children}</h5>,
+    h6: ({ children }: { children?: React.ReactNode }) => <h6 className="mt-3 mb-2 font-medium">{children}</h6>,
+    p: ({ children }: { children?: React.ReactNode }) => <p className="my-4 leading-relaxed">{children}</p>,
+    ul: ({ children }: { children?: React.ReactNode }) => <ul className="my-4 ml-4 list-disc space-y-2">{children}</ul>,
+    ol: ({ children }: { children?: React.ReactNode }) => <ol className="my-4 ml-4 list-decimal space-y-2">{children}</ol>,
+    li: ({ children }: { children?: React.ReactNode }) => <li className="my-1 leading-relaxed">{children}</li>,
+  }), [fontSize])
+
+  const proseClasses = cn(
+    "prose prose-invert max-w-none",
+    "prose-pre:my-5 prose-pre:bg-transparent prose-pre:p-0",
+    "prose-code:text-purple-300 prose-code:bg-black/20 prose-code:px-1 prose-code:rounded",
+    "prose-hr:my-6",
+    FONT_SIZE_CLASSES[fontSize],
+    msg.role === 'system' ? 'text-yellow-200' : 'text-foreground'
+  )
+
+  const agentProvider = useMemo(() => {
+    const agent = msg.agent || missionAgent
+    switch (agent) {
+      case 'claude': return 'anthropic'
+      case 'openai': return 'openai'
+      case 'gemini': return 'google'
+      case 'bob': return 'bob'
+      case 'claude-code': return 'anthropic-local'
+      default: return agent || 'anthropic'
+    }
+  }, [msg.agent, missionAgent])
+
+  return (
+    <div className={cn('flex gap-3', msg.role === 'user' && 'flex-row-reverse')}>
+      <div className={cn(
+        'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
+        msg.role === 'user' ? 'bg-primary/20' : msg.role === 'assistant' ? 'bg-purple-500/20' : 'bg-yellow-500/20'
+      )}>
+        {msg.role === 'user' ? (
+          <User className="w-4 h-4 text-primary" />
+        ) : msg.role === 'assistant' ? (
+          <AgentIcon provider={agentProvider} className="w-4 h-4" />
+        ) : (
+          <AlertCircle className="w-4 h-4 text-yellow-400" />
+        )}
+      </div>
+      <div className={cn(
+        'flex-1 rounded-lg p-3',
+        isFullScreen ? 'max-w-[98%]' : 'max-w-[85%]',
+        msg.role === 'user' ? 'bg-primary/10 ml-auto' : msg.role === 'assistant' ? 'bg-secondary/50' : 'bg-yellow-500/10'
+      )}>
+        {msg.role === 'assistant' || msg.role === 'system' ? (
+          parsedContent ? (
+            <div className="space-y-4">
+              {parsedContent.before && (
+                <div className={proseClasses}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
+                    {parsedContent.before.replace(/\r\n/g, '\n')}
+                  </ReactMarkdown>
+                </div>
+              )}
+              <div className="mt-4 p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                <div className={cn(proseClasses, "text-purple-200")}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
+                    {parsedContent.request.replace(/\r\n/g, '\n')}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className={proseClasses}>
+              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownComponents}>
+                {msg.content.replace(/\r\n/g, '\n')}
+              </ReactMarkdown>
+            </div>
+          )
+        ) : (
+          <p className={cn("text-foreground whitespace-pre-wrap", FONT_SIZE_CLASSES[fontSize].split(' ')[0])}>{msg.content}</p>
+        )}
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-[10px] text-muted-foreground">
+            {msg.timestamp.toLocaleTimeString()}
+          </span>
+          {/* Show working indicator if this is the last assistant message, mission is running, and content indicates work */}
+          {isLastAssistantMessage && missionStatus === 'running' && msg.role === 'assistant' && detectWorkingIndicator(msg.content) && (
+            <span className="flex items-center gap-1 text-[10px] text-blue-400 animate-pulse">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              {detectWorkingIndicator(msg.content)}...
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+})
+
+// Extract the last paragraph that contains an input request for highlighting
+function extractInputRequestParagraph(content: string): { before: string; request: string } | null {
+  const lines = content.split('\n')
+  // Look for the last line/paragraph that contains a question
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim()
+    if (line && (line.endsWith('?') || /should I|would you|do you want|shall I|please confirm/i.test(line))) {
+      return {
+        before: lines.slice(0, i).join('\n'),
+        request: lines.slice(i).join('\n')
+      }
+    }
+  }
+  return null
+}
+
+function MissionChat({ mission, isFullScreen = false, fontSize = 'base' as FontSize, onToggleFullScreen }: { mission: Mission; isFullScreen?: boolean; fontSize?: FontSize; onToggleFullScreen?: () => void }) {
+  const { sendMessage, cancelMission, rateMission, setActiveMission, dismissMission, selectedAgent } = useMissions()
   const [input, setInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
@@ -173,6 +381,56 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   const savedInputRef = useRef('')
+
+  // Save transcript as markdown file
+  const saveTranscript = useCallback(() => {
+    const lines: string[] = [
+      `# Mission: ${mission.title}`,
+      '',
+      `**Type:** ${mission.type}`,
+      `**Status:** ${mission.status}`,
+      `**Started:** ${mission.createdAt.toLocaleString()}`,
+      mission.agent ? `**Agent:** ${mission.agent}` : '',
+      mission.cluster ? `**Cluster:** ${mission.cluster}` : '',
+      '',
+      '---',
+      '',
+      '## Conversation',
+      '',
+    ]
+
+    for (const msg of mission.messages) {
+      const timestamp = msg.timestamp.toLocaleString()
+      if (msg.role === 'user') {
+        lines.push(`### User (${timestamp})`)
+        lines.push('')
+        lines.push(msg.content)
+        lines.push('')
+      } else if (msg.role === 'assistant') {
+        const agent = msg.agent || mission.agent || 'Assistant'
+        lines.push(`### ${agent} (${timestamp})`)
+        lines.push('')
+        lines.push(msg.content)
+        lines.push('')
+      } else if (msg.role === 'system') {
+        lines.push(`### System (${timestamp})`)
+        lines.push('')
+        lines.push(`> ${msg.content}`)
+        lines.push('')
+      }
+    }
+
+    const content = lines.filter(l => l !== undefined).join('\n')
+    const blob = new Blob([content], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `mission-${mission.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${new Date().toISOString().split('T')[0]}.md`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, [mission])
 
   // Check if user is at bottom of scroll container
   const isAtBottom = useCallback(() => {
@@ -204,6 +462,48 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
       inputRef.current?.focus()
     }
   }, [mission.status])
+
+  // Scroll to bottom when entering full screen mode
+  useEffect(() => {
+    if (isFullScreen) {
+      // Small delay to allow layout to settle
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  }, [isFullScreen])
+
+  // Get the original ask (first user message)
+  const originalAsk = useMemo(() => {
+    const firstUserMsg = mission.messages.find(m => m.role === 'user')
+    return firstUserMsg?.content || mission.description
+  }, [mission.messages, mission.description])
+
+  // Generate a simple summary based on conversation state
+  const conversationSummary = useMemo(() => {
+    const userMsgs = mission.messages.filter(m => m.role === 'user')
+    const assistantMsgs = mission.messages.filter(m => m.role === 'assistant')
+    const lastAssistant = assistantMsgs[assistantMsgs.length - 1]
+
+    // Extract key info from last assistant message
+    let keyPoints: string[] = []
+    if (lastAssistant) {
+      // Look for bullet points or numbered items
+      const bullets = lastAssistant.content.match(/^[-•*]\s+.+$/gm) || []
+      const numbered = lastAssistant.content.match(/^\d+\.\s+.+$/gm) || []
+      keyPoints = [...bullets, ...numbered].slice(0, 3).map(s => s.replace(/^[-•*\d.]\s+/, ''))
+    }
+
+    return {
+      exchanges: Math.min(userMsgs.length, assistantMsgs.length),
+      status: mission.status,
+      lastUpdate: mission.updatedAt,
+      keyPoints,
+      hasToolExecution: assistantMsgs.some(m =>
+        m.content.includes('```') && (m.content.includes('kubectl') || m.content.includes('executed'))
+      ),
+    }
+  }, [mission.messages, mission.status, mission.updatedAt])
 
   const handleSend = () => {
     if (!input.trim()) return
@@ -253,12 +553,40 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
   const TypeIcon = TYPE_ICONS[mission.type]
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className={cn("flex flex-1 min-h-0", isFullScreen && "gap-4")}>
+      {/* Main chat area */}
+      <div className={cn("flex flex-col flex-1 min-h-0", isFullScreen && "max-w-4xl")}>
       {/* Header */}
       <div className="p-4 border-b border-border flex-shrink-0">
         <div className="flex items-center gap-2 mb-2">
           <TypeIcon className="w-5 h-5 text-primary" />
           <h3 className="font-semibold text-foreground flex-1 truncate">{mission.title}</h3>
+          <button
+            onClick={saveTranscript}
+            className="p-1 hover:bg-secondary rounded transition-colors"
+            title="Save transcript"
+          >
+            <Download className="w-4 h-4 text-muted-foreground" />
+          </button>
+          <button
+            onClick={() => {
+              dismissMission(mission.id)
+              setActiveMission(null)
+            }}
+            className="p-1 hover:bg-red-500/20 rounded transition-colors"
+            title="Delete mission"
+          >
+            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-red-400" />
+          </button>
+          {onToggleFullScreen && !isFullScreen && (
+            <button
+              onClick={onToggleFullScreen}
+              className="p-1 hover:bg-secondary rounded transition-colors"
+              title="Expand to full screen"
+            >
+              <Maximize2 className="w-4 h-4 text-muted-foreground" />
+            </button>
+          )}
           <div className={cn('flex items-center gap-1', config.color)}>
             <StatusIcon className={cn('w-4 h-4', mission.status === 'running' && 'animate-spin')} />
             <span className="text-xs">{config.label}</span>
@@ -285,93 +613,29 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
         )}
       </div>
 
-      {/* Messages */}
+      {/* Messages - using memoized component for better scroll performance */}
       <div
         ref={messagesContainerRef}
         onScroll={handleScroll}
         className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
       >
-        {mission.messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              'flex gap-3',
-              msg.role === 'user' && 'flex-row-reverse'
-            )}
-          >
-            <div className={cn(
-              'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0',
-              msg.role === 'user' ? 'bg-primary/20' :
-              msg.role === 'assistant' ? 'bg-purple-500/20' :
-              'bg-yellow-500/20'
-            )}>
-              {msg.role === 'user' ? (
-                <User className="w-4 h-4 text-primary" />
-              ) : msg.role === 'assistant' ? (
-                <AgentIcon
-                  provider={
-                    (msg.agent || mission.agent) === 'claude' ? 'anthropic' :
-                    (msg.agent || mission.agent) === 'openai' ? 'openai' :
-                    (msg.agent || mission.agent) === 'gemini' ? 'google' :
-                    (msg.agent || mission.agent) === 'bob' ? 'bob' :
-                    (msg.agent || mission.agent) === 'claude-code' ? 'anthropic-local' :
-                    (msg.agent || mission.agent || 'anthropic')
-                  }
-                  className="w-4 h-4"
-                />
-              ) : (
-                <AlertCircle className="w-4 h-4 text-yellow-400" />
-              )}
-            </div>
-            <div className={cn(
-              'flex-1 rounded-lg p-3',
-              isFullScreen ? 'max-w-[95%]' : 'max-w-[85%]',
-              msg.role === 'user' ? 'bg-primary/10 ml-auto' :
-              msg.role === 'assistant' ? 'bg-secondary/50' :
-              'bg-yellow-500/10'
-            )}>
-              {msg.role === 'assistant' || msg.role === 'system' ? (
-                <div className={cn(
-                  "text-sm prose prose-sm prose-invert max-w-none prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-pre:my-2 prose-pre:bg-black/30 prose-pre:text-xs prose-code:text-purple-300 prose-code:bg-black/20 prose-code:px-1 prose-code:rounded",
-                  msg.role === 'system' ? 'text-yellow-200' : 'text-foreground'
-                )}>
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkBreaks]}
-                    components={{
-                      a: ({ href, children }) => {
-                        // Internal links use react-router Link styled as button
-                        if (href?.startsWith('/')) {
-                          return (
-                            <Link
-                              to={href}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 mt-1 bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30 rounded text-xs font-medium transition-colors no-underline"
-                            >
-                              <Settings className="w-3 h-3" />
-                              {children}
-                            </Link>
-                          )
-                        }
-                        // External links
-                        return (
-                          <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline hover:text-blue-300">
-                            {children}
-                          </a>
-                        )
-                      }
-                    }}
-                  >
-                    {msg.content.replace(/\r\n/g, '\n')}
-                  </ReactMarkdown>
-                </div>
-              ) : (
-                <p className="text-sm text-foreground whitespace-pre-wrap">{msg.content}</p>
-              )}
-              <span className="text-[10px] text-muted-foreground mt-1 block">
-                {msg.timestamp.toLocaleTimeString()}
-              </span>
-            </div>
-          </div>
-        ))}
+        {mission.messages.map((msg, index) => {
+          // Find if this is the last assistant message
+          const isLastAssistantMessage = msg.role === 'assistant' &&
+            !mission.messages.slice(index + 1).some(m => m.role === 'assistant')
+
+          return (
+            <MemoizedMessage
+              key={msg.id}
+              msg={msg}
+              missionAgent={mission.agent}
+              isFullScreen={isFullScreen}
+              fontSize={fontSize}
+              isLastAssistantMessage={isLastAssistantMessage}
+              missionStatus={mission.status}
+            />
+          )
+        })}
 
         {/* Typing indicator when agent is working - uses currently selected agent */}
         {mission.status === 'running' && (
@@ -529,6 +793,107 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
           </div>
         )}
       </div>
+      </div>
+
+      {/* Right sidebar for full screen mode */}
+      {isFullScreen && (
+        <div className="w-80 flex-shrink-0 flex flex-col gap-4 overflow-y-auto">
+          {/* Original Ask */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-primary" />
+              Original Request
+            </h4>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {originalAsk}
+            </p>
+          </div>
+
+          {/* AI Summary */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-400" />
+              Summary
+            </h4>
+            <div className="space-y-3">
+              {/* Status */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Status</span>
+                <span className={cn('font-medium', STATUS_CONFIG[mission.status].color)}>
+                  {STATUS_CONFIG[mission.status].label}
+                </span>
+              </div>
+
+              {/* Exchanges */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Exchanges</span>
+                <span className="text-foreground">{conversationSummary.exchanges}</span>
+              </div>
+
+              {/* Tool Execution */}
+              {conversationSummary.hasToolExecution && (
+                <div className="flex items-center gap-2 text-sm text-green-400">
+                  <CheckCircle className="w-3.5 h-3.5" />
+                  <span>Commands executed</span>
+                </div>
+              )}
+
+              {/* Key Points */}
+              {conversationSummary.keyPoints.length > 0 && (
+                <div className="pt-2 border-t border-border/50">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide">Key Points</span>
+                  <ul className="mt-2 space-y-1">
+                    {conversationSummary.keyPoints.map((point, i) => (
+                      <li key={i} className="text-xs text-foreground flex items-start gap-2">
+                        <span className="text-purple-400 mt-0.5">•</span>
+                        <span className="line-clamp-2">{point}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Last Update */}
+              <div className="text-[10px] text-muted-foreground/70 pt-2 border-t border-border/50">
+                Last updated: {conversationSummary.lastUpdate.toLocaleTimeString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Mission Info */}
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h4 className="text-sm font-semibold text-foreground mb-3">Mission Details</h4>
+            <div className="space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Type</span>
+                <span className="text-foreground capitalize">{mission.type}</span>
+              </div>
+              {mission.cluster && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Cluster</span>
+                  <span className="text-purple-400">{mission.cluster}</span>
+                </div>
+              )}
+              {mission.agent && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Agent</span>
+                  <span className="text-foreground">{mission.agent}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Started</span>
+                <span className="text-foreground text-xs">{mission.createdAt.toLocaleString()}</span>
+              </div>
+              {mission.tokenUsage && mission.tokenUsage.total > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Tokens</span>
+                  <span className="text-foreground font-mono text-xs">{mission.tokenUsage.total.toLocaleString()}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -536,6 +901,7 @@ function MissionChat({ mission, isFullScreen = false }: { mission: Mission; isFu
 export function MissionSidebar() {
   const { missions, activeMission, isSidebarOpen, isSidebarMinimized, isFullScreen, setActiveMission, closeSidebar, dismissMission, minimizeSidebar, expandSidebar, setFullScreen, selectedAgent } = useMissions()
   const [collapsedMissions, setCollapsedMissions] = useState<Set<string>>(new Set())
+  const [fontSize, setFontSize] = useState<FontSize>('base')
 
   // Exit fullscreen on Escape key
   useEffect(() => {
@@ -641,14 +1007,33 @@ export function MissionSidebar() {
         {/* Agent Selector */}
         <div className="flex items-center gap-2">
           <AgentSelector compact={!isFullScreen} />
+          {/* Font size controls */}
+          <div className="flex items-center gap-1 border border-border rounded-lg px-1">
+            <button
+              onClick={() => setFontSize(prev => prev === 'base' ? 'sm' : prev === 'lg' ? 'base' : 'sm')}
+              disabled={fontSize === 'sm'}
+              className="p-1 hover:bg-secondary rounded transition-colors disabled:opacity-30"
+              title="Decrease font size"
+            >
+              <Minus className="w-3 h-3 text-muted-foreground" />
+            </button>
+            <Type className="w-3 h-3 text-muted-foreground" />
+            <button
+              onClick={() => setFontSize(prev => prev === 'sm' ? 'base' : prev === 'base' ? 'lg' : 'lg')}
+              disabled={fontSize === 'lg'}
+              className="p-1 hover:bg-secondary rounded transition-colors disabled:opacity-30"
+              title="Increase font size"
+            >
+              <Plus className="w-3 h-3 text-muted-foreground" />
+            </button>
+          </div>
           {isFullScreen ? (
             <button
               onClick={() => setFullScreen(false)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 border border-primary/30 hover:bg-primary/20 rounded-lg transition-colors text-sm text-primary font-medium"
-              title="Exit full screen and return to sidebar"
+              className="p-1 hover:bg-secondary rounded transition-colors"
+              title="Exit full screen"
             >
-              <PanelRightOpen className="w-4 h-4" />
-              <span>Back to Sidebar</span>
+              <Minimize2 className="w-5 h-5 text-muted-foreground" />
             </button>
           ) : (
             <>
@@ -689,7 +1074,7 @@ export function MissionSidebar() {
       ) : activeMission ? (
         <div className={cn(
           "flex-1 flex flex-col min-h-0",
-          isFullScreen && "max-w-4xl mx-auto w-full"
+          isFullScreen && "max-w-6xl mx-auto w-full"
         )}>
           {/* Back to list if multiple missions */}
           {missions.length > 1 && (
@@ -701,20 +1086,21 @@ export function MissionSidebar() {
               Back to missions ({missions.length})
             </button>
           )}
-          <MissionChat mission={activeMission} isFullScreen={isFullScreen} />
+          <MissionChat mission={activeMission} isFullScreen={isFullScreen} fontSize={fontSize} onToggleFullScreen={() => setFullScreen(true)} />
         </div>
       ) : (
         <div className={cn(
           "flex-1 overflow-y-auto p-2 space-y-2",
           isFullScreen && "max-w-2xl mx-auto w-full"
         )}>
-          {missions.map((mission) => (
+          {[...missions].reverse().map((mission) => (
             <MissionListItem
               key={mission.id}
               mission={mission}
               isActive={false}
               onClick={() => setActiveMission(mission.id)}
               onDismiss={() => dismissMission(mission.id)}
+              onExpand={() => { setActiveMission(mission.id); setFullScreen(true) }}
               isCollapsed={collapsedMissions.has(mission.id)}
               onToggleCollapse={() => toggleMissionCollapse(mission.id)}
             />

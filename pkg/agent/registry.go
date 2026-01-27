@@ -188,7 +188,16 @@ type ProviderInfo struct {
 func InitializeProviders() error {
 	registry := GetRegistry()
 
-	// Register Claude (Anthropic)
+	// Register tool-capable agents FIRST so they become the default
+	// Tool-capable agents can execute kubectl, helm, and other commands
+	// Register Claude Code (local CLI with tool execution)
+	registry.Register(NewClaudeCodeProvider())
+
+	// Register Bob (Claude OEM - local CLI with tool execution)
+	registry.Register(NewBobProvider())
+
+	// Register API-only agents (can only generate text, not execute commands)
+	// Register Claude (Anthropic API)
 	registry.Register(NewClaudeProvider())
 
 	// Register OpenAI
@@ -196,12 +205,6 @@ func InitializeProviders() error {
 
 	// Register Gemini (Google)
 	registry.Register(NewGeminiProvider())
-
-	// Register Bob (Claude OEM - local CLI)
-	registry.Register(NewBobProvider())
-
-	// Register Claude Code (local CLI)
-	registry.Register(NewClaudeCodeProvider())
 
 	// Set default agent based on environment or availability
 	if defaultAgent := os.Getenv("DEFAULT_AGENT"); defaultAgent != "" {

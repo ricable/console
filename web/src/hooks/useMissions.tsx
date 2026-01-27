@@ -97,7 +97,8 @@ function loadMissions(): Mission[] {
     const stored = localStorage.getItem(MISSIONS_STORAGE_KEY)
     if (stored) {
       const parsed = JSON.parse(stored)
-      // Convert date strings back to Date objects and mark stale running missions as failed
+      // Convert date strings back to Date objects
+      // Mark running missions for auto-reconnection instead of failing them
       return parsed.map((m: Mission) => {
         const mission = {
           ...m,
@@ -108,21 +109,12 @@ function loadMissions(): Mission[] {
             timestamp: new Date(msg.timestamp)
           }))
         }
-        // Mark any "running" missions as failed - they're stale from a previous session
+        // Mark running missions for reconnection - they'll be resumed when WS connects
         if (mission.status === 'running') {
           return {
             ...mission,
-            status: 'failed' as const,
-            currentStep: undefined,
-            messages: [
-              ...mission.messages,
-              {
-                id: `msg-stale-${Date.now()}`,
-                role: 'system' as const,
-                content: `**Session Interrupted**\n\nThis mission was interrupted when the page was refreshed.\n\n[Configure API Keys →](/settings) and start a new mission to try again.`,
-                timestamp: new Date(),
-              }
-            ]
+            currentStep: 'Reconnecting...',
+            context: { ...mission.context, needsReconnect: true }
           }
         }
         return mission
@@ -230,6 +222,68 @@ export function MissionProvider({ children }: { children: ReactNode }) {
           console.log('[Missions] Connected to KKC agent')
           // Fetch available agents on connect
           fetchAgents()
+
+          // Auto-reconnect interrupted missions
+          setMissions(prev => {
+            const missionsToReconnect = prev.filter(m =>
+              m.status === 'running' && m.context?.needsReconnect
+            )
+
+            if (missionsToReconnect.length > 0) {
+              console.log(`[Missions] Auto-reconnecting ${missionsToReconnect.length} interrupted mission(s)`)
+
+              // Schedule reconnection after a short delay to let state settle
+              setTimeout(() => {
+                missionsToReconnect.forEach(mission => {
+                  // Find the last user message to re-send
+                  const userMessages = mission.messages.filter(msg => msg.role === 'user')
+                  const lastUserMessage = userMessages[userMessages.length - 1]
+
+                  if (lastUserMessage && wsRef.current?.readyState === WebSocket.OPEN) {
+                    // Determine which agent to use - prefer claude-code for tool execution
+                    const agentToUse = mission.agent || 'claude-code'
+                    console.log(`[Missions] Resuming mission ${mission.id} with agent: ${agentToUse}`)
+                    console.log(`[Missions] Last message: "${lastUserMessage.content.substring(0, 50)}..."`)
+
+                    const requestId = `claude-reconnect-${Date.now()}-${mission.id}`
+                    pendingRequests.current.set(requestId, mission.id)
+
+                    // Build history from all messages except system messages
+                    const history = mission.messages
+                      .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+                      .map(msg => ({
+                        role: msg.role,
+                        content: msg.content,
+                      }))
+
+                    wsRef.current?.send(JSON.stringify({
+                      id: requestId,
+                      type: 'chat',
+                      payload: {
+                        prompt: lastUserMessage.content,
+                        sessionId: mission.id,
+                        agent: agentToUse,
+                        history: history,
+                      }
+                    }))
+                  }
+                })
+              }, 500)
+
+              // Clear the needsReconnect flag and update step
+              return prev.map(m =>
+                m.context?.needsReconnect
+                  ? {
+                      ...m,
+                      currentStep: 'Resuming...',
+                      context: { ...m.context, needsReconnect: false }
+                    }
+                  : m
+              )
+            }
+            return prev
+          })
+
           resolve()
         }
 
@@ -350,20 +404,40 @@ The AI missions feature requires the local KKC agent to be running.
           updatedAt: new Date(),
         }
       } else if (message.type === 'stream') {
-        // Streaming response from Claude
-        const payload = message.payload as { content?: string; done?: boolean }
+        // Streaming response from agent
+        const payload = message.payload as ChatStreamPayload
         const lastMsg = m.messages[m.messages.length - 1]
 
         if (lastMsg?.role === 'assistant' && !payload.done) {
-          // Append to existing assistant message
+          // Append to existing assistant message, preserve agent
           return {
             ...m,
             status: 'running' as MissionStatus,
             currentStep: 'Generating response...',
             updatedAt: new Date(),
+            agent: payload.agent || m.agent, // Update mission agent if provided
             messages: [
               ...m.messages.slice(0, -1),
-              { ...lastMsg, content: lastMsg.content + (payload.content || '') }
+              { ...lastMsg, content: lastMsg.content + (payload.content || ''), agent: payload.agent || lastMsg.agent }
+            ]
+          }
+        } else if (!payload.done && payload.content) {
+          // First chunk - create new assistant message with agent
+          return {
+            ...m,
+            status: 'running' as MissionStatus,
+            currentStep: 'Generating response...',
+            updatedAt: new Date(),
+            agent: payload.agent || m.agent,
+            messages: [
+              ...m.messages,
+              {
+                id: `msg-${Date.now()}`,
+                role: 'assistant' as const,
+                content: payload.content,
+                timestamp: new Date(),
+                agent: payload.agent || m.agent,
+              }
             ]
           }
         } else if (payload.done) {
@@ -487,6 +561,24 @@ The AI missions feature requires the local KKC agent to be running.
           agent: selectedAgent || undefined,
         }
       }))
+
+      // Update status after message is sent
+      setTimeout(() => {
+        setMissions(prev => prev.map(m =>
+          m.id === missionId && m.currentStep === 'Connecting to agent...'
+            ? { ...m, currentStep: 'Waiting for response...' }
+            : m
+        ))
+      }, 500)
+
+      // Update status while AI is processing
+      setTimeout(() => {
+        setMissions(prev => prev.map(m =>
+          m.id === missionId && m.currentStep === 'Waiting for response...'
+            ? { ...m, currentStep: `Processing with ${selectedAgent || 'AI'}...` }
+            : m
+        ))
+      }, 3000)
     }).catch(() => {
       const errorContent = `**Local Agent Not Connected**
 

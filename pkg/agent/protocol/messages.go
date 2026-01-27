@@ -18,6 +18,7 @@ const (
 	TypeResult        MessageType = "result"
 	TypeError         MessageType = "error"
 	TypeStream        MessageType = "stream"
+	TypeProgress      MessageType = "progress"       // Tool activity/progress events
 	TypeAgentSelected MessageType = "agent_selected" // Agent selection confirmed
 	TypeAgentsList    MessageType = "agents_list"    // List of available agents
 )
@@ -177,4 +178,12 @@ type ChatTokenUsage struct {
 	InputTokens  int `json:"inputTokens"`
 	OutputTokens int `json:"outputTokens"`
 	TotalTokens  int `json:"totalTokens"`
+}
+
+// ProgressPayload represents tool activity or progress events during streaming
+type ProgressPayload struct {
+	Step   string         `json:"step"`             // Human-readable step description
+	Tool   string         `json:"tool,omitempty"`   // Tool being used
+	Input  map[string]any `json:"input,omitempty"`  // Tool input (truncated)
+	Output string         `json:"output,omitempty"` // Tool output (truncated)
 }

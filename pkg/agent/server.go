@@ -180,6 +180,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/nodes", s.handleNodesHTTP)
 	mux.HandleFunc("/pods", s.handlePodsHTTP)
 	mux.HandleFunc("/events", s.handleEventsHTTP)
+	mux.HandleFunc("/namespaces", s.handleNamespacesHTTP)
+	mux.HandleFunc("/deployments", s.handleDeploymentsHTTP)
 	mux.HandleFunc("/cluster-health", s.handleClusterHealthHTTP)
 
 	// Rename context endpoint
@@ -477,6 +479,78 @@ func (s *Server) handleEventsHTTP(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]interface{}{"events": events, "source": "agent"})
 }
 
+// handleNamespacesHTTP returns namespaces for a cluster
+func (s *Server) handleNamespacesHTTP(w http.ResponseWriter, r *http.Request) {
+	s.setCORSHeaders(w, r)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if s.k8sClient == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"namespaces": []interface{}{}, "error": "k8s client not initialized"})
+		return
+	}
+
+	cluster := r.URL.Query().Get("cluster")
+	if cluster == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{"namespaces": []interface{}{}, "error": "cluster parameter required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	namespaces, err := s.k8sClient.ListNamespacesWithDetails(ctx, cluster)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"namespaces": []interface{}{}, "error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{"namespaces": namespaces, "source": "agent"})
+}
+
+// handleDeploymentsHTTP returns deployments for a cluster/namespace
+func (s *Server) handleDeploymentsHTTP(w http.ResponseWriter, r *http.Request) {
+	s.setCORSHeaders(w, r)
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	if s.k8sClient == nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"deployments": []interface{}{}, "error": "k8s client not initialized"})
+		return
+	}
+
+	cluster := r.URL.Query().Get("cluster")
+	namespace := r.URL.Query().Get("namespace")
+	if cluster == "" {
+		json.NewEncoder(w).Encode(map[string]interface{}{"deployments": []interface{}{}, "error": "cluster parameter required"})
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+
+	// If namespace not specified, get deployments from all namespaces
+	if namespace == "" {
+		namespace = ""
+	}
+
+	deployments, err := s.k8sClient.GetDeployments(ctx, cluster, namespace)
+	if err != nil {
+		json.NewEncoder(w).Encode(map[string]interface{}{"deployments": []interface{}{}, "error": err.Error()})
+		return
+	}
+
+	json.NewEncoder(w).Encode(map[string]interface{}{"deployments": deployments, "source": "agent"})
+}
+
 // handlePodsHTTP returns pods for a cluster/namespace
 func (s *Server) handlePodsHTTP(w http.ResponseWriter, r *http.Request) {
 	s.setCORSHeaders(w, r)
@@ -653,17 +727,26 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		response := s.handleMessage(msg)
-		if err := conn.WriteJSON(response); err != nil {
-			log.Printf("Write error: %v", err)
-			break
+		// For chat messages, use streaming handler that can send multiple responses
+		if msg.Type == protocol.TypeChat || msg.Type == protocol.TypeClaude {
+			forceAgent := ""
+			if msg.Type == protocol.TypeClaude {
+				forceAgent = "claude"
+			}
+			s.handleChatMessageStreaming(conn, msg, forceAgent)
+		} else {
+			response := s.handleMessage(msg)
+			if err := conn.WriteJSON(response); err != nil {
+				log.Printf("Write error: %v", err)
+				break
+			}
 		}
 	}
 
 	log.Printf("Client disconnected: %s", conn.RemoteAddr())
 }
 
-// handleMessage processes incoming messages
+// handleMessage processes incoming messages (non-streaming)
 func (s *Server) handleMessage(msg protocol.Message) protocol.Message {
 	switch msg.Type {
 	case protocol.TypeHealth:
@@ -672,11 +755,7 @@ func (s *Server) handleMessage(msg protocol.Message) protocol.Message {
 		return s.handleClustersMessage(msg)
 	case protocol.TypeKubectl:
 		return s.handleKubectlMessage(msg)
-	case protocol.TypeClaude:
-		// Legacy support - route to chat with claude agent
-		return s.handleChatMessage(msg, "claude")
-	case protocol.TypeChat:
-		return s.handleChatMessage(msg, "")
+	// TypeChat and TypeClaude are handled by handleChatMessageStreaming in the WebSocket loop
 	case protocol.TypeListAgents:
 		return s.handleListAgentsMessage(msg)
 	case protocol.TypeSelectAgent:
@@ -741,7 +820,207 @@ func (s *Server) handleKubectlMessage(msg protocol.Message) protocol.Message {
 	}
 }
 
+// handleChatMessageStreaming handles chat messages with streaming support
+// This allows sending multiple WebSocket messages for progress events and text chunks
+func (s *Server) handleChatMessageStreaming(conn *websocket.Conn, msg protocol.Message, forceAgent string) {
+	// Parse payload
+	payloadBytes, err := json.Marshal(msg.Payload)
+	if err != nil {
+		conn.WriteJSON(s.errorResponse(msg.ID, "invalid_payload", "Failed to parse chat request"))
+		return
+	}
+
+	var req protocol.ChatRequest
+	if err := json.Unmarshal(payloadBytes, &req); err != nil {
+		// Try legacy ClaudeRequest format for backward compatibility
+		var legacyReq protocol.ClaudeRequest
+		if err := json.Unmarshal(payloadBytes, &legacyReq); err != nil {
+			conn.WriteJSON(s.errorResponse(msg.ID, "invalid_payload", "Invalid chat request format"))
+			return
+		}
+		req.Prompt = legacyReq.Prompt
+		req.SessionID = legacyReq.SessionID
+	}
+
+	if req.Prompt == "" {
+		conn.WriteJSON(s.errorResponse(msg.ID, "empty_prompt", "Prompt cannot be empty"))
+		return
+	}
+
+	// Determine which agent to use
+	agentName := req.Agent
+	if forceAgent != "" {
+		agentName = forceAgent
+	}
+	if agentName == "" {
+		agentName = s.registry.GetSelectedAgent(req.SessionID)
+	}
+
+	// Smart agent routing: if the prompt suggests command execution, prefer tool-capable agents
+	// Also check conversation history for tool execution context
+	needsTools := s.promptNeedsToolExecution(req.Prompt)
+	log.Printf("[Chat] Smart routing: prompt=%q, needsTools=%v, currentAgent=%q, isToolCapable=%v",
+		truncateString(req.Prompt, 50), needsTools, agentName, s.isToolCapableAgent(agentName))
+
+	if !needsTools && len(req.History) > 0 {
+		// Check if any message in history suggests tool execution was requested
+		for _, h := range req.History {
+			if s.promptNeedsToolExecution(h.Content) {
+				needsTools = true
+				log.Printf("[Chat] History contains tool execution request: %q", truncateString(h.Content, 50))
+				break
+			}
+		}
+	}
+
+	if needsTools && !s.isToolCapableAgent(agentName) {
+		// Try to find a tool-capable agent
+		if toolAgent := s.findToolCapableAgent(); toolAgent != "" {
+			log.Printf("[Chat] Smart routing: switching to tool-capable agent %s (was: %s)", toolAgent, agentName)
+			agentName = toolAgent
+		} else {
+			log.Printf("[Chat] Smart routing: no tool-capable agent available, keeping %s", agentName)
+		}
+	}
+
+	log.Printf("[Chat] Final agent selection: requested=%q, forceAgent=%q, selected=%q, sessionID=%q",
+		req.Agent, forceAgent, agentName, req.SessionID)
+
+	// Get the provider
+	provider, err := s.registry.Get(agentName)
+	if err != nil {
+		// Try default agent
+		log.Printf("[Chat] Agent %q not found, trying default", agentName)
+		provider, err = s.registry.GetDefault()
+		if err != nil {
+			conn.WriteJSON(s.errorResponse(msg.ID, "no_agent", "No AI agent available. Please configure an API key"))
+			return
+		}
+		agentName = provider.Name()
+		log.Printf("[Chat] Using default agent: %s", agentName)
+	}
+
+	if !provider.IsAvailable() {
+		conn.WriteJSON(s.errorResponse(msg.ID, "agent_unavailable", fmt.Sprintf("Agent %s is not available", agentName)))
+		return
+	}
+
+	// Convert protocol history to provider history
+	var history []ChatMessage
+	for _, m := range req.History {
+		history = append(history, ChatMessage{
+			Role:    m.Role,
+			Content: m.Content,
+		})
+	}
+
+	chatReq := &ChatRequest{
+		SessionID: req.SessionID,
+		Prompt:    req.Prompt,
+		History:   history,
+	}
+
+	// Send initial progress message so user sees feedback immediately
+	conn.WriteJSON(protocol.Message{
+		ID:   msg.ID,
+		Type: protocol.TypeProgress,
+		Payload: protocol.ProgressPayload{
+			Step: fmt.Sprintf("Processing with %s...", agentName),
+		},
+	})
+
+	// Check if provider supports streaming with progress events
+	var resp *ChatResponse
+	if streamingProvider, ok := provider.(StreamingProvider); ok {
+		// Use streaming with progress callbacks
+		var streamedContent strings.Builder
+
+		onChunk := func(chunk string) {
+			streamedContent.WriteString(chunk)
+			// Send stream message for text chunk
+			conn.WriteJSON(protocol.Message{
+				ID:   msg.ID,
+				Type: protocol.TypeStream,
+				Payload: protocol.ChatStreamPayload{
+					Content:   chunk,
+					Agent:     agentName,
+					SessionID: req.SessionID,
+					Done:      false,
+				},
+			})
+		}
+
+		onProgress := func(event StreamEvent) {
+			// Build human-readable step description
+			step := event.Tool
+			if event.Type == "tool_use" {
+				// For tool_use, show what tool is being called
+				if cmd, ok := event.Input["command"].(string); ok {
+					// Truncate long commands
+					if len(cmd) > 60 {
+						cmd = cmd[:60] + "..."
+					}
+					step = fmt.Sprintf("%s: %s", event.Tool, cmd)
+				}
+			} else if event.Type == "tool_result" {
+				step = fmt.Sprintf("%s completed", event.Tool)
+			}
+
+			// Send progress message
+			conn.WriteJSON(protocol.Message{
+				ID:   msg.ID,
+				Type: protocol.TypeProgress,
+				Payload: protocol.ProgressPayload{
+					Step:   step,
+					Tool:   event.Tool,
+					Input:  event.Input,
+					Output: event.Output,
+				},
+			})
+		}
+
+		resp, err = streamingProvider.StreamChatWithProgress(context.Background(), chatReq, onChunk, onProgress)
+		if err != nil {
+			conn.WriteJSON(s.errorResponse(msg.ID, "execution_error", fmt.Sprintf("Failed to execute %s: %s", agentName, err.Error())))
+			return
+		}
+
+		// Use streamed content if result content is empty
+		if resp.Content == "" {
+			resp.Content = streamedContent.String()
+		}
+	} else {
+		// Fall back to non-streaming for providers that don't support progress
+		resp, err = provider.Chat(context.Background(), chatReq)
+		if err != nil {
+			conn.WriteJSON(s.errorResponse(msg.ID, "execution_error", fmt.Sprintf("Failed to execute %s: %s", agentName, err.Error())))
+			return
+		}
+	}
+
+	// Track token usage
+	s.addTokenUsage(resp.TokenUsage)
+
+	// Send final result
+	conn.WriteJSON(protocol.Message{
+		ID:   msg.ID,
+		Type: protocol.TypeResult,
+		Payload: protocol.ChatStreamPayload{
+			Content:   resp.Content,
+			Agent:     resp.Agent,
+			SessionID: req.SessionID,
+			Done:      true,
+			Usage: &protocol.ChatTokenUsage{
+				InputTokens:  resp.TokenUsage.InputTokens,
+				OutputTokens: resp.TokenUsage.OutputTokens,
+				TotalTokens:  resp.TokenUsage.TotalTokens,
+			},
+		},
+	})
+}
+
 // handleChatMessage handles chat messages (both legacy claude and new chat types)
+// This is the non-streaming version, kept for API compatibility
 func (s *Server) handleChatMessage(msg protocol.Message, forceAgent string) protocol.Message {
 	// Parse payload
 	payloadBytes, err := json.Marshal(msg.Payload)
@@ -900,6 +1179,56 @@ func (s *Server) errorResponse(id, code, message string) protocol.Message {
 			Message: message,
 		},
 	}
+}
+
+// promptNeedsToolExecution checks if the prompt or history suggests command execution
+func (s *Server) promptNeedsToolExecution(prompt string) bool {
+	prompt = strings.ToLower(prompt)
+	// Keywords that suggest command execution is needed
+	executionKeywords := []string{
+		"run ", "execute", "kubectl", "helm", "check ", "show me", "get ",
+		"list ", "describe", "analyze", "investigate", "fix ", "repair",
+		"uncordon", "cordon", "drain", "scale", "restart", "delete",
+		"apply", "create", "patch", "rollout", "logs", "status",
+		"deploy", "install", "upgrade", "rollback",
+	}
+	for _, keyword := range executionKeywords {
+		if strings.Contains(prompt, keyword) {
+			return true
+		}
+	}
+	// Also check for retry/continuation requests which imply tool execution
+	retryKeywords := []string{"try again", "retry", "do it", "run it", "execute it", "yes", "proceed", "go ahead", "please do"}
+	for _, keyword := range retryKeywords {
+		if strings.Contains(prompt, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// isToolCapableAgent checks if an agent has tool execution capabilities
+func (s *Server) isToolCapableAgent(agentName string) bool {
+	// Agents that can execute tools/commands
+	toolCapableAgents := []string{"claude-code", "bob"}
+	for _, name := range toolCapableAgents {
+		if agentName == name {
+			return true
+		}
+	}
+	return false
+}
+
+// findToolCapableAgent finds an available agent with tool execution capabilities
+func (s *Server) findToolCapableAgent() string {
+	// Priority order for tool-capable agents
+	preferredAgents := []string{"claude-code", "bob"}
+	for _, name := range preferredAgents {
+		if provider, err := s.registry.Get(name); err == nil && provider.IsAvailable() {
+			return name
+		}
+	}
+	return ""
 }
 
 func (s *Server) checkClaudeAvailable() bool {

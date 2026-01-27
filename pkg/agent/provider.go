@@ -77,6 +77,21 @@ type ProviderTokenUsage struct {
 	TotalTokens  int `json:"totalTokens"`
 }
 
+// StreamEvent represents an event during streaming (tool use, thinking, etc.)
+type StreamEvent struct {
+	Type   string                 `json:"type"`            // "tool_use", "tool_result", "thinking", "text"
+	Tool   string                 `json:"tool,omitempty"`  // Tool name (for tool_use)
+	Input  map[string]any         `json:"input,omitempty"` // Tool input
+	Output string                 `json:"output,omitempty"` // Tool output (for tool_result)
+}
+
+// StreamingProvider is an optional interface for providers that support progress events
+type StreamingProvider interface {
+	AIProvider
+	// StreamChatWithProgress streams chat with progress events for tool activity
+	StreamChatWithProgress(ctx context.Context, req *ChatRequest, onChunk func(chunk string), onProgress func(event StreamEvent)) (*ChatResponse, error)
+}
+
 // DefaultSystemPrompt is the default system prompt for KubeStellar console
 const DefaultSystemPrompt = `You are a helpful AI assistant embedded in the KubeStellar Console.
 Your job is to help users with:
