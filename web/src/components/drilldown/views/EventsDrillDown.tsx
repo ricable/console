@@ -1,27 +1,107 @@
 import { useMemo } from 'react'
+import { AlertCircle, RefreshCw, Terminal, Copy, CheckCircle } from 'lucide-react'
 import { useEvents } from '../../../hooks/useMCP'
 import { StatusIndicator } from '../../charts/StatusIndicator'
+import { useState } from 'react'
 
 interface Props {
   data: Record<string, unknown>
+}
+
+// Skeleton component for loading state
+function EventsSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse">
+      <div className="grid grid-cols-3 gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="p-4 rounded-lg bg-card/50 border border-border">
+            <div className="h-8 w-16 bg-muted rounded mb-2" />
+            <div className="h-4 w-24 bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-2">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="p-4 rounded-lg bg-card/50 border-l-4 border-l-muted">
+            <div className="h-4 w-32 bg-muted rounded mb-2" />
+            <div className="h-3 w-48 bg-muted rounded mb-2" />
+            <div className="h-3 w-full bg-muted rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export function EventsDrillDown({ data }: Props) {
   const cluster = data.cluster as string
   const namespace = data.namespace as string | undefined
   const objectName = data.objectName as string | undefined
+  const clusterShort = cluster.split('/').pop() || cluster
 
-  const { events, isLoading } = useEvents(cluster, namespace, 50)
+  const { events, isLoading, error, refetch } = useEvents(cluster, namespace, 50)
+  const [copied, setCopied] = useState(false)
 
   const filteredEvents = useMemo(() => {
     if (!objectName) return events
     return events.filter(e => e.object.includes(objectName))
   }, [events, objectName])
 
+  const copyCommand = () => {
+    const cmd = objectName
+      ? `kubectl --context ${clusterShort} get events --field-selector involvedObject.name=${objectName}${namespace ? ` -n ${namespace}` : ''}`
+      : `kubectl --context ${clusterShort} get events${namespace ? ` -n ${namespace}` : ' -A'} --sort-by=.lastTimestamp`
+    navigator.clipboard.writeText(cmd)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   if (isLoading) {
+    return <EventsSkeleton />
+  }
+
+  // Show error state with retry and kubectl fallback
+  if (error || (events.length === 0 && !isLoading)) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      <div className="space-y-4">
+        <div className="p-6 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-center">
+          <AlertCircle className="w-8 h-8 text-yellow-400 mx-auto mb-3" />
+          <h4 className="font-medium text-yellow-400 mb-2">
+            {error ? 'Failed to load events' : 'No events found'}
+          </h4>
+          <p className="text-sm text-muted-foreground mb-4">
+            {error || `No events found for ${objectName || clusterShort}. Events may have expired or the cluster may be unreachable.`}
+          </p>
+          <div className="flex justify-center gap-2">
+            <button
+              onClick={() => refetch?.()}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-card border border-border text-sm hover:bg-card/80 transition-colors"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Retry
+            </button>
+          </div>
+        </div>
+
+        {/* Kubectl fallback */}
+        <div className="p-4 rounded-lg bg-card/50 border border-border">
+          <h4 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+            <Terminal className="w-4 h-4" />
+            Get Events via kubectl
+          </h4>
+          <div className="flex items-center justify-between p-2 rounded bg-background/50 font-mono text-xs">
+            <code className="text-muted-foreground truncate">
+              kubectl --context {clusterShort} get events{objectName ? ` --field-selector involvedObject.name=${objectName}` : ''}{namespace ? ` -n ${namespace}` : ' -A'}
+            </code>
+            <button
+              onClick={copyCommand}
+              className="ml-2 p-1 hover:bg-card rounded flex-shrink-0"
+              title="Copy command"
+            >
+              {copied ? <CheckCircle className="w-3 h-3 text-green-400" /> : <Copy className="w-3 h-3 text-muted-foreground" />}
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
