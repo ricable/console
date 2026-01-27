@@ -462,6 +462,23 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
   const { startMission } = useMissions()
 
+  // Fetch clusters directly from agent as fallback
+  const [agentClusters, setAgentClusters] = useState<{ name: string; healthy?: boolean }[]>([])
+  useEffect(() => {
+    fetch('http://127.0.0.1:8585/clusters')
+      .then(res => res.json())
+      .then(data => {
+        if (data.clusters) {
+          console.log('[OPA] Fetched clusters from agent:', data.clusters.map((c: { name: string }) => c.name))
+          setAgentClusters(data.clusters.map((c: { name: string }) => ({ name: c.name, healthy: true })))
+        }
+      })
+      .catch(err => console.error('[OPA] Failed to fetch clusters:', err))
+  }, [])
+
+  // Use agent clusters if shared state is empty
+  const effectiveClusters = clusters.length > 0 ? clusters : agentClusters
+
   // Local cluster filter
   const {
     localClusterFilter,
@@ -488,10 +505,17 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
   statusesRef.current = statuses
 
   // Filter clusters
+  // IMPORTANT: Don't filter by healthy status - the agent can reach clusters that browser health checks can't
+  // The OPA card uses kubectl via the agent, not browser-based API calls
   const filteredClusters = useMemo(() => {
-    let result = clusters.filter(c =>
-      c.healthy !== false && (isAllClustersSelected || selectedClusters.includes(c.name))
-    )
+    // Start with effective clusters (agent clusters if shared state is empty)
+    let result = effectiveClusters
+
+    // Apply global cluster filter (but NOT health filter - agent can reach unreachable clusters)
+    if (!isAllClustersSelected) {
+      result = result.filter(c => selectedClusters.includes(c.name))
+    }
+
     // Apply local cluster filter
     if (localClusterFilter.length > 0) {
       result = result.filter(c => localClusterFilter.includes(c.name))
@@ -502,7 +526,7 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
       result = result.filter(c => c.name.toLowerCase().includes(query))
     }
     return result
-  }, [clusters, isAllClustersSelected, selectedClusters, localClusterFilter, localSearch])
+  }, [effectiveClusters, isAllClustersSelected, selectedClusters, localClusterFilter, localSearch])
 
   // Check Gatekeeper on filtered clusters
   const checkAllClusters = useCallback(async () => {
