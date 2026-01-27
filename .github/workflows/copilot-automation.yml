@@ -244,11 +244,111 @@ jobs:
               }
             }
 
-      - name: Trigger gh-aw verification
+      - name: Handle build failures
         if: steps.pr-info.outputs.is_copilot == 'true'
         uses: actions/github-script@v7
         with:
           script: |
-            // This step exists to bridge plain GHA to gh-aw
-            // After mechanical fixes are done, we can trigger AI-powered verification
-            core.info('Mechanical fixes complete. gh-aw workflows can now handle AI tasks.');
+            const prNumber = parseInt('${{ steps.pr-info.outputs.pr_number }}', 10);
+            if (!prNumber) return;
+
+            // Check for build failures (only on check_run events)
+            if (context.eventName === 'check_run') {
+              const checkRun = context.payload.check_run;
+              const isNetlify = checkRun.name && checkRun.name.toLowerCase().includes('netlify');
+              const isFailed = checkRun.conclusion === 'failure';
+
+              if (isNetlify && isFailed) {
+                core.info(`Netlify build failed for PR #${prNumber}`);
+
+                // Check if we already posted a build failure comment recently
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  per_page: 20
+                });
+
+                const recentBuildComment = comments.find(c =>
+                  c.body.includes('Build Failed') &&
+                  c.body.includes('@Copilot') &&
+                  new Date(c.created_at) > new Date(Date.now() - 30 * 60 * 1000) // Last 30 mins
+                );
+
+                if (!recentBuildComment) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    body: `## Build Failed
+
+@Copilot The Netlify build has failed. Please check the build logs and fix the TypeScript/compilation errors.
+
+**Build URL:** ${checkRun.details_url || 'Check the PR checks for details'}
+
+Common fixes needed:
+- Missing imports or undefined functions
+- Type errors
+- Unused variables (remove them)
+
+Please analyze the error and push a fix.`
+                  });
+                  core.info('Posted build failure comment');
+                } else {
+                  core.info('Recent build failure comment already exists, skipping');
+                }
+              }
+            }
+
+            // For workflow_dispatch, check current check status
+            if (context.eventName === 'workflow_dispatch') {
+              const { data: checkRuns } = await github.rest.checks.listForRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: '${{ steps.pr-info.outputs.head_sha }}'
+              });
+
+              const failedNetlify = checkRuns.check_runs.find(cr =>
+                cr.name && cr.name.toLowerCase().includes('netlify') &&
+                cr.conclusion === 'failure'
+              );
+
+              if (failedNetlify) {
+                core.info('Found failed Netlify build, posting comment');
+
+                const { data: comments } = await github.rest.issues.listComments({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  per_page: 20
+                });
+
+                const recentBuildComment = comments.find(c =>
+                  c.body.includes('Build Failed') &&
+                  c.body.includes('@Copilot') &&
+                  new Date(c.created_at) > new Date(Date.now() - 30 * 60 * 1000)
+                );
+
+                if (!recentBuildComment) {
+                  await github.rest.issues.createComment({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    body: `## Build Failed
+
+@Copilot The Netlify build has failed. Please check the build logs and fix the TypeScript/compilation errors.
+
+**Build URL:** ${failedNetlify.details_url || 'Check the PR checks for details'}
+
+Common fixes needed:
+- Missing imports or undefined functions
+- Type errors
+- Unused variables (remove them)
+
+Please analyze the error and push a fix.`
+                  });
+                }
+              }
+            }
+
+            core.info('Build failure handling complete.');
