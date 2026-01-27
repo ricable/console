@@ -1,0 +1,210 @@
+name: Copilot PR Automation
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, ready_for_review]
+  check_run:
+    types: [completed]
+  status:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  statuses: write
+
+jobs:
+  copilot-automation:
+    runs-on: ubuntu-latest
+    # Only run for Copilot PRs
+    if: |
+      (github.event_name == 'pull_request_target' && 
+       (github.event.pull_request.user.login == 'Copilot' || 
+        contains(github.event.pull_request.user.login, 'copilot'))) ||
+      (github.event_name == 'check_run' && 
+       github.event.check_run.pull_requests[0] != null) ||
+      (github.event_name == 'status')
+    steps:
+      - name: Get PR info
+        id: pr-info
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let prNumber, prAuthor, isDraft, title, headSha;
+            
+            if (context.eventName === 'pull_request_target') {
+              prNumber = context.payload.pull_request.number;
+              prAuthor = context.payload.pull_request.user.login;
+              isDraft = context.payload.pull_request.draft;
+              title = context.payload.pull_request.title;
+              headSha = context.payload.pull_request.head.sha;
+            } else if (context.eventName === 'check_run') {
+              const prs = context.payload.check_run.pull_requests;
+              if (!prs || prs.length === 0) {
+                core.info('No PRs associated with this check run');
+                return;
+              }
+              prNumber = prs[0].number;
+              headSha = context.payload.check_run.head_sha;
+              // Get PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber
+              });
+              prAuthor = pr.user.login;
+              isDraft = pr.draft;
+              title = pr.title;
+            } else if (context.eventName === 'status') {
+              // Find PR by commit SHA
+              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.payload.sha
+              });
+              if (!prs || prs.length === 0) {
+                core.info('No PRs associated with this commit');
+                return;
+              }
+              const pr = prs[0];
+              prNumber = pr.number;
+              prAuthor = pr.user.login;
+              isDraft = pr.draft;
+              title = pr.title;
+              headSha = context.payload.sha;
+            }
+            
+            // Check if this is a Copilot PR
+            const isCopilot = prAuthor === 'Copilot' || 
+                              prAuthor.toLowerCase().includes('copilot') ||
+                              prAuthor === 'copilot-swe-agent[bot]';
+            
+            if (!isCopilot) {
+              core.info(`PR #${prNumber} is not from Copilot (author: ${prAuthor})`);
+              return;
+            }
+            
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('pr_author', prAuthor);
+            core.setOutput('is_draft', isDraft);
+            core.setOutput('title', title);
+            core.setOutput('head_sha', headSha);
+            core.setOutput('is_copilot', 'true');
+
+      - name: Override DCO
+        if: steps.pr-info.outputs.is_copilot == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+            const headSha = '${{ steps.pr-info.outputs.head_sha }}';
+            
+            if (!prNumber || !headSha) return;
+            
+            // Set DCO status to success
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: headSha,
+                state: 'success',
+                context: 'dco',
+                description: 'DCO waived for Copilot',
+                target_url: 'https://github.com/kubestellar/console/blob/master/CONTRIBUTING.md'
+              });
+              core.info(`Set DCO status to success for ${headSha}`);
+            } catch (e) {
+              core.warning(`Failed to set DCO status: ${e.message}`);
+            }
+            
+            // Fix labels
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: 'dco-signoff: no'
+              });
+            } catch (e) {
+              // Label might not exist
+            }
+            
+            try {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ['dco-signoff: yes']
+              });
+            } catch (e) {
+              core.warning(`Failed to add label: ${e.message}`);
+            }
+
+      - name: Fix title and mark ready
+        if: steps.pr-info.outputs.is_copilot == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ steps.pr-info.outputs.pr_number }};
+            const isDraft = ${{ steps.pr-info.outputs.is_draft }};
+            let title = `${{ steps.pr-info.outputs.title }}`;
+            
+            if (!prNumber) return;
+            
+            // Fix title if it has [WIP]
+            if (title.includes('[WIP]')) {
+              // Determine emoji based on linked issue or PR content
+              let emoji = '🐛'; // Default to bug fix
+              
+              // Remove [WIP] and add emoji
+              const newTitle = title.replace('[WIP] ', '').replace('[WIP]', '');
+              const finalTitle = newTitle.startsWith('🐛') || newTitle.startsWith('✨') || 
+                                 newTitle.startsWith('📖') || newTitle.startsWith('🌱') 
+                                 ? newTitle : `${emoji} ${newTitle}`;
+              
+              try {
+                await github.rest.pulls.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  title: finalTitle
+                });
+                core.info(`Updated title to: ${finalTitle}`);
+              } catch (e) {
+                core.warning(`Failed to update title: ${e.message}`);
+              }
+              
+              // Remove do-not-merge/work-in-progress label
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: 'do-not-merge/work-in-progress'
+                });
+              } catch (e) {
+                // Label might not exist
+              }
+            }
+            
+            // Mark as ready for review if still draft
+            if (isDraft) {
+              try {
+                await github.graphql(`
+                  mutation($prId: ID!) {
+                    markPullRequestReadyForReview(input: {pullRequestId: $prId}) {
+                      pullRequest { id }
+                    }
+                  }
+                `, {
+                  prId: (await github.rest.pulls.get({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: prNumber
+                  })).data.node_id
+                });
+                core.info('Marked PR as ready for review');
+              } catch (e) {
+                core.warning(`Failed to mark ready: ${e.message}`);
+              }
+            }
