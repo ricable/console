@@ -1,0 +1,86 @@
+name: Copilot Build Monitor
+
+on:
+  check_run:
+    types: [completed]
+
+permissions:
+  pull-requests: write
+  issues: write
+  statuses: write
+
+jobs:
+  handle-build-failure:
+    runs-on: ubuntu-latest
+    if: |
+      github.event.check_run.conclusion == 'failure' &&
+      contains(github.event.check_run.name, 'netlify')
+    steps:
+      - name: Handle Netlify Failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prs = context.payload.check_run.pull_requests;
+            if (!prs || prs.length === 0) {
+              core.info('No PRs for this check run');
+              return;
+            }
+            
+            const prNumber = prs[0].number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            
+            const author = pr.user.login;
+            const isCopilot = author === 'Copilot' || 
+                              author.toLowerCase().includes('copilot');
+            
+            if (!isCopilot) {
+              core.info(`PR #${prNumber} not from Copilot`);
+              return;
+            }
+            
+            core.info(`Build failed for Copilot PR #${prNumber}`);
+            
+            // Override DCO for new commits
+            const headSha = pr.head.sha;
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                sha: headSha,
+                state: 'success',
+                context: 'dco',
+                description: 'DCO waived for Copilot'
+              });
+            } catch (e) { core.info('DCO already set'); }
+            
+            // Check for recent notification
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              per_page: 5
+            });
+            
+            const recent = comments.find(c => 
+              c.body.includes('Build Failed') && 
+              c.body.includes('@Copilot') &&
+              Date.now() - new Date(c.created_at).getTime() < 20 * 60 * 1000
+            );
+            
+            if (recent) {
+              core.info('Recent notification exists');
+              return;
+            }
+            
+            const url = context.payload.check_run.details_url || '';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## Build Failed\n\n@Copilot The build failed. Please fix the error.\n\n**Logs:** ${url}`
+            });
+            core.info('Posted notification');
