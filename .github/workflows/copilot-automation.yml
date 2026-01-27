@@ -6,11 +6,9 @@ on:
       pr_number:
         description: PR number to process
         required: true
+        type: string
   pull_request_target:
-    types: [opened, synchronize, ready_for_review]
-  check_run:
-    types: [completed]
-  status:
+    types: [opened, synchronize]
 
 permissions:
   contents: write
@@ -21,114 +19,49 @@ permissions:
 jobs:
   copilot-automation:
     runs-on: ubuntu-latest
-    # Always run - we filter inside the job
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'pull_request_target' &&
-       (github.event.pull_request.user.login == 'Copilot' ||
-        contains(github.event.pull_request.user.login, 'copilot'))) ||
-      (github.event_name == 'check_run' &&
-       github.event.check_run.pull_requests[0] != null) ||
-      (github.event_name == 'status')
     steps:
-      - name: Get PR info
-        id: pr-info
+      - name: Process Copilot PR
         uses: actions/github-script@v7
         with:
           script: |
-            let prNumber, prAuthor, isDraft, title, headSha;
+            // Get PR info based on event type
+            let prNumber, pr;
 
             if (context.eventName === 'workflow_dispatch') {
-              // Manual trigger with PR number
-              prNumber = parseInt('${{ github.event.inputs.pr_number }}', 10);
-              if (!prNumber) {
-                core.setFailed('PR number is required for workflow_dispatch');
-                return;
-              }
-              const { data: pr } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber
-              });
-              prAuthor = pr.user.login;
-              isDraft = pr.draft;
-              title = pr.title;
-              headSha = pr.head.sha;
+              prNumber = parseInt(context.payload.inputs.pr_number, 10);
             } else if (context.eventName === 'pull_request_target') {
               prNumber = context.payload.pull_request.number;
-              prAuthor = context.payload.pull_request.user.login;
-              isDraft = context.payload.pull_request.draft;
-              title = context.payload.pull_request.title;
-              headSha = context.payload.pull_request.head.sha;
-            } else if (context.eventName === 'check_run') {
-              const prs = context.payload.check_run.pull_requests;
-              if (!prs || prs.length === 0) {
-                core.info('No PRs associated with this check run');
-                return;
-              }
-              prNumber = prs[0].number;
-              headSha = context.payload.check_run.head_sha;
-              const { data: pr } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber
-              });
-              prAuthor = pr.user.login;
-              isDraft = pr.draft;
-              title = pr.title;
-            } else if (context.eventName === 'status') {
-              const { data: prs } = await github.rest.repos.listPullRequestsAssociatedWithCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                commit_sha: context.payload.sha
-              });
-              if (!prs || prs.length === 0) {
-                core.info('No PRs associated with this commit');
-                return;
-              }
-              const pr = prs[0];
-              prNumber = pr.number;
-              prAuthor = pr.user.login;
-              isDraft = pr.draft;
-              title = pr.title;
-              headSha = context.payload.sha;
             }
 
-            // Check if this is a Copilot PR
-            const isCopilot = prAuthor === 'Copilot' ||
-                              prAuthor.toLowerCase().includes('copilot') ||
-                              prAuthor === 'copilot-swe-agent[bot]';
+            if (!prNumber) {
+              core.info('No PR number found');
+              return;
+            }
+
+            // Get PR details
+            const { data: prData } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber
+            });
+            pr = prData;
+
+            // Check if Copilot PR
+            const author = pr.user.login;
+            const isCopilot = author === 'Copilot' ||
+                              author.toLowerCase().includes('copilot') ||
+                              author.includes('[bot]');
 
             if (!isCopilot) {
-              core.info(`PR #${prNumber} is not from Copilot (author: ${prAuthor}), skipping`);
-              core.setOutput('is_copilot', 'false');
+              core.info(`PR #${prNumber} author ${author} is not Copilot, skipping`);
               return;
             }
 
             core.info(`Processing Copilot PR #${prNumber}`);
-            core.setOutput('pr_number', prNumber);
-            core.setOutput('pr_author', prAuthor);
-            core.setOutput('is_draft', isDraft);
-            core.setOutput('title', title);
-            core.setOutput('head_sha', headSha);
-            core.setOutput('is_copilot', 'true');
+            const headSha = pr.head.sha;
 
-      - name: Override DCO
-        if: steps.pr-info.outputs.is_copilot == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = parseInt('${{ steps.pr-info.outputs.pr_number }}', 10);
-            const headSha = '${{ steps.pr-info.outputs.head_sha }}';
-
-            if (!prNumber || !headSha) {
-              core.warning('Missing PR number or head SHA');
-              return;
-            }
-
-            core.info(`Overriding DCO for PR #${prNumber}, SHA: ${headSha}`);
-
-            // Set DCO status to success
+            // 1. Override DCO
+            core.info('Setting DCO status to success...');
             try {
               await github.rest.repos.createCommitStatus({
                 owner: context.repo.owner,
@@ -139,12 +72,13 @@ jobs:
                 description: 'DCO waived for Copilot',
                 target_url: 'https://github.com/kubestellar/console/blob/master/CONTRIBUTING.md'
               });
-              core.info(`Set DCO status to success`);
+              core.info('DCO status set to success');
             } catch (e) {
-              core.warning(`Failed to set DCO status: ${e.message}`);
+              core.warning(`Failed to set DCO: ${e.message}`);
             }
 
-            // Remove dco-signoff: no label
+            // 2. Fix DCO labels
+            core.info('Fixing DCO labels...');
             try {
               await github.rest.issues.removeLabel({
                 owner: context.repo.owner,
@@ -152,12 +86,8 @@ jobs:
                 issue_number: prNumber,
                 name: 'dco-signoff: no'
               });
-              core.info('Removed dco-signoff: no label');
-            } catch (e) {
-              core.info('Label dco-signoff: no not present');
-            }
+            } catch (e) { /* ignore */ }
 
-            // Add dco-signoff: yes label
             try {
               await github.rest.issues.addLabels({
                 owner: context.repo.owner,
@@ -165,36 +95,16 @@ jobs:
                 issue_number: prNumber,
                 labels: ['dco-signoff: yes']
               });
-              core.info('Added dco-signoff: yes label');
             } catch (e) {
               core.warning(`Failed to add label: ${e.message}`);
             }
 
-      - name: Fix title and mark ready
-        if: steps.pr-info.outputs.is_copilot == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = parseInt('${{ steps.pr-info.outputs.pr_number }}', 10);
-            const isDraft = '${{ steps.pr-info.outputs.is_draft }}' === 'true';
-            let title = '${{ steps.pr-info.outputs.title }}';
-
-            if (!prNumber) {
-              core.warning('Missing PR number');
-              return;
-            }
-
-            core.info(`Fixing title and draft status for PR #${prNumber}`);
-            core.info(`Current title: ${title}, isDraft: ${isDraft}`);
-
-            // Fix title if it has [WIP]
+            // 3. Fix title if WIP
+            let title = pr.title;
             if (title.includes('[WIP]')) {
-              let emoji = '🐛'; // Default to bug fix
-
-              // Remove [WIP] and add emoji
-              let newTitle = title.replace('[WIP] ', '').replace('[WIP]', '').trim();
-              const hasEmoji = /^[\u{1F300}-\u{1F9FF}]/u.test(newTitle);
-              const finalTitle = hasEmoji ? newTitle : `${emoji} ${newTitle}`;
+              core.info('Fixing WIP title...');
+              const newTitle = title.replace('[WIP] ', '').replace('[WIP]', '').trim();
+              const finalTitle = newTitle.match(/^[^\w]/) ? newTitle : '\uD83D\uDC1B ' + newTitle;
 
               try {
                 await github.rest.pulls.update({
@@ -203,12 +113,12 @@ jobs:
                   pull_number: prNumber,
                   title: finalTitle
                 });
-                core.info(`Updated title to: ${finalTitle}`);
+                core.info(`Title updated to: ${finalTitle}`);
               } catch (e) {
                 core.warning(`Failed to update title: ${e.message}`);
               }
 
-              // Remove do-not-merge/work-in-progress label
+              // Remove WIP label
               try {
                 await github.rest.issues.removeLabel({
                   owner: context.repo.owner,
@@ -216,21 +126,13 @@ jobs:
                   issue_number: prNumber,
                   name: 'do-not-merge/work-in-progress'
                 });
-                core.info('Removed do-not-merge/work-in-progress label');
-              } catch (e) {
-                core.info('Label do-not-merge/work-in-progress not present');
-              }
+              } catch (e) { /* ignore */ }
             }
 
-            // Mark as ready for review if still draft
-            if (isDraft) {
+            // 4. Mark ready for review if draft
+            if (pr.draft) {
+              core.info('Marking PR as ready for review...');
               try {
-                const { data: pr } = await github.rest.pulls.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: prNumber
-                });
-
                 await github.graphql(`
                   mutation($prId: ID!) {
                     markPullRequestReadyForReview(input: {pullRequestId: $prId}) {
@@ -238,117 +140,10 @@ jobs:
                     }
                   }
                 `, { prId: pr.node_id });
-                core.info('Marked PR as ready for review');
+                core.info('Marked as ready for review');
               } catch (e) {
                 core.warning(`Failed to mark ready: ${e.message}`);
               }
             }
 
-      - name: Handle build failures
-        if: steps.pr-info.outputs.is_copilot == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const prNumber = parseInt('${{ steps.pr-info.outputs.pr_number }}', 10);
-            if (!prNumber) return;
-
-            // Check for build failures (only on check_run events)
-            if (context.eventName === 'check_run') {
-              const checkRun = context.payload.check_run;
-              const isNetlify = checkRun.name && checkRun.name.toLowerCase().includes('netlify');
-              const isFailed = checkRun.conclusion === 'failure';
-
-              if (isNetlify && isFailed) {
-                core.info(`Netlify build failed for PR #${prNumber}`);
-
-                // Check if we already posted a build failure comment recently
-                const { data: comments } = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  per_page: 20
-                });
-
-                const recentBuildComment = comments.find(c =>
-                  c.body.includes('Build Failed') &&
-                  c.body.includes('@Copilot') &&
-                  new Date(c.created_at) > new Date(Date.now() - 30 * 60 * 1000) // Last 30 mins
-                );
-
-                if (!recentBuildComment) {
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: prNumber,
-                    body: `## Build Failed
-
-@Copilot The Netlify build has failed. Please check the build logs and fix the TypeScript/compilation errors.
-
-**Build URL:** ${checkRun.details_url || 'Check the PR checks for details'}
-
-Common fixes needed:
-- Missing imports or undefined functions
-- Type errors
-- Unused variables (remove them)
-
-Please analyze the error and push a fix.`
-                  });
-                  core.info('Posted build failure comment');
-                } else {
-                  core.info('Recent build failure comment already exists, skipping');
-                }
-              }
-            }
-
-            // For workflow_dispatch, check current check status
-            if (context.eventName === 'workflow_dispatch') {
-              const { data: checkRuns } = await github.rest.checks.listForRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: '${{ steps.pr-info.outputs.head_sha }}'
-              });
-
-              const failedNetlify = checkRuns.check_runs.find(cr =>
-                cr.name && cr.name.toLowerCase().includes('netlify') &&
-                cr.conclusion === 'failure'
-              );
-
-              if (failedNetlify) {
-                core.info('Found failed Netlify build, posting comment');
-
-                const { data: comments } = await github.rest.issues.listComments({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: prNumber,
-                  per_page: 20
-                });
-
-                const recentBuildComment = comments.find(c =>
-                  c.body.includes('Build Failed') &&
-                  c.body.includes('@Copilot') &&
-                  new Date(c.created_at) > new Date(Date.now() - 30 * 60 * 1000)
-                );
-
-                if (!recentBuildComment) {
-                  await github.rest.issues.createComment({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    issue_number: prNumber,
-                    body: `## Build Failed
-
-@Copilot The Netlify build has failed. Please check the build logs and fix the TypeScript/compilation errors.
-
-**Build URL:** ${failedNetlify.details_url || 'Check the PR checks for details'}
-
-Common fixes needed:
-- Missing imports or undefined functions
-- Type errors
-- Unused variables (remove them)
-
-Please analyze the error and push a fix.`
-                  });
-                }
-              }
-            }
-
-            core.info('Build failure handling complete.');
+            core.info('Copilot PR automation complete');
