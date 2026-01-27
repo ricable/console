@@ -460,7 +460,8 @@ export function OPAPolicies({ config: _config }: OPAPoliciesProps) {
       const query = localSearch.toLowerCase()
       result = result.filter(c => c.name.toLowerCase().includes(query))
     }
-    return result
+    // Sort by name for consistent ordering
+    return [...result].sort((a, b) => a.name.localeCompare(b.name))
   }, [effectiveClusters, isAllClustersSelected, selectedClusters, localClusterFilter, localSearch])
 
   // Check Gatekeeper on filtered clusters - sequentially to avoid overwhelming kubectlProxy queue
