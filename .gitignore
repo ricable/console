@@ -59,6 +59,4 @@ vendor/
 
 # Claude Code local files
 .bob/
-CLAUDE.md
-TASKS.md
 bin/

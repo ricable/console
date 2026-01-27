@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "workflow": {
+    "description": "Task coordination for Claude Code instances",
+    "steps": [
+      "1. Read tasks.json and find an unclaimed 'pending' task",
+      "2. Set status to 'in_progress', add your instance ID as 'owner', set 'lockedAt' timestamp",
+      "3. Complete the work described in the task",
+      "4. Set status to 'completed', set 'completedAt' timestamp",
+      "5. Create a new test task for the completed item (see testTaskTemplate)"
+    ],
+    "testTaskTemplate": {
+      "description": "After completing a task, create a test task using Chrome DevTools MCP",
+      "tools": [
+        "mcp__chrome-devtools__navigate_page - Load the relevant page",
+        "mcp__chrome-devtools__take_snapshot - Verify UI elements exist",
+        "mcp__chrome-devtools__list_console_messages - Check for errors/warnings",
+        "mcp__chrome-devtools__click / fill - Interact with UI elements",
+        "mcp__chrome-devtools__take_screenshot - Capture visual state",
+        "mcp__chrome-devtools__list_network_requests - Verify API calls"
+      ],
+      "namingConvention": "test-{original-task-id}"
+    }
+  },
+  "tasks": [
+    {
+      "id": "example-1",
+      "subject": "Example: Add login button to header",
+      "description": "Add a login button to the main header component that redirects to /login",
+      "status": "pending",
+      "owner": null,
+      "lockedAt": null,
+      "completedAt": null,
+      "testTaskId": null
+    },
+    {
+      "id": "test-example-1",
+      "subject": "Test: Login button in header",
+      "description": "Verify login button works using Chrome DevTools MCP",
+      "status": "pending",
+      "owner": null,
+      "lockedAt": null,
+      "completedAt": null,
+      "parentTaskId": "example-1",
+      "testSteps": [
+        "Navigate to homepage with mcp__chrome-devtools__navigate_page",
+        "Take snapshot and verify login button exists with uid",
+        "Check console for errors with mcp__chrome-devtools__list_console_messages",
+        "Click login button with mcp__chrome-devtools__click",
+        "Verify navigation to /login page",
+        "Take screenshot of result"
+      ],
+      "testResults": null
+    }
+  ]
+}

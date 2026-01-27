@@ -1,0 +1,39 @@
+# Project Configuration
+
+## Port Requirements
+
+- **Backend**: Must always run on port **8080**
+- **Frontend**: Must always start on port **5174** (use `npm run dev -- --port 5174`)
+
+## Development
+
+When starting the frontend dev server, always use:
+```bash
+npm run dev -- --port 5174
+```
+
+The backend (KKC API server) runs on port 8080. The KKC agent WebSocket runs on port 8585.
+
+## Shared Task Coordination
+
+This project uses `tasks.json` for coordinating work across Claude Code instances.
+
+### On Session Start
+1. Read `tasks.json` to see available tasks
+2. Check for any `in_progress` tasks that may be stale (no recent updates)
+3. Claim a `pending` task if you have work to do
+
+### Task Workflow
+1. **Claim**: Set `status: "in_progress"`, `owner: "<your-instance-id>"`, `lockedAt: "<ISO timestamp>"`
+2. **Work**: Complete the task as described
+3. **Complete**: Set `status: "completed"`, `completedAt: "<ISO timestamp>"`
+4. **Test**: Create a test task with `id: "test-{original-id}"` using Chrome DevTools MCP
+
+### Chrome DevTools MCP Testing
+After completing implementation tasks, create test tasks that use:
+- `mcp__chrome-devtools__navigate_page` - Load the page
+- `mcp__chrome-devtools__take_snapshot` - Verify UI elements
+- `mcp__chrome-devtools__list_console_messages` - Check for errors
+- `mcp__chrome-devtools__click` / `mcp__chrome-devtools__fill` - Interact with UI
+- `mcp__chrome-devtools__take_screenshot` - Capture visual state
+- `mcp__chrome-devtools__list_network_requests` - Verify API calls
