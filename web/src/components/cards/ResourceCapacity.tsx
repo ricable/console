@@ -119,8 +119,12 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
   const resourceItems = useMemo(() => {
     const formatBytes = (v: number) => v >= 1024 ? `${(v / 1024).toFixed(1)} TB` : `${Math.round(v)} GB`
 
-    const items: ResourceItem[] = [
-      {
+    const items: ResourceItem[] = []
+
+    // Only include CPU if we have capacity data (capacity > 0 means we have real data)
+    // A cluster always has at least 1 CPU core, so 0 means data is missing
+    if (totals.cpuCores > 0) {
+      items.push({
         id: 'cpu',
         icon: 'cpu',
         label: 'CPU',
@@ -128,8 +132,12 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
         capacity: totals.cpuCores,
         unit: 'cores',
         color: 'blue',
-      },
-      {
+      })
+    }
+
+    // Only include memory if we have capacity data
+    if (totals.memoryGB > 0) {
+      items.push({
         id: 'memory',
         icon: 'memory',
         label: 'Memory',
@@ -138,12 +146,12 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
         unit: 'GB',
         color: 'purple',
         format: formatBytes,
-      },
-    ]
+      })
+    }
 
     // Add GPU if available
     if (totals.totalGPUs > 0) {
-      items.splice(2, 0, {
+      items.push({
         id: 'gpu',
         icon: 'gpu',
         label: 'GPUs',
@@ -180,8 +188,9 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
   const effectivePerPage = limit === 'unlimited' ? 100 : limit
   const pagination = usePagination(resourceItems, effectivePerPage)
 
-  // Check if we have real data
-  const hasRealData = totals.cpuCores > 0 || totals.memoryGB > 0 || totals.nodes > 0
+  // Check if we have real data - need both clusters and at least some capacity data
+  const hasCapacityData = totals.cpuCores > 0 || totals.memoryGB > 0 || totals.totalGPUs > 0
+  const hasClusters = clusters.length > 0
 
   if (isLoading && clusters.length === 0) {
     return (
@@ -249,7 +258,7 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
 
       {/* Resource metrics */}
       <div className="flex-1 space-y-2 overflow-y-auto">
-        {hasRealData ? (
+        {hasCapacityData ? (
           pagination.paginatedItems.map((item) => {
             const percentage = item.capacity > 0 ? Math.round((item.requested / item.capacity) * 100) : 0
             const colorClasses: Record<string, string> = {
@@ -297,6 +306,11 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
               </div>
             )
           })
+        ) : hasClusters ? (
+          <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm py-8">
+            <p>Loading capacity data...</p>
+            <p className="text-xs mt-1">Fetching resource metrics from clusters</p>
+          </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm py-8">
             <p>Waiting for cluster metrics...</p>

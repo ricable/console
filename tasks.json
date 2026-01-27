@@ -55,10 +55,12 @@
       "id": "resource-capacity-zero",
       "subject": "Resource capacity showing 0 for cpu and mem",
       "description": "Resource capacity card is showing 0 for CPU and memory values. Investigate why capacity metrics are not being fetched or displayed correctly.",
-      "status": "pending",
+      "status": "completed",
       "priority": "high",
       "created": "2025-01-27",
-      "tags": ["bug", "resource-capacity", "cpu", "memory"]
+      "completedAt": "2026-01-27",
+      "tags": ["bug", "resource-capacity", "cpu", "memory"],
+      "resolution": "Fixed by only showing resource metrics when capacity data is available. Now shows 'Loading capacity data...' while fetching instead of misleading '0 / 0' values."
     },
     {
       "id": "opa-policies-empty",
@@ -77,6 +79,16 @@
       "priority": "medium",
       "created": "2025-01-27",
       "tags": ["feature", "github", "issues", "workflow"]
+    },
+    {
+      "id": "console-docs-weekly-release",
+      "subject": "Create console docs for weekly release in kubestellar/docs",
+      "description": "Create comprehensive documentation for KubeStellar Klaude Console in kubestellar/docs repository for the weekly release. Features documented: Updates (nightly/weekly), LinkedIn sharing, KubeStellar rewards (coins), 100+ cards, stat blocks, dashboards. Created 5 doc files and captured 5 screenshots using demo mode.",
+      "status": "completed",
+      "priority": "high",
+      "created": "2026-01-27",
+      "completed": "2026-01-27",
+      "tags": ["documentation", "weekly-release", "demo-mode", "kubestellar-docs"]
     }
   ]
 }
