@@ -73,8 +73,12 @@ function getClusterStateFromInfo(cluster: ClusterInfo): ClusterState {
     return getClusterState(false, false, cluster.nodeCount, undefined, classified.type)
   }
 
-  // Check reachability - if explicitly marked unreachable, show as offline
-  const isReachable = cluster.reachable !== false
+  // Check reachability:
+  // - reachable === false: explicitly unreachable
+  // - nodeCount === 0: health check completed but no nodes (unreachable)
+  // - nodeCount === undefined: still checking
+  const isUnreachable = cluster.reachable === false || cluster.nodeCount === 0
+  const isReachable = !isUnreachable
 
   // Determine health status:
   // - cluster.healthy === true: 50%+ nodes are Ready
