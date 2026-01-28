@@ -1,12 +1,12 @@
 import { useState, useMemo } from 'react'
-import { CheckCircle, XCircle, WifiOff, Cpu, Loader2, ExternalLink, Search } from 'lucide-react'
+import { CheckCircle, XCircle, WifiOff, Cpu, Loader2, ExternalLink, Search, AlertTriangle } from 'lucide-react'
 import { useClusters, useGPUNodes, ClusterInfo } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { CardControls, SortDirection } from '../ui/CardControls'
 import { Pagination, usePagination } from '../ui/Pagination'
 import { Skeleton, SkeletonStats, SkeletonList } from '../ui/Skeleton'
 import { RefreshButton } from '../ui/RefreshIndicator'
-import { ClusterStatusDot, getClusterState, ClusterState } from '../ui/ClusterStatusBadge'
+import { getClusterState, ClusterState } from '../ui/ClusterStatusBadge'
 import { classifyError } from '../../lib/errorClassifier'
 import { ClusterDetailModal } from '../clusters/ClusterDetailModal'
 import { CloudProviderIcon, detectCloudProvider, getProviderLabel, CloudProvider } from '../ui/CloudProviderIcon'
@@ -325,7 +325,16 @@ export function ClusterHealth() {
               title={`Click to view details for ${cluster.name}`}
             >
               <div className="flex items-center gap-2 min-w-0 flex-1" title={statusTooltip}>
-                <ClusterStatusDot state={clusterState} />
+                {/* Status icon: green check for healthy, yellow wifi-off for offline, orange triangle for degraded */}
+                {clusterLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground shrink-0" />
+                ) : clusterUnreachable ? (
+                  <WifiOff className="w-3.5 h-3.5 text-yellow-400 shrink-0" />
+                ) : clusterState === 'healthy' ? (
+                  <CheckCircle className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                ) : (
+                  <AlertTriangle className="w-3.5 h-3.5 text-orange-400 shrink-0" />
+                )}
                 <span title={providerLabel} className="shrink-0">
                   <CloudProviderIcon provider={provider} size={14} />
                 </span>
@@ -341,16 +350,6 @@ export function ClusterHealth() {
                   >
                     <ExternalLink className="w-3 h-3" />
                   </a>
-                )}
-                {clusterLoading && (
-                  <span title="Checking health...">
-                    <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />
-                  </span>
-                )}
-                {!clusterLoading && clusterUnreachable && (
-                  <span title="Offline - check network connection">
-                    <WifiOff className="w-3 h-3 text-yellow-400" />
-                  </span>
                 )}
               </div>
               <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">

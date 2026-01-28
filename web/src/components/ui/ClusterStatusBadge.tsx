@@ -213,14 +213,15 @@ export function ClusterStatusDot({
   const dotSize = size === 'sm' ? 'w-2 h-2' : 'w-3 h-3'
 
   // Map to solid colors for the dot
+  // Yellow = offline, Orange = degraded, Green = healthy
   const dotColors: Record<ClusterState, string> = {
     healthy: 'bg-green-500',
-    degraded: 'bg-yellow-500',
+    degraded: 'bg-orange-500',
     'unreachable-timeout': 'bg-yellow-500',
-    'unreachable-auth': 'bg-red-500',
-    'unreachable-network': 'bg-red-500',
-    'unreachable-cert': 'bg-red-500',
-    'unreachable-unknown': 'bg-red-500',
+    'unreachable-auth': 'bg-yellow-500',
+    'unreachable-network': 'bg-yellow-500',
+    'unreachable-cert': 'bg-yellow-500',
+    'unreachable-unknown': 'bg-yellow-500',
   }
 
   return (
