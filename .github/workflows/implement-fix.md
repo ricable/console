@@ -47,6 +47,8 @@ You are a workflow coordinator for the KubeStellar Console project.
 
 Only process issues that have BOTH `ai-fix-requested` AND `triage/accepted` labels. If either label is missing, do nothing.
 
+**IMPORTANT: Skip if any of these labels are already present:** `ai-awaiting-fix`, `ai-processing`, `ai-pr-draft`, `ai-pr-ready`. These indicate another workflow (triage-command.yml or copilot-assigned.yml) already assigned Copilot. Do NOT double-assign.
+
 ## Your Task
 
 **Assign Copilot to work on this issue.**
