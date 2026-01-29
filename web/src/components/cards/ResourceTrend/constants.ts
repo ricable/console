@@ -22,7 +22,8 @@ export const WORKLOAD_LINES: LineConfig[] = [
   { dataKey: 'nodes', color: '#f59e0b', name: 'Nodes' },
 ]
 
+// Default 'all' view shows CPU and Pods (matches original behavior)
 export const ALL_LINES: LineConfig[] = [
-  ...COMPUTE_LINES,
-  ...WORKLOAD_LINES,
+  { dataKey: 'cpuCores', color: '#3b82f6', name: 'CPU' },
+  { dataKey: 'pods', color: '#9333ea', name: 'Pods' },
 ]

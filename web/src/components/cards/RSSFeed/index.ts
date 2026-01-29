@@ -1,4 +1,4 @@
-// Barrel export for RSSFeed sub-modules
+// Barrel exports for RSSFeed modules
 export * from './types'
 export * from './constants'
 export * from './utils'

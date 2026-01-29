@@ -1,4 +1,4 @@
-// Barrel exports for ResourceTrend sub-modules
+// Barrel exports for ResourceTrend modules
 export * from './types'
 export * from './constants'
 export * from './storage'
