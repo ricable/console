@@ -12,24 +12,20 @@ import {
 } from 'recharts'
 import { useClusters } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
-
-interface ResourcePoint {
-  time: string
-  cpuCores: number
-  memoryGB: number
-  pods: number
-  nodes: number
-}
-
-type MetricView = 'all' | 'compute' | 'workloads'
-type TimeRange = '15m' | '1h' | '6h' | '24h'
-
-const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; points: number }[] = [
-  { value: '15m', label: '15 min', points: 15 },
-  { value: '1h', label: '1 hour', points: 20 },
-  { value: '6h', label: '6 hours', points: 24 },
-  { value: '24h', label: '24 hours', points: 24 },
-]
+import type { ResourcePoint, MetricView, TimeRange } from './ResourceTrend/types'
+import {
+  TIME_RANGE_OPTIONS,
+  MAX_HISTORY_POINTS,
+} from './ResourceTrend/constants'
+import {
+  loadSavedHistory,
+  saveHistory,
+  shouldAddPoint,
+} from './ResourceTrend/storage'
+import {
+  getChartLines,
+  formatTime,
+} from './ResourceTrend/utils'
 
 export function ResourceTrend() {
   const { deduplicatedClusters: clusters, isLoading } = useClusters()
@@ -52,41 +48,12 @@ export function ResourceTrend() {
   }, [])
 
   // Track historical data points with persistence
-  const STORAGE_KEY = 'resource-trend-history'
-  const MAX_AGE_MS = 30 * 60 * 1000 // 30 minutes - discard older data
-
-  // Load from localStorage on mount
-  const loadSavedHistory = (): ResourcePoint[] => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved) as { data: ResourcePoint[]; timestamp: number }
-        // Check if data is not too old
-        if (Date.now() - parsed.timestamp < MAX_AGE_MS) {
-          return parsed.data
-        }
-      }
-    } catch {
-      // Ignore parse errors
-    }
-    return []
-  }
-
   const historyRef = useRef<ResourcePoint[]>(loadSavedHistory())
   const [history, setHistory] = useState<ResourcePoint[]>(historyRef.current)
 
   // Save to localStorage when history changes
   useEffect(() => {
-    if (history.length > 0) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          data: history,
-          timestamp: Date.now(),
-        }))
-      } catch {
-        // Ignore storage errors (quota exceeded, etc.)
-      }
-    }
+    saveHistory(history)
   }, [history])
 
   // Get reachable clusters
@@ -142,20 +109,14 @@ export function ResourceTrend() {
 
     const now = new Date()
     const newPoint: ResourcePoint = {
-      time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: formatTime(now),
       ...currentTotals,
     }
 
     // Only add if data changed
     const lastPoint = historyRef.current[historyRef.current.length - 1]
-    const shouldAdd = !lastPoint ||
-      lastPoint.cpuCores !== newPoint.cpuCores ||
-      lastPoint.memoryGB !== newPoint.memoryGB ||
-      lastPoint.pods !== newPoint.pods ||
-      lastPoint.nodes !== newPoint.nodes
-
-    if (shouldAdd) {
-      const newHistory = [...historyRef.current, newPoint].slice(-20)
+    if (shouldAddPoint(lastPoint, newPoint)) {
+      const newHistory = [...historyRef.current, newPoint].slice(-MAX_HISTORY_POINTS)
       historyRef.current = newHistory
       setHistory(newHistory)
     }
@@ -166,7 +127,7 @@ export function ResourceTrend() {
     if (history.length === 0 && currentTotals.nodes > 0) {
       const now = new Date()
       const initialPoint: ResourcePoint = {
-        time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        time: formatTime(now),
         cpuCores: currentTotals.cpuCores,
         memoryGB: currentTotals.memoryGB,
         pods: currentTotals.pods,
@@ -185,28 +146,7 @@ export function ResourceTrend() {
     )
   }
 
-  // Get visible lines based on view
-  const getLines = () => {
-    switch (view) {
-      case 'compute':
-        return [
-          { dataKey: 'cpuCores', color: '#3b82f6', name: 'CPU Cores' },
-          { dataKey: 'memoryGB', color: '#22c55e', name: 'Memory (GB)' },
-        ]
-      case 'workloads':
-        return [
-          { dataKey: 'pods', color: '#9333ea', name: 'Pods' },
-          { dataKey: 'nodes', color: '#f59e0b', name: 'Nodes' },
-        ]
-      default:
-        return [
-          { dataKey: 'cpuCores', color: '#3b82f6', name: 'CPU' },
-          { dataKey: 'pods', color: '#9333ea', name: 'Pods' },
-        ]
-    }
-  }
-
-  const lines = getLines()
+  const lines = getChartLines(view)
 
   return (
     <div className="h-full flex flex-col">
