@@ -522,7 +522,7 @@ export const CARD_DEFAULT_WIDTHS: Record<string, number> = {
   network_utils: 5,
   mobile_browser: 5,
   kube_chess: 5,
-  kube_craft_3d: 6,
+  // kube_craft_3d: 6,  // Temporarily disabled
 
   // Wide cards (7-8 columns) - charts and trends
   pod_health_trend: 8,

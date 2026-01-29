@@ -76,8 +76,8 @@ export function SimpleGlobe({ className = '' }: SimpleGlobeProps) {
         </div>
 
         {/* Orbital rings */}
-        <div className="absolute inset-0 rounded-full border border-purple-500/20 animate-spin-slow" style={{ animationDuration: '20s' }} />
-        <div className="absolute inset-8 rounded-full border border-cyan-500/20 animate-spin-slower" style={{ animationDuration: '30s' }} />
+        <div className="absolute inset-0 rounded-full border border-purple-500/20 animate-spin-slow" />
+        <div className="absolute inset-8 rounded-full border border-cyan-500/20 animate-spin-slower" />
       </div>
 
       {/* Title */}
