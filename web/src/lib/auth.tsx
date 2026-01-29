@@ -66,8 +66,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Demo token - set demo user directly without API call
+    // Demo token — check if the backend has come online since the token was issued.
+    // If so, clear the stale demo token so the login screen appears and the user
+    // can authenticate with a real JWT via GitHub OAuth.
     if (effectiveToken === 'demo-token') {
+      const backendUp = await checkBackendAvailability(true)
+      if (backendUp) {
+        localStorage.removeItem('token')
+        setTokenState(null)
+        setUser(null)
+        return
+      }
       setDemoMode()
       return
     }
