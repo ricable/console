@@ -111,7 +111,8 @@ const IframeEmbed = lazy(() => import('./IframeEmbed').then(m => ({ default: m.I
 const NetworkUtils = lazy(() => import('./NetworkUtils').then(m => ({ default: m.NetworkUtils })))
 const MobileBrowser = lazy(() => import('./MobileBrowser').then(m => ({ default: m.MobileBrowser })))
 const KubeChess = lazy(() => import('./KubeChess').then(m => ({ default: m.KubeChess })))
-const KubeCraft3D = lazy(() => import('./KubeCraft3D').then(m => ({ default: m.KubeCraft3D })))
+// Temporarily disabled to reduce bundle size (saves ~469KB)
+// const KubeCraft3D = lazy(() => import('./KubeCraft3D').then(m => ({ default: m.KubeCraft3D })))
 const ServiceExports = lazy(() => import('./ServiceExports').then(m => ({ default: m.ServiceExports })))
 const ServiceImports = lazy(() => import('./ServiceImports').then(m => ({ default: m.ServiceImports })))
 const GatewayStatus = lazy(() => import('./GatewayStatus').then(m => ({ default: m.GatewayStatus })))
@@ -279,8 +280,8 @@ export const CARD_COMPONENTS: Record<string, CardComponent> = {
   mobile_browser: MobileBrowser,
   // Kube Chess card
   kube_chess: KubeChess,
-  // KubeCraft 3D card
-  kube_craft_3d: KubeCraft3D,
+  // KubeCraft 3D card - Temporarily disabled to reduce bundle size
+  // kube_craft_3d: KubeCraft3D,
   // MCS (Multi-Cluster Service) cards
   service_exports: ServiceExports,
   service_imports: ServiceImports,
