@@ -1,6 +1,12 @@
 name: Auto-QA Agent
-# Runs hourly quality checks on main and opens GitHub issues for failures.
-# Issues carry labels that feed into the Copilot automation pipeline.
+# Hourly quality checks with rotating daily focus areas.
+# Layer 1 (always): Build, lint, Go build, bundle size, npm audit
+# Layer 2 (daily rotation):
+#   Mon=Performance, Tue=Security, Wed=Navigation/A11y,
+#   Thu=Operator Usefulness, Fri=SRE/Multi-Cluster,
+#   Sat=Feature Recommendations, Sun=Resilience/Error Handling
+#
+# Issues feed into the Copilot automation pipeline.
 
 on:
   schedule:
@@ -10,18 +16,23 @@ on:
       auto_triage:
         description: 'Auto-triage created issues (post /triage accepted to start Copilot)'
         required: false
-        default: false
+        default: true
         type: boolean
       skip_audit:
         description: 'Skip npm audit check'
         required: false
         default: false
         type: boolean
+      focus_override:
+        description: 'Override daily focus (performance|security|a11y|operator|sre|features|resilience|none)'
+        required: false
+        default: ''
+        type: string
 
 env:
-  BUNDLE_SIZE_LIMIT_KB: 5120 # 5 MB max for web/dist directory
-  MAX_ISSUES_PER_RUN: 3      # Rate limit: max issues created per run
-  ISSUE_PREFIX: "[Auto-QA]"  # Title prefix for deduplication
+  BUNDLE_SIZE_LIMIT_KB: 5120
+  MAX_ISSUES_PER_RUN: 3
+  ISSUE_PREFIX: "[Auto-QA]"
   NODE_VERSION: "20"
   GO_VERSION: "1.23"
 
@@ -32,7 +43,7 @@ permissions:
 jobs:
   auto-qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       # ── Setup ──────────────────────────────────────────────────────
@@ -56,7 +67,29 @@ jobs:
         working-directory: web
         run: npm ci
 
-      # ── Quality Checks ─────────────────────────────────────────────
+      - name: Determine daily focus
+        id: focus
+        run: |
+          OVERRIDE="${{ inputs.focus_override }}"
+          if [ -n "$OVERRIDE" ] && [ "$OVERRIDE" != "none" ]; then
+            echo "area=$OVERRIDE" >> "$GITHUB_OUTPUT"
+            echo "Focus override: $OVERRIDE"
+          else
+            DOW=$(date -u +%u)  # 1=Mon ... 7=Sun
+            case $DOW in
+              1) FOCUS="performance" ;;
+              2) FOCUS="security" ;;
+              3) FOCUS="a11y" ;;
+              4) FOCUS="operator" ;;
+              5) FOCUS="sre" ;;
+              6) FOCUS="features" ;;
+              7) FOCUS="resilience" ;;
+            esac
+            echo "area=$FOCUS" >> "$GITHUB_OUTPUT"
+            echo "Day $DOW focus: $FOCUS"
+          fi
+
+      # ── Layer 1: Baseline Quality Checks ──────────────────────────
 
       - name: "Check: TypeScript build"
         id: build_check
@@ -102,25 +135,18 @@ jobs:
         if: inputs.skip_audit != true
         working-directory: web
         run: |
-          # Run audit with retry for network flakes
           AUDIT_EXIT=0
           npm audit --audit-level=high --json > /tmp/audit-output.json 2>/dev/null || AUDIT_EXIT=$?
-
-          # Retry once on network error (exit code 1 can mean network or findings)
           if [ "$AUDIT_EXIT" -ne 0 ] && ! jq -e '.metadata' /tmp/audit-output.json > /dev/null 2>&1; then
             echo "First audit attempt failed (possibly network), retrying in 30s..."
             sleep 30
             npm audit --audit-level=high --json > /tmp/audit-output.json 2>/dev/null || true
           fi
-
-          # Parse results (jq returns 0/null if key missing)
           CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' /tmp/audit-output.json 2>/dev/null || echo "0")
           HIGH=$(jq '.metadata.vulnerabilities.high // 0' /tmp/audit-output.json 2>/dev/null || echo "0")
           TOTAL=$((CRITICAL + HIGH))
-
           echo "critical=$CRITICAL" >> "$GITHUB_OUTPUT"
           echo "high=$HIGH" >> "$GITHUB_OUTPUT"
-
           if [ "$TOTAL" -gt "0" ]; then
             echo "has_vulnerabilities=true" >> "$GITHUB_OUTPUT"
             echo "Found $CRITICAL critical + $HIGH high vulnerabilities"
@@ -130,17 +156,462 @@ jobs:
             echo "No high/critical vulnerabilities found"
           fi
 
-      # ── Issue Creation ──────────────────────────────────────────────
+      # ── Layer 2: Daily Focus Checks ───────────────────────────────
 
-      - name: Ensure auto-qa label exists
+      # === PERFORMANCE (Monday) ===
+      - name: "Focus: Unused dependencies"
+        id: focus_unused_deps
+        if: steps.focus.outputs.area == 'performance'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for potentially unused dependencies..."
+          ISSUES=""
+
+          # Get all dependencies from package.json
+          DEPS=$(jq -r '.dependencies // {} | keys[]' package.json)
+
+          for dep in $DEPS; do
+            # Skip known framework deps that won't appear as direct imports
+            case "$dep" in
+              react|react-dom|react-scripts|vite|@vitejs/*|@types/*|typescript) continue ;;
+            esac
+
+            # Search for import/require of this dep in src/
+            COUNT=$(grep -rl "from ['\"]${dep}" src/ 2>/dev/null | wc -l || echo "0")
+            COUNT2=$(grep -rl "require(['\"]${dep}" src/ 2>/dev/null | wc -l || echo "0")
+            TOTAL=$((COUNT + COUNT2))
+
+            if [ "$TOTAL" -eq 0 ]; then
+              ISSUES="${ISSUES}  - \`${dep}\` — no direct imports found in src/\n"
+            fi
+          done
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "Potentially unused dependencies:\n%b" "$ISSUES" > /tmp/focus-unused-deps.txt
+            cat /tmp/focus-unused-deps.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No unused dependencies detected"
+          fi
+
+      - name: "Focus: Missing lazy loading"
+        id: focus_lazy_loading
+        if: steps.focus.outputs.area == 'performance'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for large components that could benefit from lazy loading..."
+          ISSUES=""
+
+          # Find .tsx files larger than 300 lines in pages/ or views/ directories
+          for f in $(find src -path "*/pages/*.tsx" -o -path "*/views/*.tsx" 2>/dev/null); do
+            LINES=$(wc -l < "$f")
+            if [ "$LINES" -gt 300 ]; then
+              BASENAME=$(basename "$f")
+              # Check if it's already lazy-loaded
+              LAZY=$(grep -rl "React.lazy.*${BASENAME%.*}" src/ 2>/dev/null | wc -l || echo "0")
+              if [ "$LAZY" -eq 0 ]; then
+                ISSUES="${ISSUES}  - \`${f}\` (${LINES} lines) — not lazy-loaded\n"
+              fi
+            fi
+          done
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "Large components without lazy loading:\n%b" "$ISSUES" > /tmp/focus-lazy-loading.txt
+            cat /tmp/focus-lazy-loading.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No lazy loading gaps detected"
+          fi
+
+      # === SECURITY (Tuesday) ===
+      - name: "Focus: Hardcoded URLs and tokens"
+        id: focus_hardcoded
+        if: steps.focus.outputs.area == 'security'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Scanning for hardcoded URLs, tokens, and secrets..."
+          ISSUES=""
+
+          # Look for hardcoded API URLs (not localhost, not relative)
+          URLS=$(grep -rn "https\?://[^localhost][^'\"]*api" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v node_modules | grep -v "\.test\." | grep -v "example\.com" | head -20 || true)
+          if [ -n "$URLS" ]; then
+            ISSUES="${ISSUES}### Hardcoded API URLs\n\`\`\`\n${URLS}\n\`\`\`\n\n"
+          fi
+
+          # Look for potential secrets/tokens
+          TOKENS=$(grep -rn "token\s*[:=]\s*['\"][A-Za-z0-9]" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v node_modules | grep -v "\.test\." | grep -vi "csrf" | grep -vi "type" | head -10 || true)
+          if [ -n "$TOKENS" ]; then
+            ISSUES="${ISSUES}### Potential Hardcoded Tokens\n\`\`\`\n${TOKENS}\n\`\`\`\n\n"
+          fi
+
+          # Look for hardcoded passwords
+          PASSWORDS=$(grep -rn "password\s*[:=]\s*['\"][^'\"]\+" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v node_modules | grep -v "\.test\." | grep -vi "type\|interface\|placeholder\|label\|name=" | head -10 || true)
+          if [ -n "$PASSWORDS" ]; then
+            ISSUES="${ISSUES}### Potential Hardcoded Passwords\n\`\`\`\n${PASSWORDS}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-hardcoded.txt
+            echo "Potential security issues found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No hardcoded credentials detected"
+          fi
+
+      - name: "Focus: Dependency age check"
+        id: focus_dep_age
+        if: steps.focus.outputs.area == 'security'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for outdated dependencies..."
+          npm outdated --json > /tmp/outdated.json 2>/dev/null || true
+
+          MAJOR_OUTDATED=$(jq -r 'to_entries[] | select(.value.current != .value.latest) | select((.value.current | split(".")[0]) != (.value.latest | split(".")[0])) | "\(.key): \(.value.current) → \(.value.latest)"' /tmp/outdated.json 2>/dev/null | head -20 || true)
+
+          if [ -n "$MAJOR_OUTDATED" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Dependencies with major version updates available:" > /tmp/focus-dep-age.txt
+            echo "$MAJOR_OUTDATED" >> /tmp/focus-dep-age.txt
+            cat /tmp/focus-dep-age.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No major version gaps detected"
+          fi
+
+      # === NAVIGATION & ACCESSIBILITY (Wednesday) ===
+      - name: "Focus: Missing ARIA labels"
+        id: focus_aria
+        if: steps.focus.outputs.area == 'a11y'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for interactive elements missing ARIA labels..."
+          ISSUES=""
+
+          # Find buttons without aria-label or children text
+          BUTTONS=$(grep -rn "<button" src/ --include="*.tsx" 2>/dev/null | grep -v "aria-label" | grep -v "aria-labelledby" | grep -v node_modules | head -20 || true)
+          if [ -n "$BUTTONS" ]; then
+            ISSUES="${ISSUES}### Buttons possibly missing ARIA labels\n\`\`\`\n${BUTTONS}\n\`\`\`\n\n"
+          fi
+
+          # Find icon-only buttons (button with only an icon child)
+          ICON_BUTTONS=$(grep -rn "<button.*>" src/ --include="*.tsx" 2>/dev/null | grep -i "icon\|svg" | grep -v "aria-label" | grep -v node_modules | head -10 || true)
+          if [ -n "$ICON_BUTTONS" ]; then
+            ISSUES="${ISSUES}### Icon-only buttons without ARIA labels\n\`\`\`\n${ICON_BUTTONS}\n\`\`\`\n\n"
+          fi
+
+          # Find images without alt text
+          IMAGES=$(grep -rn "<img" src/ --include="*.tsx" 2>/dev/null | grep -v 'alt=' | grep -v node_modules | head -10 || true)
+          if [ -n "$IMAGES" ]; then
+            ISSUES="${ISSUES}### Images without alt text\n\`\`\`\n${IMAGES}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-aria.txt
+            echo "Accessibility issues found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No ARIA label issues detected"
+          fi
+
+      - name: "Focus: Keyboard navigation gaps"
+        id: focus_keyboard
+        if: steps.focus.outputs.area == 'a11y'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for keyboard navigation issues..."
+          ISSUES=""
+
+          # onClick without onKeyDown/onKeyPress
+          CLICK_NO_KEY=$(grep -rn "onClick=" src/ --include="*.tsx" 2>/dev/null | grep -v "onKey" | grep -v "<button" | grep -v "<a " | grep -v "<input" | grep -v "<select" | grep -v node_modules | head -15 || true)
+          if [ -n "$CLICK_NO_KEY" ]; then
+            ISSUES="${ISSUES}### Click handlers without keyboard equivalents\n\`\`\`\n${CLICK_NO_KEY}\n\`\`\`\n\n"
+          fi
+
+          # Divs with onClick (should be buttons)
+          DIV_CLICK=$(grep -rn "<div.*onClick" src/ --include="*.tsx" 2>/dev/null | grep -v 'role=' | grep -v 'tabIndex' | grep -v node_modules | head -10 || true)
+          if [ -n "$DIV_CLICK" ]; then
+            ISSUES="${ISSUES}### Clickable divs without role or tabIndex\n\`\`\`\n${DIV_CLICK}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-keyboard.txt
+            echo "Keyboard navigation gaps found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No keyboard navigation gaps detected"
+          fi
+
+      # === OPERATOR USEFULNESS (Thursday) ===
+      - name: "Focus: Hardcoded thresholds and magic numbers"
+        id: focus_magic_numbers
+        if: steps.focus.outputs.area == 'operator'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for hardcoded thresholds and magic numbers..."
+          ISSUES=""
+
+          # Find numeric comparisons that look like thresholds
+          THRESHOLDS=$(grep -rn "[><=]\s*[0-9]\{2,\}" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v node_modules | grep -v "\.test\." | grep -v "index\." | grep -v "z-index" | grep -v "width\|height\|padding\|margin\|size\|px\|rem\|em" | head -20 || true)
+          if [ -n "$THRESHOLDS" ]; then
+            ISSUES="${ISSUES}### Numeric thresholds that could be configurable\n\`\`\`\n${THRESHOLDS}\n\`\`\`\n\n"
+          fi
+
+          # Find setTimeout/setInterval with magic numbers
+          TIMERS=$(grep -rn "setTimeout\|setInterval" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -o "[0-9]\{4,\}" | sort -u | head -10 || true)
+          if [ -n "$TIMERS" ]; then
+            ISSUES="${ISSUES}### Timer values that could be named constants\nValues found: ${TIMERS}\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-magic-numbers.txt
+            echo "Magic numbers found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No magic numbers detected"
+          fi
+
+      - name: "Focus: Missing tooltips and help text"
+        id: focus_tooltips
+        if: steps.focus.outputs.area == 'operator'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for UI elements that could benefit from tooltips..."
+          ISSUES=""
+
+          # Find abbreviated or technical text without tooltips
+          ABBREV=$(grep -rn "CPU\|RAM\|OOM\|CRD\|RBAC\|PVC\|PV\b\|HPA\|VPA\|SLO\|SLI\|SLA\|MTTR\|MTTF" src/ --include="*.tsx" 2>/dev/null | grep -v "tooltip\|Tooltip\|title=" | grep -v node_modules | grep -v "\.test\." | head -15 || true)
+          if [ -n "$ABBREV" ]; then
+            ISSUES="${ISSUES}### Technical abbreviations without tooltips\n\`\`\`\n${ABBREV}\n\`\`\`\n\n"
+          fi
+
+          # Find status indicators without explanation
+          STATUS=$(grep -rn "status\|Status" src/ --include="*.tsx" 2>/dev/null | grep -i "badge\|chip\|indicator\|dot" | grep -v "tooltip\|Tooltip\|title=" | grep -v node_modules | head -10 || true)
+          if [ -n "$STATUS" ]; then
+            ISSUES="${ISSUES}### Status indicators without tooltips\n\`\`\`\n${STATUS}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-tooltips.txt
+            echo "Missing tooltips found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No tooltip gaps detected"
+          fi
+
+      # === SRE / MULTI-CLUSTER (Friday) ===
+      - name: "Focus: Single-cluster assumptions"
+        id: focus_single_cluster
+        if: steps.focus.outputs.area == 'sre'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for single-cluster assumptions..."
+          ISSUES=""
+
+          # Find hardcoded cluster references
+          SINGLE=$(grep -rn "cluster\b" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v "clusters\|Clusters\|multi\|Multi\|clusterName\|clusterId\|ClusterList\|ClusterCard" | grep -vi "type\|interface\|import" | grep -v node_modules | grep -v "\.test\." | head -15 || true)
+          if [ -n "$SINGLE" ]; then
+            ISSUES="${ISSUES}### References that may assume single cluster\n\`\`\`\n${SINGLE}\n\`\`\`\n\n"
+          fi
+
+          # Find missing aggregation (forEach without reduce/map across clusters)
+          NO_AGG=$(grep -rn "\.forEach\|\.map\|\.filter" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -i "cluster\|namespace" | grep -v "\.reduce\|aggregate\|total\|sum" | grep -v node_modules | head -10 || true)
+          if [ -n "$NO_AGG" ]; then
+            ISSUES="${ISSUES}### Cluster iterations without aggregation\n\`\`\`\n${NO_AGG}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-single-cluster.txt
+            echo "Single-cluster assumptions found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No single-cluster assumptions detected"
+          fi
+
+      - name: "Focus: Missing health indicators"
+        id: focus_health
+        if: steps.focus.outputs.area == 'sre'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for missing health/status indicators in SRE views..."
+          ISSUES=""
+
+          # Find dashboard/overview components without health status
+          DASHBOARDS=$(find src -name "*Dashboard*" -o -name "*Overview*" -o -name "*Summary*" 2>/dev/null | grep -v node_modules | grep "\.tsx$")
+          for f in $DASHBOARDS; do
+            HAS_HEALTH=$(grep -l "health\|Health\|status\|Status\|alert\|Alert\|warning\|Warning" "$f" 2>/dev/null || true)
+            if [ -z "$HAS_HEALTH" ]; then
+              ISSUES="${ISSUES}  - \`${f}\` — dashboard/overview without health indicators\n"
+            fi
+          done
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "Dashboard components missing health indicators:\n%b" "$ISSUES" > /tmp/focus-health.txt
+            cat /tmp/focus-health.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No missing health indicators detected"
+          fi
+
+      # === FEATURE RECOMMENDATIONS (Saturday) ===
+      - name: "Focus: TODO/FIXME/HACK comments"
+        id: focus_todos
+        if: steps.focus.outputs.area == 'features'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Scanning for TODO, FIXME, HACK comments..."
+          ISSUES=""
+
+          TODOS=$(grep -rn "TODO\|FIXME\|HACK\|XXX\|WORKAROUND" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -v node_modules | head -30 || true)
+          if [ -n "$TODOS" ]; then
+            COUNT=$(echo "$TODOS" | wc -l)
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+            echo "Found ${COUNT} TODO/FIXME/HACK comments:" > /tmp/focus-todos.txt
+            echo "$TODOS" >> /tmp/focus-todos.txt
+            cat /tmp/focus-todos.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No TODO/FIXME/HACK comments found"
+          fi
+
+      - name: "Focus: High-complexity components"
+        id: focus_complexity
+        if: steps.focus.outputs.area == 'features'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Finding high-complexity components..."
+          ISSUES=""
+
+          # Components over 400 lines are candidates for splitting
+          for f in $(find src -name "*.tsx" 2>/dev/null | grep -v node_modules); do
+            LINES=$(wc -l < "$f")
+            if [ "$LINES" -gt 400 ]; then
+              # Count useState hooks as complexity indicator
+              HOOKS=$(grep -c "useState\|useEffect\|useCallback\|useMemo\|useRef" "$f" 2>/dev/null || echo "0")
+              ISSUES="${ISSUES}  - \`${f}\` — ${LINES} lines, ${HOOKS} hooks\n"
+            fi
+          done
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "Components that could benefit from splitting:\n%b" "$ISSUES" > /tmp/focus-complexity.txt
+            cat /tmp/focus-complexity.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No overly complex components detected"
+          fi
+
+      # === RESILIENCE & ERROR HANDLING (Sunday) ===
+      - name: "Focus: Swallowed errors"
+        id: focus_swallowed
+        if: steps.focus.outputs.area == 'resilience'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for swallowed errors and empty catch blocks..."
+          ISSUES=""
+
+          # Empty catch blocks
+          EMPTY_CATCH=$(grep -rn -A1 "catch\s*(" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep -B1 "^\s*}" | grep "catch" | grep -v node_modules | head -15 || true)
+          if [ -n "$EMPTY_CATCH" ]; then
+            ISSUES="${ISSUES}### Empty catch blocks\n\`\`\`\n${EMPTY_CATCH}\n\`\`\`\n\n"
+          fi
+
+          # Catch with only console.log (no user feedback)
+          CONSOLE_CATCH=$(grep -rn -A2 "catch\s*(" src/ --include="*.ts" --include="*.tsx" 2>/dev/null | grep "console\.\(log\|warn\)" | grep -v node_modules | head -15 || true)
+          if [ -n "$CONSOLE_CATCH" ]; then
+            ISSUES="${ISSUES}### Catch blocks with only console logging (no user feedback)\n\`\`\`\n${CONSOLE_CATCH}\n\`\`\`\n\n"
+          fi
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "%b" "$ISSUES" > /tmp/focus-swallowed.txt
+            echo "Swallowed errors found"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No swallowed errors detected"
+          fi
+
+      - name: "Focus: Missing loading and error states"
+        id: focus_loading_states
+        if: steps.focus.outputs.area == 'resilience'
+        working-directory: web
+        continue-on-error: true
+        run: |
+          echo "Checking for missing loading/error states in data-fetching components..."
+          ISSUES=""
+
+          # Find fetch/useEffect with data fetching but no loading state
+          for f in $(find src -name "*.tsx" 2>/dev/null | grep -v node_modules); do
+            HAS_FETCH=$(grep -l "fetch\|axios\|useQuery\|useSWR\|useEffect.*fetch\|api\." "$f" 2>/dev/null || true)
+            if [ -n "$HAS_FETCH" ]; then
+              HAS_LOADING=$(grep -l "loading\|Loading\|isLoading\|spinner\|Spinner\|skeleton\|Skeleton" "$f" 2>/dev/null || true)
+              HAS_ERROR=$(grep -l "error\|Error\|isError\|errorMessage\|ErrorBoundary" "$f" 2>/dev/null || true)
+              MISSING=""
+              [ -z "$HAS_LOADING" ] && MISSING="loading"
+              [ -z "$HAS_ERROR" ] && MISSING="${MISSING:+$MISSING, }error"
+              if [ -n "$MISSING" ]; then
+                ISSUES="${ISSUES}  - \`${f}\` — fetches data but missing ${MISSING} state\n"
+              fi
+            fi
+          done
+
+          if [ -n "$ISSUES" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            printf "Components fetching data without proper loading/error states:\n%b" "$ISSUES" > /tmp/focus-loading-states.txt
+            cat /tmp/focus-loading-states.txt
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No missing loading/error states detected"
+          fi
+
+      # ── Ensure Labels Exist ────────────────────────────────────────
+
+      - name: Ensure labels exist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh label create "auto-qa" \
-            --repo "${{ github.repository }}" \
-            --color "FF6B35" \
-            --description "Issue detected by automated QA" \
-            2>/dev/null || true
+          LABELS=(
+            "auto-qa:FF6B35:Issue detected by automated QA"
+            "auto-qa:performance:3B82F6:Performance improvement"
+            "auto-qa:security:EF4444:Security issue"
+            "auto-qa:a11y:A855F7:Accessibility improvement"
+            "auto-qa:operator:F59E0B:Operator experience improvement"
+            "auto-qa:sre:10B981:SRE/multi-cluster improvement"
+            "auto-qa:features:8B5CF6:Feature recommendation"
+            "auto-qa:resilience:F97316:Resilience/error handling improvement"
+          )
+          for entry in "${LABELS[@]}"; do
+            IFS=: read -r NAME COLOR DESC <<< "$entry"
+            gh label create "$NAME" \
+              --repo "${{ github.repository }}" \
+              --color "$COLOR" \
+              --description "$DESC" \
+              2>/dev/null || true
+          done
+
+      # ── Issue Creation ──────────────────────────────────────────────
 
       - name: Create issues for failures
         uses: actions/github-script@v7
@@ -153,7 +624,31 @@ jobs:
           HAS_VULNS: ${{ steps.audit_check.outputs.has_vulnerabilities }}
           VULN_CRITICAL: ${{ steps.audit_check.outputs.critical }}
           VULN_HIGH: ${{ steps.audit_check.outputs.high }}
-          AUTO_TRIAGE: ${{ inputs.auto_triage }}
+          FOCUS_AREA: ${{ steps.focus.outputs.area }}
+          # Performance focus
+          FOCUS_UNUSED_DEPS: ${{ steps.focus_unused_deps.outputs.found }}
+          FOCUS_LAZY_LOADING: ${{ steps.focus_lazy_loading.outputs.found }}
+          # Security focus
+          FOCUS_HARDCODED: ${{ steps.focus_hardcoded.outputs.found }}
+          FOCUS_DEP_AGE: ${{ steps.focus_dep_age.outputs.found }}
+          # A11y focus
+          FOCUS_ARIA: ${{ steps.focus_aria.outputs.found }}
+          FOCUS_KEYBOARD: ${{ steps.focus_keyboard.outputs.found }}
+          # Operator focus
+          FOCUS_MAGIC_NUMBERS: ${{ steps.focus_magic_numbers.outputs.found }}
+          FOCUS_TOOLTIPS: ${{ steps.focus_tooltips.outputs.found }}
+          # SRE focus
+          FOCUS_SINGLE_CLUSTER: ${{ steps.focus_single_cluster.outputs.found }}
+          FOCUS_HEALTH: ${{ steps.focus_health.outputs.found }}
+          # Features focus
+          FOCUS_TODOS: ${{ steps.focus_todos.outputs.found }}
+          FOCUS_TODO_COUNT: ${{ steps.focus_todos.outputs.count }}
+          FOCUS_COMPLEXITY: ${{ steps.focus_complexity.outputs.found }}
+          # Resilience focus
+          FOCUS_SWALLOWED: ${{ steps.focus_swallowed.outputs.found }}
+          FOCUS_LOADING_STATES: ${{ steps.focus_loading_states.outputs.found }}
+          # Control
+          AUTO_TRIAGE: ${{ inputs.auto_triage || 'true' }}
           COMMIT_SHA: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
@@ -164,9 +659,9 @@ jobs:
             const sha = process.env.COMMIT_SHA.substring(0, 7);
             const fullSha = process.env.COMMIT_SHA;
             const runUrl = process.env.RUN_URL;
+            const focusArea = process.env.FOCUS_AREA;
             const now = new Date().toISOString();
 
-            // Helper: read file safely, return last N lines
             function readOutput(path, lines = 80) {
               try {
                 const content = fs.readFileSync(path, 'utf8');
@@ -176,7 +671,6 @@ jobs:
               }
             }
 
-            // Helper: build issue body
             function buildBody(checkName, command, output, fixes) {
               return [
                 `## Auto-QA: ${checkName} Failure`,
@@ -203,134 +697,325 @@ jobs:
               ].join('\n');
             }
 
-            // Collect failures
+            function buildFocusBody(areaName, checkName, output, fixes, isEnhancement) {
+              return [
+                `## Auto-QA [${areaName}]: ${checkName}`,
+                '',
+                `**Detected:** ${now} | **Focus:** ${areaName} | **Commit:** \`${sha}\` | **Run:** [View](${runUrl})`,
+                '',
+                '### Findings',
+                '```',
+                output,
+                '```',
+                '',
+                `### ${isEnhancement ? 'Suggested Improvements' : 'How to Fix'}`,
+                ...fixes.map(f => `- ${f}`),
+                '',
+                '---',
+                `*This issue was automatically created by the [Auto-QA workflow](${runUrl}) during **${areaName}** focus day.*`,
+                '*Labels `ai-fix-requested` and `help wanted` enable Copilot to fix this after triage.*',
+              ].join('\n');
+            }
+
+            // ── Collect baseline failures ──
+
             const checks = [];
 
-            // 1. TypeScript Build
             if (process.env.BUILD_OUTCOME === 'failure') {
               checks.push({
                 title: `${prefix} TypeScript build failure on main`,
-                body: buildBody(
-                  'TypeScript Build',
-                  'cd web && npm run build',
+                body: buildBody('TypeScript Build', 'cd web && npm run build',
                   readOutput('/tmp/build-output.txt'),
-                  [
-                    'Check the TypeScript errors shown above',
-                    'Fix type errors, missing imports, or syntax issues',
-                    'Run `cd web && npm run build` to verify the fix',
-                  ]
-                ),
+                  ['Check the TypeScript errors shown above',
+                   'Fix type errors, missing imports, or syntax issues',
+                   'Run `cd web && npm run build` to verify the fix']),
+                labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'],
               });
             }
 
-            // 2. ESLint
             if (process.env.LINT_OUTCOME === 'failure') {
               checks.push({
                 title: `${prefix} ESLint violations on main`,
-                body: buildBody(
-                  'ESLint',
-                  'cd web && npm run lint',
+                body: buildBody('ESLint', 'cd web && npm run lint',
                   readOutput('/tmp/lint-output.txt'),
-                  [
-                    'Fix the ESLint errors listed above',
-                    'Common fixes: remove unused imports, add missing hook dependencies',
-                    'Run `cd web && npm run lint` to verify the fix',
-                  ]
-                ),
+                  ['Fix the ESLint errors listed above',
+                   'Common fixes: remove unused imports, add missing hook dependencies',
+                   'Run `cd web && npm run lint` to verify the fix']),
+                labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'],
               });
             }
 
-            // 3. Go Backend Build
             if (process.env.GO_BUILD_OUTCOME === 'failure') {
               checks.push({
                 title: `${prefix} Go backend build failure on main`,
-                body: buildBody(
-                  'Go Build',
-                  'CGO_ENABLED=1 go build -o /dev/null ./cmd/console',
+                body: buildBody('Go Build', 'CGO_ENABLED=1 go build -o /dev/null ./cmd/console',
                   readOutput('/tmp/go-build-output.txt'),
-                  [
-                    'Fix the Go compilation errors shown above',
-                    'Check for missing dependencies, type errors, or undefined references',
-                    'Run `go build ./cmd/console` to verify the fix',
-                  ]
-                ),
+                  ['Fix the Go compilation errors shown above',
+                   'Check for missing dependencies, type errors, or undefined references',
+                   'Run `go build ./cmd/console` to verify the fix']),
+                labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'],
               });
             }
 
-            // 4. Bundle Size
             if (process.env.BUNDLE_EXCEEDED === 'true') {
               const sizeKB = process.env.BUNDLE_SIZE_KB;
               const limitKB = process.env.BUNDLE_SIZE_LIMIT_KB || '5120';
-              let breakdown = '(breakdown not available)';
-              try { breakdown = fs.readFileSync('/tmp/bundle-breakdown.txt', 'utf8').trim(); } catch {}
               checks.push({
                 title: `${prefix} Bundle size exceeds ${limitKB}KB (currently ${sizeKB}KB)`,
                 body: [
                   `## Auto-QA: Bundle Size Exceeded`,
-                  '',
-                  `**Detected:** ${now} | **Commit:** \`${sha}\` | **Run:** [View](${runUrl})`,
-                  '',
-                  `The production bundle size is **${sizeKB}KB**, exceeding the **${limitKB}KB** threshold.`,
-                  '',
-                  '### Largest Assets',
-                  '```',
-                  breakdown,
-                  '```',
-                  '',
+                  '', `**Detected:** ${now} | **Commit:** \`${sha}\` | **Run:** [View](${runUrl})`,
+                  '', `The production bundle size is **${sizeKB}KB**, exceeding the **${limitKB}KB** threshold.`,
+                  '', '### Largest Assets', '```',
+                  readOutput('/tmp/bundle-breakdown.txt', 20),
+                  '```', '',
                   '### How to Fix',
                   '- Check for recently added large dependencies',
                   '- Use dynamic imports (`React.lazy`) for heavy components',
                   '- Review bundle with `npx vite-bundle-visualizer`',
                   '- If the size increase is intentional, update `BUNDLE_SIZE_LIMIT_KB` in `.github/workflows/auto-qa.yml`',
-                  '',
-                  '---',
+                  '', '---',
                   `*This issue was automatically created by the [Auto-QA workflow](${runUrl}).*`,
                   '*Labels `ai-fix-requested` and `help wanted` enable Copilot to fix this after triage.*',
                 ].join('\n'),
+                labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'],
               });
             }
 
-            // 5. npm Audit
             if (process.env.HAS_VULNS === 'true') {
               const critical = process.env.VULN_CRITICAL || '0';
               const high = process.env.VULN_HIGH || '0';
-              let summary = '(audit summary not available)';
-              try { summary = fs.readFileSync('/tmp/audit-summary.txt', 'utf8').trim(); } catch {}
               checks.push({
                 title: `${prefix} npm audit: ${critical} critical, ${high} high vulnerabilities`,
                 body: [
                   `## Auto-QA: Security Vulnerabilities`,
-                  '',
-                  `**Detected:** ${now} | **Commit:** \`${sha}\` | **Run:** [View](${runUrl})`,
-                  '',
-                  `Found **${critical} critical** and **${high} high** severity vulnerabilities.`,
-                  '',
-                  '### Audit Summary',
-                  '```',
-                  summary,
-                  '```',
-                  '',
+                  '', `**Detected:** ${now} | **Commit:** \`${sha}\` | **Run:** [View](${runUrl})`,
+                  '', `Found **${critical} critical** and **${high} high** severity vulnerabilities.`,
+                  '', '### Audit Summary', '```',
+                  readOutput('/tmp/audit-summary.txt', 50),
+                  '```', '',
                   '### How to Fix',
                   '- Run `cd web && npm audit fix` to auto-fix compatible updates',
                   '- For breaking changes, run `cd web && npm audit fix --force` (test thoroughly)',
                   '- Check advisories for manual remediation steps',
                   '- Run `cd web && npm audit --audit-level=high` to verify the fix',
-                  '',
-                  '---',
+                  '', '---',
                   `*This issue was automatically created by the [Auto-QA workflow](${runUrl}).*`,
                   '*Labels `ai-fix-requested` and `help wanted` enable Copilot to fix this after triage.*',
                 ].join('\n'),
+                labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'],
               });
             }
 
+            // ── Collect focus-area findings ──
+
+            const focusLabels = {
+              performance: 'auto-qa:performance',
+              security: 'auto-qa:security',
+              a11y: 'auto-qa:a11y',
+              operator: 'auto-qa:operator',
+              sre: 'auto-qa:sre',
+              features: 'auto-qa:features',
+              resilience: 'auto-qa:resilience',
+            };
+
+            const focusLabel = focusLabels[focusArea] || 'auto-qa';
+
+            // Performance (Monday)
+            if (focusArea === 'performance') {
+              if (process.env.FOCUS_UNUSED_DEPS === 'true') {
+                checks.push({
+                  title: `${prefix} Potentially unused npm dependencies`,
+                  body: buildFocusBody('Performance', 'Unused Dependencies',
+                    readOutput('/tmp/focus-unused-deps.txt'),
+                    ['Remove unused dependencies with `npm uninstall <pkg>`',
+                     'Verify each package is truly unused before removing',
+                     'Some packages may be used indirectly (plugins, configs)'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_LAZY_LOADING === 'true') {
+                checks.push({
+                  title: `${prefix} Large components missing lazy loading`,
+                  body: buildFocusBody('Performance', 'Missing Lazy Loading',
+                    readOutput('/tmp/focus-lazy-loading.txt'),
+                    ['Wrap large page components with `React.lazy(() => import(...))`',
+                     'Add `<Suspense fallback={<Loading />}>` around lazy components',
+                     'Focus on route-level components first for maximum impact'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // Security (Tuesday)
+            if (focusArea === 'security') {
+              if (process.env.FOCUS_HARDCODED === 'true') {
+                checks.push({
+                  title: `${prefix} Hardcoded URLs or potential credentials in source`,
+                  body: buildFocusBody('Security', 'Hardcoded Credentials/URLs',
+                    readOutput('/tmp/focus-hardcoded.txt'),
+                    ['Move API URLs to environment variables or config files',
+                     'Remove any hardcoded tokens or passwords',
+                     'Use `.env` files for environment-specific values',
+                     'Ensure no real credentials are committed (check git history)'], false),
+                  labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_DEP_AGE === 'true') {
+                checks.push({
+                  title: `${prefix} Dependencies with major version updates available`,
+                  body: buildFocusBody('Security', 'Outdated Dependencies',
+                    readOutput('/tmp/focus-dep-age.txt'),
+                    ['Review changelogs for breaking changes before updating',
+                     'Update one dependency at a time and test thoroughly',
+                     'Major version bumps may require code changes'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // A11y (Wednesday)
+            if (focusArea === 'a11y') {
+              if (process.env.FOCUS_ARIA === 'true') {
+                checks.push({
+                  title: `${prefix} Interactive elements missing ARIA labels`,
+                  body: buildFocusBody('Accessibility', 'Missing ARIA Labels',
+                    readOutput('/tmp/focus-aria.txt'),
+                    ['Add `aria-label` to icon-only buttons',
+                     'Add `alt` text to all images',
+                     'Use semantic HTML elements where possible',
+                     'Test with a screen reader to verify'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_KEYBOARD === 'true') {
+                checks.push({
+                  title: `${prefix} Keyboard navigation gaps`,
+                  body: buildFocusBody('Accessibility', 'Keyboard Navigation Gaps',
+                    readOutput('/tmp/focus-keyboard.txt'),
+                    ['Replace clickable `<div>` elements with `<button>` or add `role="button"` and `tabIndex={0}`',
+                     'Add `onKeyDown` handlers alongside `onClick` for non-button elements',
+                     'Ensure all interactive elements are focusable via Tab'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // Operator (Thursday)
+            if (focusArea === 'operator') {
+              if (process.env.FOCUS_MAGIC_NUMBERS === 'true') {
+                checks.push({
+                  title: `${prefix} Hardcoded thresholds and magic numbers`,
+                  body: buildFocusBody('Operator Usefulness', 'Magic Numbers',
+                    readOutput('/tmp/focus-magic-numbers.txt'),
+                    ['Extract magic numbers to named constants at the top of the file',
+                     'Consider making thresholds configurable via environment or props',
+                     'Add comments explaining the reasoning behind threshold values'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_TOOLTIPS === 'true') {
+                checks.push({
+                  title: `${prefix} Technical abbreviations without tooltips`,
+                  body: buildFocusBody('Operator Usefulness', 'Missing Tooltips',
+                    readOutput('/tmp/focus-tooltips.txt'),
+                    ['Add tooltips to technical abbreviations (CPU, RBAC, CRD, etc.)',
+                     'Use the existing Tooltip component or HTML `title` attribute',
+                     'Explain what status indicators mean on hover'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // SRE (Friday)
+            if (focusArea === 'sre') {
+              if (process.env.FOCUS_SINGLE_CLUSTER === 'true') {
+                checks.push({
+                  title: `${prefix} Code may assume single-cluster deployment`,
+                  body: buildFocusBody('SRE/Multi-Cluster', 'Single-Cluster Assumptions',
+                    readOutput('/tmp/focus-single-cluster.txt'),
+                    ['Review flagged code for multi-cluster compatibility',
+                     'Ensure cluster selectors and filters work with multiple clusters',
+                     'Add cluster context to API calls where missing'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_HEALTH === 'true') {
+                checks.push({
+                  title: `${prefix} Dashboard components missing health indicators`,
+                  body: buildFocusBody('SRE/Multi-Cluster', 'Missing Health Indicators',
+                    readOutput('/tmp/focus-health.txt'),
+                    ['Add health/status indicators to dashboard components',
+                     'Show cluster connectivity status, degraded/healthy state',
+                     'Add visual alerts for unhealthy resources'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // Features (Saturday)
+            if (focusArea === 'features') {
+              if (process.env.FOCUS_TODOS === 'true') {
+                const count = process.env.FOCUS_TODO_COUNT || '?';
+                checks.push({
+                  title: `${prefix} ${count} TODO/FIXME/HACK comments need attention`,
+                  body: buildFocusBody('Feature Recommendations', 'TODO/FIXME/HACK Comments',
+                    readOutput('/tmp/focus-todos.txt'),
+                    ['Review each TODO and either implement or create a tracking issue',
+                     'Remove stale TODOs that are no longer relevant',
+                     'Convert HACKs to proper implementations'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_COMPLEXITY === 'true') {
+                checks.push({
+                  title: `${prefix} High-complexity components could be split`,
+                  body: buildFocusBody('Feature Recommendations', 'Complex Components',
+                    readOutput('/tmp/focus-complexity.txt'),
+                    ['Extract sub-components from large files',
+                     'Move hooks into custom hooks for reusability',
+                     'Consider splitting into container + presentational components'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // Resilience (Sunday)
+            if (focusArea === 'resilience') {
+              if (process.env.FOCUS_SWALLOWED === 'true') {
+                checks.push({
+                  title: `${prefix} Swallowed errors and empty catch blocks`,
+                  body: buildFocusBody('Resilience', 'Swallowed Errors',
+                    readOutput('/tmp/focus-swallowed.txt'),
+                    ['Add proper error handling in empty catch blocks',
+                     'Show user-facing error messages instead of just logging',
+                     'Use error boundaries for React component errors',
+                     'At minimum, log errors with `console.error` for debugging'], false),
+                  labels: ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+              if (process.env.FOCUS_LOADING_STATES === 'true') {
+                checks.push({
+                  title: `${prefix} Components fetching data without loading/error states`,
+                  body: buildFocusBody('Resilience', 'Missing Loading/Error States',
+                    readOutput('/tmp/focus-loading-states.txt'),
+                    ['Add loading indicators (skeleton screens or spinners) while data loads',
+                     'Add error states with retry buttons for failed fetches',
+                     'Consider using a shared data-fetching wrapper or custom hook'], true),
+                  labels: ['enhancement', 'ai-fix-requested', 'help wanted', 'auto-qa', focusLabel],
+                });
+              }
+            }
+
+            // ── Create issues ──
+
             if (checks.length === 0) {
-              core.info('All checks passed. No issues to create.');
+              core.info(`All checks passed (focus: ${focusArea}). No issues to create.`);
               return;
             }
 
-            core.info(`${checks.length} check(s) failed. Processing issue creation...`);
+            core.info(`${checks.length} finding(s) detected (focus: ${focusArea}). Processing...`);
 
-            // Fetch existing open auto-qa issues for deduplication
             const { data: existingIssues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -339,42 +1024,40 @@ jobs:
               per_page: 100,
             });
 
-            const issueLabels = ['bug', 'ai-fix-requested', 'help wanted', 'auto-qa', 'needs-triage'];
             let created = 0;
 
             for (const check of checks) {
               if (created >= maxIssues) {
-                core.warning(`Rate limit reached (${maxIssues} issues). Remaining failures skipped.`);
+                core.warning(`Rate limit reached (${maxIssues} issues). Remaining findings skipped.`);
                 break;
               }
 
-              // Deduplication: check if same title already open
               const duplicate = existingIssues.find(i => i.title === check.title);
               if (duplicate) {
-                core.info(`Duplicate found: "${check.title}" (existing #${duplicate.number}). Adding re-detection comment.`);
+                core.info(`Duplicate: "${check.title}" (#${duplicate.number}). Adding re-detection comment.`);
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: duplicate.number,
-                  body: `**Re-detected** at ${now} on commit \`${sha}\`.\n\n[Workflow run](${runUrl})`,
+                  body: `**Re-detected** at ${now} on commit \`${sha}\` (focus: ${focusArea}).\n\n[Workflow run](${runUrl})`,
                 });
                 continue;
               }
 
-              // Create issue
               const { data: issue } = await github.rest.issues.create({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: check.title,
                 body: check.body,
-                labels: issueLabels,
+                labels: check.labels,
               });
 
               core.info(`Created issue #${issue.number}: ${check.title}`);
               created++;
 
-              // Auto-triage if requested (triggers Copilot pipeline via triage-command.yml)
-              if (process.env.AUTO_TRIAGE === 'true') {
+              // Auto-triage: scheduled runs always auto-triage; dispatch respects input
+              const shouldTriage = process.env.AUTO_TRIAGE === 'true';
+              if (shouldTriage) {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -385,4 +1068,4 @@ jobs:
               }
             }
 
-            core.info(`Auto-QA complete: ${created} issue(s) created, ${checks.length} failure(s) detected.`);
+            core.info(`Auto-QA complete (focus: ${focusArea}): ${created} issue(s) created, ${checks.length} finding(s) total.`);
