@@ -35,12 +35,7 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
   const {
     issues: rawIssues,
     isLoading: hookLoading,
-    isRefreshing,
-    error,
-    refetch,
-    isFailed,
-    consecutiveFailures,
-    lastRefresh
+    error
   } = useCachedDeploymentIssues(clusterConfig, namespaceConfig)
 
   // Only show skeleton when no cached data exists
@@ -148,13 +143,6 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
             onSortChange: (v) => setSortBy(v as SortByOption),
             sortDirection,
             onSortDirectionChange: setSortDirection,
-          }}
-          refresh={{
-            isRefreshing,
-            isFailed,
-            consecutiveFailures,
-            lastRefresh,
-            onRefresh: () => refetch(),
           }}
         />
       </div>

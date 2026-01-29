@@ -279,6 +279,9 @@ import { CardClusterIndicator } from '../../lib/cards'
 
 Composition component assembling the standard card controls row.
 
+> **Note:** Do NOT add a refresh button here — refresh is handled by
+> the CardWrapper title bar to avoid duplication.
+
 ```tsx
 import { CardControlsRow } from '../../lib/cards'
 
@@ -304,13 +307,6 @@ import { CardControlsRow } from '../../lib/cards'
     onSortChange: setSortBy,
     sortDirection,
     onSortDirectionChange: setSortDirection,
-  }}
-  refresh={{
-    isRefreshing,
-    isFailed,
-    consecutiveFailures,
-    lastRefresh,
-    onRefresh: refetch,
   }}
 />
 ```
@@ -703,8 +699,7 @@ interface MyCardProps {
 export function MyCard({ config }: MyCardProps) {
   const clusterConfig = config?.cluster as string | undefined
   const {
-    items: rawItems, isLoading: hookLoading, isRefreshing, error,
-    refetch, isFailed, consecutiveFailures, lastRefresh,
+    items: rawItems, isLoading: hookLoading, error,
   } = useCachedXxx(clusterConfig)
 
   const isLoading = hookLoading && rawItems.length === 0
@@ -789,13 +784,6 @@ export function MyCard({ config }: MyCardProps) {
               onSortChange: setSortBy,
               sortDirection,
               onSortDirectionChange: setSortDirection,
-            }}
-            refresh={{
-              isRefreshing,
-              isFailed,
-              consecutiveFailures,
-              lastRefresh,
-              onRefresh: refetch,
             }}
           />
         }

@@ -30,12 +30,7 @@ export function PodIssues() {
   const {
     issues: rawIssues,
     isLoading: hookLoading,
-    isRefreshing,
-    error,
-    refetch,
-    isFailed,
-    consecutiveFailures,
-    lastRefresh
+    error
   } = useCachedPodIssues()
 
   // Only show skeleton when no cached data exists
@@ -137,13 +132,6 @@ export function PodIssues() {
             onSortChange: (v) => setSortBy(v as SortByOption),
             sortDirection,
             onSortDirectionChange: setSortDirection,
-          }}
-          refresh={{
-            isRefreshing,
-            isFailed,
-            consecutiveFailures,
-            lastRefresh,
-            onRefresh: () => refetch(),
           }}
         />
       </div>

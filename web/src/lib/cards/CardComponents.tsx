@@ -3,7 +3,6 @@ import { LucideIcon, CheckCircle, AlertTriangle, Info, Search, Filter, ChevronDo
 import { Skeleton } from '../../components/ui/Skeleton'
 import { Pagination } from '../../components/ui/Pagination'
 import { CardControls as CardControlsUI, type SortDirection } from '../../components/ui/CardControls'
-import { RefreshButton } from '../../components/ui/RefreshIndicator'
 
 // ============================================================================
 // CardSkeleton - Loading state for cards
@@ -579,14 +578,6 @@ export interface CardControlsRowProps {
     sortDirection: SortDirection
     onSortDirectionChange: (dir: SortDirection) => void
   }
-  /** Refresh button config */
-  refresh?: {
-    isRefreshing: boolean
-    isFailed?: boolean
-    consecutiveFailures?: number
-    lastRefresh?: Date | number | null
-    onRefresh: () => void
-  }
   /** Extra content to render at the end */
   extra?: ReactNode
   className?: string
@@ -594,7 +585,10 @@ export interface CardControlsRowProps {
 
 /**
  * Composition component assembling the standard controls row:
- * [ClusterIndicator] [ClusterFilter] [CardControls] [RefreshButton] [Extra]
+ * [ClusterIndicator] [ClusterFilter] [CardControls] [Extra]
+ *
+ * Refresh is handled by CardWrapper's title bar — do NOT add a refresh
+ * button here to avoid duplication.
  *
  * All sections are optional — only renders what's provided.
  */
@@ -602,7 +596,6 @@ export function CardControlsRow({
   clusterFilter,
   clusterIndicator,
   cardControls,
-  refresh,
   extra,
   className = '',
 }: CardControlsRowProps) {
@@ -635,16 +628,6 @@ export function CardControlsRow({
           onSortChange={cardControls.onSortChange}
           sortDirection={cardControls.sortDirection}
           onSortDirectionChange={cardControls.onSortDirectionChange}
-        />
-      )}
-      {refresh && (
-        <RefreshButton
-          isRefreshing={refresh.isRefreshing}
-          isFailed={refresh.isFailed}
-          consecutiveFailures={refresh.consecutiveFailures}
-          lastRefresh={refresh.lastRefresh}
-          onRefresh={refresh.onRefresh}
-          size="sm"
         />
       )}
       {extra}
