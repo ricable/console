@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Box, WifiOff, X, Settings } from 'lucide-react'
+import { Box, WifiOff, X, Settings, Rocket } from 'lucide-react'
 import { Navbar } from './navbar/index'
 import { Sidebar } from './Sidebar'
 import { MissionSidebar, MissionSidebarToggle } from './mission-sidebar'
@@ -14,6 +14,7 @@ import { cn } from '../../lib/cn'
 import { TourOverlay, TourPrompt } from '../onboarding/Tour'
 import { DemoInstallBanner } from '../onboarding/DemoInstallGuide'
 import { TourProvider } from '../../hooks/useTour'
+import { SetupInstructionsDialog } from '../setup/SetupInstructionsDialog'
 
 interface LayoutProps {
   children: ReactNode
@@ -25,6 +26,7 @@ export function Layout({ children }: LayoutProps) {
   const { isDemoMode, toggleDemoMode } = useDemoMode()
   const { status: agentStatus } = useLocalAgent()
   const [offlineBannerDismissed, setOfflineBannerDismissed] = useState(false)
+  const [showSetupDialog, setShowSetupDialog] = useState(false)
 
   // Show offline banner when agent is disconnected (not demo mode, not connecting)
   const showOfflineBanner = !isDemoMode && agentStatus === 'disconnected' && !offlineBannerDismissed
@@ -75,6 +77,13 @@ export function Layout({ children }: LayoutProps) {
             <span className="text-xs text-yellow-400/70">
               Showing sample data from all cloud providers
             </span>
+            <button
+              onClick={() => setShowSetupDialog(true)}
+              className="ml-2 flex items-center gap-1.5 px-3 py-1 bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 rounded-full text-xs font-medium transition-colors"
+            >
+              <Rocket className="w-3.5 h-3.5" />
+              Want your own local KubeStellar Console?
+            </button>
             <button
               onClick={toggleDemoMode}
               className="ml-2 p-1 hover:bg-yellow-500/20 rounded transition-colors"
@@ -148,6 +157,12 @@ export function Layout({ children }: LayoutProps) {
       {/* AI Mission sidebar */}
       <MissionSidebar />
       <MissionSidebarToggle />
+
+      {/* Setup Instructions Dialog */}
+      <SetupInstructionsDialog
+        isOpen={showSetupDialog}
+        onClose={() => setShowSetupDialog(false)}
+      />
     </div>
     </TourProvider>
   )
