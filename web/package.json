@@ -45,6 +45,13 @@
     "tailwind-merge": "^2.6.0",
     "three": "^0.169.0"
   },
+  "comments": {
+    "dependencies": {
+      "@netlify/blobs": "Used in netlify/functions/presence.mts for session tracking",
+      "react-is": "Peer dependency for recharts and @react-three/drei (via prop-types)",
+      "sucrase": "Used in src/lib/dynamic-cards/compiler.ts for runtime TSX compilation + Tailwind dependency"
+    }
+  },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
