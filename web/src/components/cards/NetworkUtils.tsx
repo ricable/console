@@ -72,6 +72,7 @@ export function NetworkUtils() {
   const [hostInput, setHostInput] = useState('')
   const [portInput, setPortInput] = useState('443')
   const [networkInfo, setNetworkInfo] = useState<NetworkInfo>({ online: navigator.onLine })
+  const [pingError, setPingError] = useState<string | null>(null)
 
   const pingIntervalRef = useRef<number | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -177,18 +178,23 @@ export function NetworkUtils() {
     if (isPingingRef.current) return
     isPingingRef.current = true
     setIsPinging(true)
+    setPingError(null)
 
     const pingHosts = savedHosts.filter(h => h.type === 'ping')
 
-    for (const { host } of pingHosts) {
-      const result = await pingHost(host)
-      setPingResults(prev => {
-        const newMap = new Map(prev)
-        const existing = newMap.get(host) || []
-        // Keep last 10 results
-        newMap.set(host, [...existing.slice(-9), result])
-        return newMap
-      })
+    try {
+      for (const { host } of pingHosts) {
+        const result = await pingHost(host)
+        setPingResults(prev => {
+          const newMap = new Map(prev)
+          const existing = newMap.get(host) || []
+          // Keep last 10 results
+          newMap.set(host, [...existing.slice(-9), result])
+          return newMap
+        })
+      }
+    } catch (error) {
+      setPingError(error instanceof Error ? error.message : 'Network ping failed')
     }
 
     isPingingRef.current = false
@@ -397,6 +403,24 @@ export function NetworkUtils() {
                 )}
               </button>
             </div>
+
+            {/* Error display */}
+            {pingError && (
+              <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+                <div>
+                  <div className="font-medium">Network Error</div>
+                  <div className="text-xs text-red-400/80 mt-0.5">{pingError}</div>
+                </div>
+                <button
+                  onClick={() => setPingError(null)}
+                  className="ml-auto p-1 hover:bg-red-500/20 rounded"
+                  title="Dismiss"
+                >
+                  <XCircle className="w-3 h-3" />
+                </button>
+              </div>
+            )}
 
             {/* Results */}
             <div className="flex-1 overflow-y-auto space-y-2">

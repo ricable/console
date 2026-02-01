@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Save, RefreshCw, Check, X, Github, ExternalLink } from 'lucide-react'
+import { Skeleton } from '../../ui/Skeleton'
 
 interface GitHubTokenSectionProps {
   forceVersionCheck: () => void
@@ -22,6 +23,7 @@ export function GitHubTokenSection({ forceVersionCheck }: GitHubTokenSectionProp
   const [githubTokenTesting, setGithubTokenTesting] = useState(false)
   const [githubTokenError, setGithubTokenError] = useState<string | null>(null)
   const [githubRateLimit, setGithubRateLimit] = useState<{ limit: number; remaining: number; reset: Date } | null>(null)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
 
   // Load GitHub token status on mount and test existing token
   useEffect(() => {
@@ -29,7 +31,9 @@ export function GitHubTokenSection({ forceVersionCheck }: GitHubTokenSectionProp
     setHasGithubToken(!!encodedToken)
     if (encodedToken) {
       const token = decodeToken(encodedToken)
-      testGithubToken(token)
+      testGithubToken(token).finally(() => setIsInitialLoad(false))
+    } else {
+      setIsInitialLoad(false)
     }
   }, [])
 
@@ -107,51 +111,61 @@ export function GitHubTokenSection({ forceVersionCheck }: GitHubTokenSectionProp
       </div>
 
       {/* Status */}
-      <div className={`p-4 rounded-lg mb-4 ${
-        githubTokenError ? 'bg-red-500/10 border border-red-500/20' :
-        hasGithubToken ? 'bg-green-500/10 border border-green-500/20' :
-        'bg-yellow-500/10 border border-yellow-500/20'
-      }`}>
-        <div className="flex items-center gap-2">
-          {githubTokenTesting ? (
-            <>
-              <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />
-              <span className="font-medium text-blue-400">Testing token...</span>
-            </>
-          ) : githubTokenError ? (
-            <>
-              <X className="w-5 h-5 text-red-400" />
-              <span className="font-medium text-red-400">Token Error</span>
-              <span className="text-muted-foreground">- {githubTokenError}</span>
-            </>
-          ) : hasGithubToken && githubRateLimit ? (
-            <>
-              <Check className="w-5 h-5 text-green-400" />
-              <span className="font-medium text-green-400">Token Valid</span>
-              <span className="text-muted-foreground">
-                - {githubRateLimit.remaining.toLocaleString()}/{githubRateLimit.limit.toLocaleString()} requests remaining
-              </span>
-            </>
-          ) : hasGithubToken ? (
-            <>
-              <Check className="w-5 h-5 text-green-400" />
-              <span className="font-medium text-green-400">Token Configured</span>
-              <span className="text-muted-foreground">- 5,000 requests/hour</span>
-            </>
-          ) : (
-            <>
-              <X className="w-5 h-5 text-yellow-400" />
-              <span className="font-medium text-yellow-400">No Token</span>
-              <span className="text-muted-foreground">- Limited to 60 requests/hour</span>
-            </>
+      {isInitialLoad ? (
+        <div className="p-4 rounded-lg mb-4 bg-secondary/30 border border-border/50">
+          <div className="flex items-center gap-2">
+            <Skeleton variant="circular" width={20} height={20} />
+            <Skeleton width={120} height={20} />
+            <Skeleton width={200} height={16} />
+          </div>
+        </div>
+      ) : (
+        <div className={`p-4 rounded-lg mb-4 ${
+          githubTokenError ? 'bg-red-500/10 border border-red-500/20' :
+          hasGithubToken ? 'bg-green-500/10 border border-green-500/20' :
+          'bg-yellow-500/10 border border-yellow-500/20'
+        }`}>
+          <div className="flex items-center gap-2">
+            {githubTokenTesting ? (
+              <>
+                <RefreshCw className="w-5 h-5 text-blue-400 animate-spin" />
+                <span className="font-medium text-blue-400">Testing token...</span>
+              </>
+            ) : githubTokenError ? (
+              <>
+                <X className="w-5 h-5 text-red-400" />
+                <span className="font-medium text-red-400">Token Error</span>
+                <span className="text-muted-foreground">- {githubTokenError}</span>
+              </>
+            ) : hasGithubToken && githubRateLimit ? (
+              <>
+                <Check className="w-5 h-5 text-green-400" />
+                <span className="font-medium text-green-400">Token Valid</span>
+                <span className="text-muted-foreground">
+                  - {githubRateLimit.remaining.toLocaleString()}/{githubRateLimit.limit.toLocaleString()} requests remaining
+                </span>
+              </>
+            ) : hasGithubToken ? (
+              <>
+                <Check className="w-5 h-5 text-green-400" />
+                <span className="font-medium text-green-400">Token Configured</span>
+                <span className="text-muted-foreground">- 5,000 requests/hour</span>
+              </>
+            ) : (
+              <>
+                <X className="w-5 h-5 text-yellow-400" />
+                <span className="font-medium text-yellow-400">No Token</span>
+                <span className="text-muted-foreground">- Limited to 60 requests/hour</span>
+              </>
+            )}
+          </div>
+          {githubRateLimit && hasGithubToken && !githubTokenError && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Rate limit resets at {githubRateLimit.reset.toLocaleTimeString()}
+            </p>
           )}
         </div>
-        {githubRateLimit && hasGithubToken && !githubTokenError && (
-          <p className="text-xs text-muted-foreground mt-2">
-            Rate limit resets at {githubRateLimit.reset.toLocaleTimeString()}
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Token Input */}
       <div className="space-y-4">

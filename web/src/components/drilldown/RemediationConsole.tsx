@@ -226,7 +226,13 @@ export function RemediationConsole({
         })
       }
     } catch (error) {
-      // Simulate output for demo purposes when backend is not available
+      // Show error message with clear UI feedback
+      addLog({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Failed to execute command',
+        details: 'Backend API may be unavailable. Falling back to demo mode.',
+      })
+      // Also show simulated output in demo mode
       addLog({
         type: 'output',
         message: simulateCommandOutput(cmd),
