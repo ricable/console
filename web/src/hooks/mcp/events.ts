@@ -138,7 +138,7 @@ export function useEvents(cluster?: string, namespace?: string, limit = 20) {
       setLastRefresh(now)
       // console.log('[useEvents] Data updated successfully')
     } catch (err) {
-      // console.log('[useEvents] Caught error:', err)
+      console.error('[useEvents] Failed to fetch events:', err)
       // Keep stale data, only use demo if no cached data
       setConsecutiveFailures(prev => prev + 1)
       setLastRefresh(new Date())
@@ -262,6 +262,7 @@ export function useWarningEvents(cluster?: string, namespace?: string, limit = 2
       setError(null)
       setLastUpdated(now)
     } catch (err) {
+      console.error('[useWarningEvents] Failed to fetch warning events:', err)
       // Keep stale data, only use demo if no cached data
       if (!silent && !warningEventsCache) {
         setError('Failed to fetch warning events')
