@@ -1,6 +1,6 @@
 # KubeStellar Console - Complete Inventory
 
-Last Updated: 2026-01-23
+Last Updated: 2026-02-02
 
 ## Summary
 
@@ -9,8 +9,8 @@ Last Updated: 2026-01-23
 | Dashboard Pages | 20 (1 main + 19 dedicated) |
 | Card Types | 110 |
 | Cards with Drill-Down | 40 |
-| Drill-Down Views | 22 |
-| Modal Dialogs | 19 |
+| Drill-Down Views | 23 |
+| Modal Dialogs | 28 |
 | Stats Block Types | 93 (across 14 dashboard types) |
 
 ---
@@ -460,9 +460,9 @@ Based on feature requests:
 
 ---
 
-## 7. Modal Dialogs (19 Total)
+## 7. Modal Dialogs (28 Total)
 
-### Dashboard-Related Modals (6)
+### Dashboard-Related Modals (11)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
 | 1 | AddCardModal | `dashboard/AddCardModal.tsx` | "Add Card" button | AI-powered modal for adding dashboard cards with "Browse Cards" and "AI Suggestions" tabs |
@@ -470,52 +470,61 @@ Based on feature requests:
 | 3 | ReplaceCardModal | `dashboard/ReplaceCardModal.tsx` | Card replace action | Replace card with "Select" and "AI" tabs for choosing new card type |
 | 4 | ResetDialog | `dashboard/ResetDialog.tsx` | Dashboard reset action | Two-option dialog: "Add Missing Cards" or "Replace All Cards" |
 | 5 | TemplatesModal | `dashboard/TemplatesModal.tsx` | Templates selector | Dashboard template browser organized by category |
-| 6 | ResourceDetailModal | `dashboard/ResourceDetailModal.tsx` | Click resource in card | Generic resource detail modal with Details, Actions, and AI tabs |
+| 6 | CardFactoryModal | `dashboard/CardFactoryModal.tsx` | Card Factory menu | Create custom cards declaratively, with code, or AI-generated |
+| 7 | StatBlockFactoryModal | `dashboard/StatBlockFactoryModal.tsx` | Stats Factory menu | Create custom stat blocks with builder or AI generation |
+| 8 | CreateDashboardModal | `dashboard/CreateDashboardModal.tsx` | New dashboard button | Create new dashboard with optional template selection |
+| 9 | FeedbackModal | `feedback/FeedbackModal.tsx` | Feedback menu | Submit bug reports or feature requests via GitHub |
+| 10 | SaveResolutionDialog | `missions/SaveResolutionDialog.tsx` | Save mission resolution | Save successful mission resolution for future reference |
+| 11 | SetupInstructionsDialog | `setup/SetupInstructionsDialog.tsx` | Setup/help menu | Quick start guide with installation commands |
 
-### Cluster Management Modals (3)
+### Cluster Management Modals (5)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 7 | ClusterDetailModal | `clusters/ClusterDetailModal.tsx` | Click cluster in list | Comprehensive cluster details: health, metrics, nodes, workloads, GPU inventory |
-| 8 | RenameModal | `clusters/components/RenameModal.tsx` | Pencil icon on cluster | Rename kubeconfig context display name |
-| 9 | GPUDetailModal | `clusters/components/GPUDetailModal.tsx` | GPU card in cluster detail | GPU resource details: inventory, specs, utilization, per-cluster breakdown |
+| 12 | ClusterDetailModal | `clusters/ClusterDetailModal.tsx` | Click cluster in list | Comprehensive cluster details: health, metrics, nodes, workloads, GPU inventory |
+| 13 | RenameModal | `clusters/components/RenameModal.tsx` | Pencil icon on cluster | Rename kubeconfig context display name |
+| 14 | GPUDetailModal | `clusters/components/GPUDetailModal.tsx` | GPU stat block | GPU resource details: inventory, specs, utilization, per-cluster breakdown |
+| 15 | CPUDetailModal | `clusters/ResourceDetailModals.tsx` | CPU stat block | CPU allocation and utilization per node |
+| 16 | MemoryDetailModal | `clusters/ResourceDetailModals.tsx` | Memory stat block | Memory allocation and utilization per node |
+| 17 | StorageDetailModal | `clusters/ResourceDetailModals.tsx` | Storage stat block | Storage capacity per node |
+| 18 | CardConfigModal | `clusters/components/CardConfigModal.tsx` | Card settings (cluster page) | Configure cluster-specific card settings |
 
 ### Navigation/Exploration Modals (1)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 10 | DrillDownModal | `drilldown/DrillDownModal.tsx` | Click resources in cards | Hierarchical navigation for Kubernetes resources with breadcrumbs |
+| 19 | DrillDownModal | `drilldown/DrillDownModal.tsx` | Click resources in cards | Hierarchical navigation for Kubernetes resources with breadcrumbs |
 
 ### Feature/Feedback Modals (1)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 11 | FeatureRequestModal | `feedback/FeatureRequestModal.tsx` | Feedback button | Submit feedback/bugs and track request updates with GitHub integration |
+| 20 | FeatureRequestModal | `feedback/FeatureRequestModal.tsx` | Feedback button | Submit feature requests with GitHub integration |
 
 ### Setup/Onboarding Modals (1)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 12 | AgentSetupDialog | `agent/AgentSetupDialog.tsx` | Auto on app load (if agent not connected) | Install KubeStellar Console agent with quick install command |
+| 21 | AgentSetupDialog | `agent/AgentSetupDialog.tsx` | Auto on app load (if agent not connected) | Install KubeStellar Console agent with quick install command |
 
-### GitOps Modals (1)
+### GitOps/Deploy Modals (2)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 13 | SyncDialog | `gitops/SyncDialog.tsx` | GitOps sync action | Multi-phase sync workflow: Detection → Plan → Execute → Complete |
+| 22 | SyncDialog | `gitops/SyncDialog.tsx` | GitOps sync action | Multi-phase sync workflow: Detection → Plan → Execute → Complete |
+| 23 | DeployConfirmDialog | `deploy/DeployConfirmDialog.tsx` | Deploy action | Confirm deployment with dependency resolution and validation |
 
 ### Stats Configuration Modals (1)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 14 | StatsConfigModal | `ui/StatsConfig.tsx` | Stats settings icon | Configure visible stats, drag-drop reordering |
+| 24 | StatsConfigModal | `ui/StatsConfig.tsx` | Stats settings icon | Configure visible stats, drag-drop reordering |
 
 ### Policy Modals (2)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 15 | PolicyDetailModal | `cards/OPAPolicies.tsx` | Click policy in OPA card | OPA policy details with violations list |
-| 16 | ViolationsModal | `cards/OPAPolicies.tsx` | Click cluster with violations | OPA Gatekeeper violations list by severity |
+| 25 | PolicyDetailModal | `cards/OPAPolicies.tsx` | Click policy in OPA card | OPA policy details with violations list (inline expansion) |
+| 26 | ViolationsModal | `cards/OPAPolicies.tsx` | Click cluster with violations | OPA Gatekeeper violations list by severity (inline expansion) |
 
-### Inline Card Modals (3)
+### Inline Card Modals (2)
 | # | Name | File | Trigger | Description |
 |---|------|------|---------|-------------|
-| 17 | QuotaModal | `cards/NamespaceQuotas.tsx` | Add/Edit quota button | Create or edit ResourceQuota with CPU/memory/storage limits |
-| 18 | ApiKeyPromptModal | `cards/AIMissions.tsx` | AI feature without API key | Prompts user to configure Anthropic API key for AI features |
-| 19 | AlertRuleEditor | `alerts/AlertRuleEditor.tsx` | Add/Edit alert rule | Form for creating/editing Prometheus-style alert rules |
+| 27 | QuotaModal | `cards/NamespaceQuotas.tsx` | Add/Edit quota button | Create or edit ResourceQuota with CPU/memory/storage limits |
+| 28 | ApiKeyPromptModal | `cards/console-missions/shared.tsx` | AI feature without API key | Prompts user to configure Anthropic API key for AI features |
 
 ### Modal Features
 - All modals support ESC key to close
@@ -525,7 +534,7 @@ Based on feature requests:
 
 ---
 
-## 8. Drill-Down Views (22 Total)
+## 8. Drill-Down Views (23 Total)
 
 Drill-down views are displayed within `DrillDownModal` when clicking items in cards.
 
@@ -543,16 +552,17 @@ Drill-down views are displayed within `DrillDownModal` when clicking items in ca
 | 10 | HelmReleaseDrillDown | `drilldown/views/HelmReleaseDrillDown.tsx` | HelmReleaseStatus, HelmHistory |
 | 11 | KustomizationDrillDown | `drilldown/views/KustomizationDrillDown.tsx` | KustomizationStatus, OverlayComparison |
 | 12 | LogsDrillDown | `drilldown/views/LogsDrillDown.tsx` | Pod logs access |
-| 13 | NamespaceDrillDown | `drilldown/views/NamespaceDrillDown.tsx` | NamespaceOverview card |
-| 14 | NodeDrillDown | `drilldown/views/NodeDrillDown.tsx` | Node items in ComputeOverview |
-| 15 | OperatorDrillDown | `drilldown/views/OperatorDrillDown.tsx` | OperatorStatus, OperatorSubscriptions |
-| 16 | PodDrillDown | `drilldown/views/PodDrillDown.tsx` | TopPods, PodIssues cards |
-| 17 | PolicyDrillDown | `drilldown/views/PolicyDrillDown.tsx` | OPAPolicies, KyvernoPolicies |
-| 18 | ReplicaSetDrillDown | `drilldown/views/ReplicaSetDrillDown.tsx` | ReplicaSet resources |
-| 19 | ResourcesDrillDown | `drilldown/views/ResourcesDrillDown.tsx` | Generic resource drill-down |
-| 20 | SecretDrillDown | `drilldown/views/SecretDrillDown.tsx` | Secret resources |
-| 21 | ServiceAccountDrillDown | `drilldown/views/ServiceAccountDrillDown.tsx` | RBAC service accounts |
-| 22 | YAMLDrillDown | `drilldown/views/YAMLDrillDown.tsx` | YAML view for any resource |
+| 13 | MultiClusterSummaryDrillDown | `drilldown/views/MultiClusterSummaryDrillDown.tsx` | Stat blocks (all-* views) |
+| 14 | NamespaceDrillDown | `drilldown/views/NamespaceDrillDown.tsx` | NamespaceOverview card |
+| 15 | NodeDrillDown | `drilldown/views/NodeDrillDown.tsx` | Node items in ComputeOverview |
+| 16 | OperatorDrillDown | `drilldown/views/OperatorDrillDown.tsx` | OperatorStatus, OperatorSubscriptions |
+| 17 | PodDrillDown | `drilldown/views/PodDrillDown.tsx` | TopPods, PodIssues cards |
+| 18 | PolicyDrillDown | `drilldown/views/PolicyDrillDown.tsx` | OPAPolicies, KyvernoPolicies |
+| 19 | ReplicaSetDrillDown | `drilldown/views/ReplicaSetDrillDown.tsx` | ReplicaSet resources |
+| 20 | ResourcesDrillDown | `drilldown/views/ResourcesDrillDown.tsx` | Generic resource drill-down |
+| 21 | SecretDrillDown | `drilldown/views/SecretDrillDown.tsx` | Secret resources |
+| 22 | ServiceAccountDrillDown | `drilldown/views/ServiceAccountDrillDown.tsx` | RBAC service accounts |
+| 23 | YAMLDrillDown | `drilldown/views/YAMLDrillDown.tsx` | YAML view for any resource |
 
 ---
 
