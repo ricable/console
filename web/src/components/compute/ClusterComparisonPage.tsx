@@ -53,8 +53,9 @@ export function ClusterComparisonPage() {
 
   // Get Kubernetes version from cluster
   const getK8sVersion = (_cluster: ClusterInfo) => {
-    // ClusterInfo interface would need to be extended with a 'version' field containing K8s version
-    // Version can be obtained from K8s API server /version endpoint during cluster discovery
+    // Kubernetes version retrieval not yet implemented
+    // Implementation approach: Extend ClusterInfo interface with 'version' field
+    // and query K8s API server /version endpoint during cluster discovery
     return 'N/A'
   }
 

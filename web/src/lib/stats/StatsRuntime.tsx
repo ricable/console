@@ -319,12 +319,13 @@ export function StatsRuntime({
 }
 
 // ============================================================================
-// YAML Parser (future implementation)
+// YAML Parser (intentionally not implemented)
 // ============================================================================
 
 export function parseStatsYAML(_yaml: string): StatsDefinition {
-  // YAML parsing intentionally not implemented - use registerStats() with JS objects
-  // If YAML config becomes a requirement, add js-yaml library and implement parser here
+  // Design decision: YAML configuration not supported for stats
+  // Rationale: JS objects via registerStats() provide better type safety and IDE support
+  // If YAML becomes a requirement, add js-yaml library and implement parser
   throw new Error('YAML parsing not yet implemented. Use registerStats() with JS objects.')
 }
 

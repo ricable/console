@@ -476,13 +476,13 @@ Please provide:
     [podIssues, createAlert]
   )
 
-  // Evaluate weather alerts condition - mock implementation for demo purposes
-  // This is intentionally a demo feature to showcase conditional alerting capabilities
-  // Production deployments should disable weather alerts or replace with actual weather API
+  // Evaluate weather alerts condition - demo feature for showcasing alerting capabilities
+  // Design decision: Weather alerts use mock data for demonstration purposes
+  // Production usage: Disable weather alerts or integrate with actual weather API service
   const evaluateWeatherAlerts = useCallback(
     (rule: AlertRule) => {
-      // Mock weather data evaluation
-      // In production, this would integrate with a weather API
+      // Mock weather data evaluation for demo purposes
+      // Production integration would query a real weather API service
       const mockWeatherCondition = rule.condition.weatherCondition || 'severe_storm'
       
       // Randomly trigger alerts for demo purposes (10% chance)

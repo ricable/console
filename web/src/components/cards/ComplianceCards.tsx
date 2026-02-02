@@ -11,8 +11,8 @@ interface CardConfig {
 
 // Falco Runtime Security Card
 export function FalcoAlerts({ config: _config }: CardConfig) {
-  // Integration approach: Detect Falco installation via K8s API, query Falco alerts from its API/CRDs
-  // UI already displays integration notice with install guide when Falco is not detected
+  // Future integration: Detect Falco installation via K8s API, query Falco alerts from its API/CRDs
+  // Current behavior: Displays demo data with integration notice and install guide
   const demoAlerts = [
     { severity: 'critical', message: 'Container escape attempt detected', time: '2m ago' },
     { severity: 'warning', message: 'Privileged pod spawned', time: '15m ago' },
@@ -64,8 +64,8 @@ export function FalcoAlerts({ config: _config }: CardConfig) {
 
 // Trivy Vulnerability Scanner Card
 export function TrivyScan({ config: _config }: CardConfig) {
-  // Integration approach: Query VulnerabilityReport CRDs from Trivy Operator
-  // UI already displays integration notice with install guide when Trivy is not detected
+  // Future integration: Query VulnerabilityReport CRDs from Trivy Operator
+  // Current behavior: Displays demo data with integration notice and install guide
   const demoVulns = {
     critical: 3,
     high: 12,
@@ -118,8 +118,8 @@ export function TrivyScan({ config: _config }: CardConfig) {
 
 // Kubescape Security Posture Card
 export function KubescapeScan({ config: _config }: CardConfig) {
-  // Integration approach: Query Kubescape scan results from ConfigurationScanSummary CRDs
-  // UI already displays integration notice with install guide when Kubescape is not detected
+  // Future integration: Query Kubescape scan results from ConfigurationScanSummary CRDs
+  // Current behavior: Displays demo data with integration notice and install guide
   const score = 78
   const frameworks = [
     { name: 'NSA-CISA', score: 82 },

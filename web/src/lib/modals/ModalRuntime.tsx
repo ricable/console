@@ -400,11 +400,12 @@ export function ModalRuntime({
 }
 
 // ============================================================================
-// YAML Parser (future implementation)
+// YAML Parser (intentionally not implemented)
 // ============================================================================
 
 export function parseModalYAML(_yaml: string): ModalDefinition {
-  // YAML parsing intentionally not implemented - use registerModal() with JS objects
-  // If YAML config becomes a requirement, add js-yaml library and implement parser here
+  // Design decision: YAML configuration not supported for modals
+  // Rationale: JS objects via registerModal() provide better type safety and IDE support
+  // If YAML becomes a requirement, add js-yaml library and implement parser
   throw new Error('YAML parsing not yet implemented. Use registerModal() with JS objects.')
 }

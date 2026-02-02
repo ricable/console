@@ -727,8 +727,9 @@ The AI missions feature requires the local agent to be running.
     setMissions(prev => prev.map(m =>
       m.id === missionId ? { ...m, feedback, updatedAt: new Date() } : m
     ))
-    // Analytics integration: Would POST feedback to /api/analytics/missions endpoint when available
-    // For now, feedback is stored locally in component state only
+    // Analytics endpoint integration not yet implemented
+    // Future implementation: POST feedback to /api/analytics/missions endpoint
+    // Current behavior: Feedback stored locally in component state only
     console.log(`[Missions] Feedback for ${missionId}: ${feedback}`)
   }, [])
 
