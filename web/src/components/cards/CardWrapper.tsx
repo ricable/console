@@ -397,6 +397,11 @@ export const CARD_TITLES: Record<string, string> = {
 
   // Provider health
   provider_health: 'Provider Health',
+
+  // AI card aliases (for INVENTORY.md compatibility)
+  ai_issues: 'AI Issues',
+  ai_kubeconfig_audit: 'AI Kubeconfig Audit',
+  ai_health_check: 'AI Health Check',
 }
 
 // Short descriptions shown via info icon tooltip in the card header
@@ -506,6 +511,10 @@ export const CARD_DESCRIPTIONS: Record<string, string> = {
   ml_jobs: 'Machine learning training and batch job status.',
   ml_notebooks: 'Jupyter notebook server status and resource usage.',
   provider_health: 'Health and status of AI and cloud infrastructure providers.',
+  // AI card aliases (for INVENTORY.md compatibility)
+  ai_issues: 'AI-detected issues and recommended fixes.',
+  ai_kubeconfig_audit: 'AI audit of kubeconfig files for security and cleanup.',
+  ai_health_check: 'AI-powered cluster health analysis.',
 }
 
 // Card icons with their colors - displayed in the card header next to the title
@@ -677,6 +686,11 @@ const CARD_ICONS: Record<string, { icon: ComponentType<{ className?: string }>, 
   iframe_embed: { icon: Globe, color: 'text-blue-400' },
   network_utils: { icon: Network, color: 'text-cyan-400' },
   mobile_browser: { icon: Globe, color: 'text-purple-400' },
+
+  // AI card aliases (for INVENTORY.md compatibility)
+  ai_issues: { icon: Wand2, color: 'text-purple-400' },
+  ai_kubeconfig_audit: { icon: Wand2, color: 'text-purple-400' },
+  ai_health_check: { icon: Wand2, color: 'text-purple-400' },
 }
 
 export function CardWrapper({

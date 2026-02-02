@@ -99,6 +99,10 @@ const CARD_CATALOG = {
     { type: 'console_ai_kubeconfig_audit', title: 'AI Kubeconfig Audit', description: 'Audit kubeconfig for stale contexts', visualization: 'status' },
     { type: 'console_ai_health_check', title: 'AI Health Check', description: 'Comprehensive AI health analysis', visualization: 'gauge' },
     { type: 'console_ai_offline_detection', title: 'Offline Detection', description: 'Detect offline nodes and unavailable GPUs', visualization: 'status' },
+    // Aliases for INVENTORY.md compatibility
+    { type: 'ai_issues', title: 'AI Issues (alias)', description: 'AI-powered issue detection and repair', visualization: 'status' },
+    { type: 'ai_kubeconfig_audit', title: 'AI Kubeconfig Audit (alias)', description: 'Audit kubeconfig for stale contexts', visualization: 'status' },
+    { type: 'ai_health_check', title: 'AI Health Check (alias)', description: 'Comprehensive AI health analysis', visualization: 'gauge' },
   ],
   'Alerting': [
     { type: 'active_alerts', title: 'Active Alerts', description: 'Firing alerts with severity and quick actions', visualization: 'status' },

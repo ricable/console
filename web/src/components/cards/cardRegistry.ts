@@ -345,6 +345,10 @@ const RAW_CARD_COMPONENTS: Record<string, CardComponent> = {
   error_count: PodIssues,
   security_overview: SecurityIssues,
   rbac_summary: NamespaceRBAC,
+  // AI card aliases (INVENTORY.md uses these names without console_ prefix)
+  ai_issues: ConsoleIssuesCard,
+  ai_kubeconfig_audit: ConsoleKubeconfigAuditCard,
+  ai_health_check: ConsoleHealthCheckCard,
 }
 
 // Wrap every card with its own Suspense boundary
