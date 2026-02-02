@@ -51,7 +51,7 @@
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.169.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^5.1.2",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.17.0",
     "eslint-plugin-react-hooks": "^5.1.0",
@@ -65,7 +65,7 @@
     "terser": "^5.46.0",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.18.2",
-    "vite": "^6.0.5",
+    "vite": "^7.3.1",
     "vite-plugin-istanbul": "^7.2.1",
     "wait-on": "^9.0.3",
     "ws": "^8.19.0"
