@@ -18,10 +18,8 @@ export interface CardDataState {
   consecutiveFailures: number
   /** Whether data is currently being fetched */
   isLoading?: boolean
-  /** Error message if fetch failed */
-  error?: string | null
-  /** Error object for detailed error handling */
-  errorObject?: Error | null
+  /** Error object for detailed error handling (use error.message for display) */
+  error?: Error | null
 }
 
 interface CardDataReportContextValue {
@@ -38,9 +36,9 @@ export const CardDataReportContext = createContext<CardDataReportContextValue>(N
  * your cached data hook (e.g. useCachedPodIssues, useCachedDeployments).
  */
 export function useReportCardDataState(state: CardDataState) {
-  const { isFailed, consecutiveFailures, isLoading, error, errorObject } = state
+  const { isFailed, consecutiveFailures, isLoading, error } = state
   const ctx = useContext(CardDataReportContext)
   useEffect(() => {
-    ctx.report({ isFailed, consecutiveFailures, isLoading, error, errorObject })
-  }, [ctx, isFailed, consecutiveFailures, isLoading, error, errorObject])
+    ctx.report({ isFailed, consecutiveFailures, isLoading, error })
+  }, [ctx, isFailed, consecutiveFailures, isLoading, error])
 }
