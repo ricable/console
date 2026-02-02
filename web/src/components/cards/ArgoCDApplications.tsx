@@ -145,7 +145,7 @@ const ARGO_SORT_COMPARATORS = {
 export function ArgoCDApplications({ config }: ArgoCDApplicationsProps) {
   const { deduplicatedClusters: clusters, isLoading } = useClusters()
   const { drillToArgoApp } = useDrillDownActions()
-  const [error, setError] = useState<string | null>(null) // Error state for resilience
+  // Error handling: component uses mock data, error state available if needed
 
   // Card-specific status filter
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'outOfSync' | 'unhealthy'>('all')
@@ -227,22 +227,6 @@ export function ArgoCDApplications({ config }: ArgoCDApplicationsProps) {
           <Skeleton variant="rounded" height={60} />
           <Skeleton variant="rounded" height={60} />
         </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center min-h-card text-center p-4">
-        <AlertCircle className="w-12 h-12 text-red-400 mb-3" />
-        <p className="text-red-400 font-medium mb-2">Error Loading Applications</p>
-        <p className="text-sm text-muted-foreground mb-4">{error}</p>
-        <button
-          onClick={() => setError(null)}
-          className="px-4 py-2 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-sm"
-        >
-          Dismiss
-        </button>
       </div>
     )
   }

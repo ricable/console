@@ -58,7 +58,7 @@ export function DashboardHeader({
 }: DashboardHeaderProps) {
   const location = useLocation()
   const [rememberPosition, setRememberPositionState] = useState(() => getRememberPosition(location.pathname))
-  const [_isLoading] = useState(isFetching) // Alias for Auto-QA resilience check
+  // Loading state tracked via isFetching prop
 
   // Self-managed timestamp: updates when isFetching goes true → false
   const [internalLastUpdated, setInternalLastUpdated] = useState<Date>(() => new Date())

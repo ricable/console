@@ -87,8 +87,7 @@ export function RemediationConsole({
   const [shellCommand, setShellCommand] = useState('')
   const [commandHistory, setCommandHistory] = useState<string[]>([])
   const [historyIndex, setHistoryIndex] = useState(-1)
-  const [isExecuting, setIsExecuting] = useState(false)
-  const [_isLoading, _setIsLoading] = useState(false) // Alias for isExecuting to satisfy Auto-QA
+  const [isExecuting, setIsExecuting] = useState(false) // Loading state tracked via isExecuting
   const [shellError, setShellError] = useState<string | null>(null)
   const logsEndRef = useRef<HTMLDivElement>(null)
   const shellInputRef = useRef<HTMLInputElement>(null)
@@ -187,7 +186,6 @@ export function RemediationConsole({
     })
 
     setIsExecuting(true)
-    _setIsLoading(true)
     setShellError(null)
 
     try {
@@ -240,7 +238,6 @@ export function RemediationConsole({
     }
 
     setIsExecuting(false)
-    _setIsLoading(false)
     setShellCommand('')
   }
 

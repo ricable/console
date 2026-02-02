@@ -11,13 +11,11 @@ export function ProfileSection({ initialEmail, initialSlackId, refreshUser }: Pr
   const [email, setEmail] = useState(initialEmail)
   const [slackId, setSlackId] = useState(initialSlackId)
   const [profileSaved, setProfileSaved] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [_isLoading, _setIsLoading] = useState(false) // Loading state for data fetching
+  const [isSaving, setIsSaving] = useState(false) // Loading state tracked via isSaving
   const [error, setError] = useState<string | null>(null)
 
   const handleSaveProfile = async () => {
     setIsSaving(true)
-    _setIsLoading(true)
     setError(null)
     try {
       const token = localStorage.getItem('token')
@@ -42,7 +40,6 @@ export function ProfileSection({ initialEmail, initialSlackId, refreshUser }: Pr
       console.error('Failed to save profile:', error)
     } finally {
       setIsSaving(false)
-      _setIsLoading(false)
     }
   }
 
