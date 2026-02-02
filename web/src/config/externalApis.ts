@@ -1,7 +1,14 @@
 /**
  * External API Configuration
  * 
- * This file centralizes external API endpoints and documentation URLs.
+ * SECURITY NOTE: This file centralizes external API endpoints and documentation URLs.
+ * 
+ * URLs in this file fall into these categories:
+ * 1. Configurable APIs: Can be overridden via environment variables (e.g., VITE_GEOCODING_API_URL)
+ * 2. Public Documentation Links: Intentionally hardcoded references to official docs (NOT credentials)
+ * 3. Installation Commands: Public kubectl commands for CRD installation (NOT sensitive)
+ * 
+ * These are NOT credentials, API keys, or sensitive endpoints.
  * Some URLs (like documentation links) are intentionally hardcoded as they
  * are part of the application's functionality and reference public resources.
  */
@@ -17,8 +24,10 @@ export const WEATHER_API = {
 
 /**
  * AI Provider Documentation URLs
- * These are hardcoded as they are public documentation links
- * that guide users to obtain API keys.
+ * 
+ * SECURITY NOTE: These are PUBLIC documentation links (NOT API keys or credentials).
+ * They guide users to obtain their own API keys from the respective providers.
+ * These URLs are intentionally hardcoded as they are stable, public resources.
  */
 export const AI_PROVIDER_DOCS = {
   claude: 'https://console.anthropic.com/settings/keys',
@@ -28,8 +37,10 @@ export const AI_PROVIDER_DOCS = {
 
 /**
  * Kubernetes and Service Mesh Documentation URLs
- * These are hardcoded references to official documentation and
- * are essential for user guidance within the application.
+ * 
+ * SECURITY NOTE: These are PUBLIC references to official Kubernetes documentation (NOT credentials).
+ * They are essential for user guidance within the application.
+ * Installation commands reference official GitHub release artifacts (public resources).
  */
 export const K8S_DOCS = {
   gatewayApi: 'https://gateway-api.sigs.k8s.io/',
