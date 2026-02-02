@@ -161,9 +161,9 @@ Last Updated: 2026-01-23
 ### Category: AI (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 58 | `ai_issues` | AI Issues | status |
-| 59 | `ai_kubeconfig_audit` | AI Kubeconfig Audit | status |
-| 60 | `ai_health_check` | AI Health Check | gauge |
+| 58 | `console_ai_issues` | AI Issues | status |
+| 59 | `console_ai_kubeconfig_audit` | AI Kubeconfig Audit | status |
+| 60 | `console_ai_health_check` | AI Health Check | gauge |
 
 ### Category: Alerting (2 cards)
 | # | Type | Title | Visualization |
