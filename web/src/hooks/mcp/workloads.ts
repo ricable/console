@@ -48,8 +48,17 @@ function getDemoDeploymentIssues(): DeploymentIssue[] {
   ]
 }
 
-// @ts-ignore - kept for demo mode reference
-function __getDemoDeployments(): Deployment[] {
+function getDemoPodIssues(): PodIssue[] {
+  return [
+    { name: 'api-server-7d8f9c6b5-x2k4m', namespace: 'production', cluster: 'eks-prod-us-east-1', status: 'CrashLoopBackOff', issues: ['Container restarting', 'OOMKilled'], restarts: 15 },
+    { name: 'worker-5c6d7e8f9-n3p2q', namespace: 'batch', cluster: 'vllm-gpu-cluster', status: 'ImagePullBackOff', issues: ['Failed to pull image'], restarts: 0 },
+    { name: 'cache-redis-0', namespace: 'data', cluster: 'gke-staging', status: 'Pending', issues: ['Insufficient memory'], restarts: 0 },
+    { name: 'metrics-collector-2b4c6-j8k9l', namespace: 'monitoring', cluster: 'openshift-prod', status: 'CrashLoopBackOff', issues: ['Exit code 137'], restarts: 8 },
+    { name: 'gpu-scheduler-0', namespace: 'ml-ops', cluster: 'vllm-gpu-cluster', status: 'Pending', issues: ['Insufficient nvidia.com/gpu'], restarts: 0 },
+  ]
+}
+
+function getDemoDeployments(): Deployment[] {
   return [
     {
       name: 'api-gateway',
@@ -483,6 +492,25 @@ export function usePodIssues(cluster?: string, namespace?: string) {
   }, [cluster, namespace])
 
   const refetch = useCallback(async (silent = false) => {
+    // In demo mode, return demo data immediately and cache it
+    if (getDemoMode()) {
+      const demoData = getDemoPodIssues()
+      const now = new Date()
+      podIssuesCache = { data: demoData, timestamp: now, key: cacheKey }
+      setIssues(demoData)
+      setError(null)
+      setLastUpdated(now)
+      setLastRefresh(now)
+      setIsLoading(false)
+      if (!silent) {
+        setIsRefreshing(true)
+        setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+      } else {
+        setIsRefreshing(false)
+      }
+      return
+    }
+
     // Skip only if not logged in at all
     const token = localStorage.getItem('token')
     if (!token) {
@@ -557,13 +585,18 @@ export function usePodIssues(cluster?: string, namespace?: string) {
       setConsecutiveFailures(0)
       setLastRefresh(now)
     } catch (err) {
-      // Keep stale data, only use demo if no cached data
+      // Keep stale data if available
       setConsecutiveFailures(prev => prev + 1)
       setLastRefresh(new Date())
-      if (!silent && !podIssuesCache) {
-        setError('Failed to fetch pod issues')
-        // Don't use demo data - show empty instead to avoid confusion
-        setIssues([])
+      if (!podIssuesCache) {
+        // Only use demo data in demo mode, otherwise show error
+        if (getDemoMode()) {
+          const demoData = getDemoPodIssues()
+          podIssuesCache = { data: demoData, timestamp: new Date(), key: cacheKey }
+          setIssues(demoData)
+        } else {
+          setError('Failed to fetch pod issues')
+        }
       }
     } finally {
       setIsLoading(false)
@@ -635,12 +668,28 @@ export function useDeploymentIssues(cluster?: string, namespace?: string) {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
 
   const refetch = useCallback(async (silent = false) => {
-    // Skip only when not logged in at all - allow demo-token to proceed so MSW can handle it
+    // In demo mode, return demo data immediately and cache it
+    if (getDemoMode()) {
+      const demoData = getDemoDeploymentIssues()
+      const now = new Date()
+      deploymentIssuesCache = { data: demoData, timestamp: now, key: cacheKey }
+      setIssues(demoData)
+      setError(null)
+      setLastUpdated(now)
+      setLastRefresh(now)
+      setIsLoading(false)
+      if (!silent) {
+        setIsRefreshing(true)
+        setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+      } else {
+        setIsRefreshing(false)
+      }
+      return
+    }
+
+    // Skip only when not logged in at all
     const token = localStorage.getItem('token')
     if (!token) {
-      if (!deploymentIssuesCache) {
-        setIssues(getDemoDeploymentIssues())
-      }
       const now = new Date()
       setLastUpdated(now)
       setLastRefresh(now)
@@ -766,6 +815,25 @@ export function useDeployments(cluster?: string, namespace?: string) {
   }, [cluster, namespace])
 
   const refetch = useCallback(async (silent = false) => {
+    // In demo mode, return demo data immediately and cache it
+    if (getDemoMode()) {
+      const demoData = getDemoDeployments()
+      const now = new Date()
+      deploymentsCache = { data: demoData, timestamp: now, key: cacheKey }
+      setDeployments(demoData)
+      setError(null)
+      setLastUpdated(now)
+      setLastRefresh(now)
+      setIsLoading(false)
+      if (!silent) {
+        setIsRefreshing(true)
+        setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
+      } else {
+        setIsRefreshing(false)
+      }
+      return
+    }
+
     // For silent (background) refreshes, don't update loading states - prevents UI flashing
     if (!silent) {
       // Always set isRefreshing first so indicator shows

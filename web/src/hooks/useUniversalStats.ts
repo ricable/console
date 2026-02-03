@@ -1,20 +1,19 @@
 import { useCallback, useMemo } from 'react'
-import {
-  useClusters,
-  usePodIssues,
-  useDeployments,
-  useDeploymentIssues,
-  usePVCs,
-  useServices,
-  useEvents,
-  useWarningEvents,
-  useSecurityIssues,
-  useHelmReleases,
-  useOperatorSubscriptions,
-  useOperators,
-  useGPUNodes,
-} from './useMCP'
+import { useClusters, useWarningEvents } from './useMCP'
+import { useSecurityIssues } from './mcp/security'
+import { useServices } from './mcp/networking'
 import { useAlerts, useAlertRules } from './useAlerts'
+import {
+  useCachedPodIssues,
+  useCachedDeployments,
+  useCachedDeploymentIssues,
+  useCachedEvents,
+  useCachedPVCs,
+  useCachedHelmReleases,
+  useCachedOperatorSubscriptions,
+  useCachedOperators,
+  useCachedGPUNodes,
+} from './useCachedData'
 import { StatBlockValue } from '../components/ui/StatsOverview'
 import { useDrillDownActions } from './useDrillDown'
 import { getDemoMode } from './useDemoMode'
@@ -43,19 +42,19 @@ export function useUniversalStats() {
     drillToAllSecurity, drillToAllGPU, drillToAllStorage,
   } = useDrillDownActions()
 
-  // Domain-specific data
-  const { issues: podIssues } = usePodIssues()
-  const { deployments } = useDeployments()
-  const { issues: deploymentIssues } = useDeploymentIssues()
-  const { pvcs } = usePVCs()
-  const { services } = useServices()
-  const { events } = useEvents(undefined, undefined, 100)
+  // Domain-specific data - use cached hooks for IndexedDB persistence
+  const { issues: podIssues } = useCachedPodIssues()
+  const { deployments } = useCachedDeployments()
+  const { issues: deploymentIssues } = useCachedDeploymentIssues()
+  const { pvcs } = useCachedPVCs()
+  const { services } = useServices() // Already migrated to useCache
+  const { events } = useCachedEvents(undefined, undefined, { limit: 100 })
   const { events: warningEvents } = useWarningEvents(undefined, undefined, 100)
-  const { issues: securityIssues } = useSecurityIssues()
-  const { releases: helmReleases } = useHelmReleases()
-  const { subscriptions: operatorSubscriptions } = useOperatorSubscriptions()
-  const { operators } = useOperators()
-  const { nodes: gpuNodes } = useGPUNodes()
+  const { issues: securityIssues } = useSecurityIssues() // Already migrated to useCache
+  const { releases: helmReleases } = useCachedHelmReleases()
+  const { subscriptions: operatorSubscriptions } = useCachedOperatorSubscriptions()
+  const { operators } = useCachedOperators()
+  const { nodes: gpuNodes } = useCachedGPUNodes()
   const { stats: alertStats } = useAlerts()
   const { rules: alertRules } = useAlertRules()
 

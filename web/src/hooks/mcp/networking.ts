@@ -1,411 +1,301 @@
-import { useState, useEffect, useCallback } from 'react'
-import { api } from '../../lib/api'
-import { reportAgentDataSuccess, isAgentUnavailable } from '../useLocalAgent'
+import { useCache, type RefreshCategory } from '../../lib/cache'
 import { getDemoMode } from '../useDemoMode'
+import { clusterCacheRef, LOCAL_AGENT_URL } from './shared'
 import { kubectlProxy } from '../../lib/kubectlProxy'
-import { REFRESH_INTERVAL_MS, MIN_REFRESH_INDICATOR_MS, getEffectiveInterval, LOCAL_AGENT_URL, clusterCacheRef } from './shared'
 import type { Service, Ingress, NetworkPolicy } from './types'
 
-// Module-level cache for services data (persists across navigation)
-const SERVICES_CACHE_KEY = 'kubestellar-services-cache'
+// ============================================================================
+// useServices - with IndexedDB caching
+// ============================================================================
 
-interface ServicesCache {
-  data: Service[]
-  timestamp: Date
-  key: string
-}
-let servicesCache: ServicesCache | null = null
-
-// Load services cache from localStorage
-function loadServicesCacheFromStorage(cacheKey: string): { data: Service[], timestamp: Date } | null {
-  try {
-    const stored = localStorage.getItem(SERVICES_CACHE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      if (parsed.key === cacheKey && parsed.data && parsed.data.length > 0) {
-        const timestamp = parsed.timestamp ? new Date(parsed.timestamp) : new Date()
-        servicesCache = { data: parsed.data, timestamp, key: cacheKey }
-        return { data: parsed.data, timestamp }
-      }
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return null
-}
-
-function saveServicesCacheToStorage() {
-  if (servicesCache) {
-    try {
-      localStorage.setItem(SERVICES_CACHE_KEY, JSON.stringify({
-        data: servicesCache.data,
-        timestamp: servicesCache.timestamp.toISOString(),
-        key: servicesCache.key
-      }))
-    } catch {
-      // Ignore storage errors
-    }
-  }
-}
-
-// Hook to get services with localStorage-backed caching
 export function useServices(cluster?: string, namespace?: string) {
-  const cacheKey = `services:${cluster || 'all'}:${namespace || 'all'}`
+  const key = `services:${cluster || 'all'}:${namespace || 'all'}`
+  const isDemo = getDemoMode()
 
-  // Initialize from cache if available and matches current key
-  const getCachedData = () => {
-    if (servicesCache && servicesCache.key === cacheKey) {
-      return { data: servicesCache.data, timestamp: servicesCache.timestamp }
-    }
-    return loadServicesCacheFromStorage(cacheKey)
-  }
-
-  const cached = getCachedData()
-  const [services, setServices] = useState<Service[]>(cached?.data || [])
-  const [isLoading, setIsLoading] = useState(!cached)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(cached?.timestamp || null)
-  const [error, setError] = useState<string | null>(null)
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(cached?.timestamp || null)
-
-  // Reset state when cluster changes
-  useEffect(() => {
-    setServices([])
-    setIsLoading(true)
-    setError(null)
-  }, [cluster, namespace])
-
-  const refetch = useCallback(async (silent = false) => {
-    // For silent (background) refreshes, don't update loading states - prevents UI flashing
-    if (!silent) {
-      setIsRefreshing(true)
-    }
-
-    // Check if we need loading state (no cached data)
-    if (!silent) {
-      const hasCachedData = servicesCache && servicesCache.key === cacheKey
-      if (!hasCachedData) {
-        setIsLoading(true)
-      }
-    }
-
-    // Try local agent HTTP endpoint first
-    if (cluster && !isAgentUnavailable()) {
-      try {
-        const agentParams = new URLSearchParams()
-        agentParams.append('cluster', cluster)
-        if (namespace) agentParams.append('namespace', namespace)
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 15000)
-        const response = await fetch(`${LOCAL_AGENT_URL}/services?${agentParams}`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        })
-        clearTimeout(timeoutId)
-        if (response.ok) {
-          const agentData = await response.json()
-          const now = new Date()
-          const mappedServices: Service[] = (agentData.services || []).map((s: Service) => ({ ...s, cluster }))
-          servicesCache = { data: mappedServices, timestamp: now, key: cacheKey }
-          setServices(mappedServices)
-          setError(null)
-          setLastUpdated(now)
-          setConsecutiveFailures(0)
-          setLastRefresh(now)
-          setIsLoading(false)
-          setIsRefreshing(false)
-          reportAgentDataSuccess()
-          return
-        }
-      } catch {
-        // Fall through to kubectl proxy
-      }
-    }
-
-    // Try kubectl proxy when cluster is specified
-    if (cluster && !isAgentUnavailable()) {
-      try {
-        const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
-        const kubectlContext = clusterInfo?.context || cluster
-        console.log(`[useServices] Fetching for ${cluster} using context: ${kubectlContext}`)
-
-        // Add timeout to prevent hanging
-        const svcPromise = kubectlProxy.getServices(kubectlContext, namespace)
-        const timeoutPromise = new Promise<null>((resolve) =>
-          setTimeout(() => resolve(null), 15000)
-        )
-        const svcData = await Promise.race([svcPromise, timeoutPromise])
-
-        if (svcData && svcData.length >= 0) {
-          console.log(`[useServices] Got ${svcData.length} services for ${cluster}`)
-          const now = new Date()
-          // Map to Service format
-          const mappedServices: Service[] = svcData.map(s => ({
-            name: s.name,
-            namespace: s.namespace,
-            cluster: cluster,
-            type: s.type,
-            clusterIP: s.clusterIP,
-            ports: s.ports ? s.ports.split(', ') : [],
-          }))
-          servicesCache = { data: mappedServices, timestamp: now, key: cacheKey }
-          setServices(mappedServices)
-          setError(null)
-          setLastUpdated(now)
-          setConsecutiveFailures(0)
-          setLastRefresh(now)
-          setIsLoading(false)
-          if (!silent) {
-            setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
-          } else {
-            setIsRefreshing(false)
-          }
-          return
-        }
-        console.log(`[useServices] No data returned for ${cluster}, trying API`)
-      } catch (err) {
-        console.error(`[useServices] kubectl proxy failed for ${cluster}:`, err)
-      }
-    }
-
-    try {
-      // If demo mode is enabled, use demo data
+  const result = useCache({
+    key,
+    category: 'services' as RefreshCategory,
+    // Only provide demo data as initialData in demo mode
+    // Otherwise start empty so skeleton shows while loading
+    initialData: isDemo ? getDemoServices() : [],
+    fetcher: async () => {
+      // In demo mode, return demo data
       if (getDemoMode()) {
-        const demoServices = getDemoServices().filter(s =>
+        return getDemoServices().filter(s =>
           (!cluster || s.cluster === cluster) && (!namespace || s.namespace === namespace)
         )
-        setServices(demoServices)
-        setError(null)
-        setLastUpdated(new Date())
-        setConsecutiveFailures(0)
-        setLastRefresh(new Date())
-        return
       }
+
+      // Try local agent HTTP endpoint first
+      if (cluster && clusterCacheRef.clusters.length > 0) {
+        try {
+          const agentParams = new URLSearchParams()
+          agentParams.append('cluster', cluster)
+          if (namespace) agentParams.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/services?${agentParams}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const agentData = await response.json()
+            return ((agentData.services || []) as Service[]).map(s => ({ ...s, cluster }))
+          }
+        } catch {
+          // Fall through to kubectl proxy
+        }
+      }
+
+      // Try kubectl proxy when cluster is specified
+      if (cluster && clusterCacheRef.clusters.length > 0) {
+        try {
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          const kubectlContext = clusterInfo?.context || cluster
+
+          const svcPromise = kubectlProxy.getServices(kubectlContext, namespace)
+          const timeoutPromise = new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), 15000)
+          )
+          const svcData = await Promise.race([svcPromise, timeoutPromise])
+
+          if (svcData && svcData.length >= 0) {
+            return svcData.map(s => ({
+              name: s.name,
+              namespace: s.namespace,
+              cluster: cluster,
+              type: s.type,
+              clusterIP: s.clusterIP,
+              ports: s.ports ? s.ports.split(', ') : [],
+            })) as Service[]
+          }
+        } catch {
+          // Fall through to REST API
+        }
+      }
+
+      // Fall back to REST API
+      const token = localStorage.getItem('token')
+      if (!token || token === 'demo-token') {
+        return getDemoServices().filter(s =>
+          (!cluster || s.cluster === cluster) && (!namespace || s.namespace === namespace)
+        )
+      }
+
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
       const url = `/api/mcp/services?${params}`
 
-      // Skip API calls when using demo token
-      const token = localStorage.getItem('token')
-      if (!token || token === 'demo-token') {
-        const demoServices = getDemoServices().filter(s =>
-          (!cluster || s.cluster === cluster) && (!namespace || s.namespace === namespace)
-        )
-        setServices(demoServices)
-        const now = new Date()
-        setLastUpdated(now)
-        setLastRefresh(now)
-        setIsLoading(false)
-        setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
-        return
-      }
-
-      // Use direct fetch with timeout to prevent hanging
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       headers['Authorization'] = `Bearer ${token}`
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-      const response = await fetch(url, { method: 'GET', headers, signal: controller.signal })
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
       clearTimeout(timeoutId)
 
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
       }
       const data = await response.json() as { services: Service[] }
-      const newData = data.services || []
-      const now = new Date()
-
-      // Update module-level cache and persist to localStorage
-      servicesCache = { data: newData, timestamp: now, key: cacheKey }
-      saveServicesCacheToStorage()
-
-      setServices(newData)
-      setError(null)
-      setLastUpdated(now)
-      setConsecutiveFailures(0)
-      setLastRefresh(now)
-    } catch (err) {
-      setConsecutiveFailures(prev => prev + 1)
-      setLastRefresh(new Date())
-      if (!silent) {
-        setError('Failed to fetch services')
-        // Only fall back to demo data on error if in demo mode and no cached data
-        if (services.length === 0 && getDemoMode()) {
-          setServices(getDemoServices().filter(s =>
-            (!cluster || s.cluster === cluster) && (!namespace || s.namespace === namespace)
-          ))
-        }
-      }
-      // Don't clear services on error - keep stale data
-    } finally {
-      setIsLoading(false)
-      // Keep isRefreshing true for minimum time so user can see it, then reset
-      if (!silent) {
-        setTimeout(() => {
-          setIsRefreshing(false)
-        }, MIN_REFRESH_INDICATOR_MS)
-      } else {
-        setIsRefreshing(false)
-      }
-    }
-  }, [cluster, namespace, cacheKey, services.length])
-
-  useEffect(() => {
-    // If we have cached data, still refresh in background but don't show loading
-    const hasCachedData = servicesCache && servicesCache.key === cacheKey
-    refetch(!!hasCachedData) // silent=true if we have cached data
-
-    // Poll every 30 seconds for service updates
-    const interval = setInterval(() => refetch(true), getEffectiveInterval(REFRESH_INTERVAL_MS))
-    return () => clearInterval(interval)
-  }, [refetch, cacheKey])
+      return data.services || []
+    },
+  })
 
   return {
-    services,
-    isLoading,
-    isRefreshing,
-    lastUpdated,
-    error,
-    refetch: () => refetch(false),
-    consecutiveFailures,
-    isFailed: consecutiveFailures >= 3,
-    lastRefresh,
+    services: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    lastUpdated: result.lastRefresh ? new Date(result.lastRefresh) : null,
+    error: result.error,
+    refetch: result.refetch,
+    consecutiveFailures: result.consecutiveFailures,
+    isFailed: result.isFailed,
+    lastRefresh: result.lastRefresh ? new Date(result.lastRefresh) : null,
   }
 }
 
+// ============================================================================
+// useIngresses - with IndexedDB caching
+// ============================================================================
+
 export function useIngresses(cluster?: string, namespace?: string) {
-  const [ingresses, setIngresses] = useState<Ingress[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const key = `ingresses:${cluster || 'all'}:${namespace || 'all'}`
+  const isDemo = getDemoMode()
 
-  const refetch = useCallback(async () => {
-    // If demo mode is enabled, use demo data
-    if (getDemoMode()) {
-      const demoIngresses = getDemoIngresses().filter(i =>
-        (!cluster || i.cluster === cluster) && (!namespace || i.namespace === namespace)
-      )
-      setIngresses(demoIngresses)
-      setIsLoading(false)
-      setError(null)
-      return
-    }
-    setIsLoading(true)
-    if (cluster && !isAgentUnavailable()) {
-      try {
-        const params = new URLSearchParams()
-        params.append('cluster', cluster)
-        if (namespace) params.append('namespace', namespace)
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 15000)
-        const response = await fetch(`${LOCAL_AGENT_URL}/ingresses?${params}`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        })
-        clearTimeout(timeoutId)
-        if (response.ok) {
-          const data = await response.json()
-          setIngresses(data.ingresses || [])
-          setError(null)
-          setIsLoading(false)
-          reportAgentDataSuccess()
-          return
-        }
-      } catch {
-        // Fall through to API
-      }
-    }
-    try {
-      const params = new URLSearchParams()
-      if (cluster) params.append('cluster', cluster)
-      if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ ingresses: Ingress[] }>(`/api/mcp/ingresses?${params}`)
-      setIngresses(data.ingresses || [])
-      setError(null)
-    } catch {
-      setError('Failed to fetch Ingresses')
-      // Only fall back to demo data on error if in demo mode
+  const result = useCache({
+    key,
+    category: 'services' as RefreshCategory,
+    initialData: isDemo ? getDemoIngresses() : [],
+    fetcher: async () => {
+      // In demo mode, return demo data
       if (getDemoMode()) {
-        setIngresses(getDemoIngresses().filter(i =>
+        return getDemoIngresses().filter(i =>
           (!cluster || i.cluster === cluster) && (!namespace || i.namespace === namespace)
-        ))
+        )
       }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [cluster, namespace])
 
-  useEffect(() => { refetch() }, [refetch])
-  return { ingresses, isLoading, error, refetch }
-}
+      // Try local agent first
+      if (cluster && clusterCacheRef.clusters.length > 0) {
+        try {
+          const params = new URLSearchParams()
+          params.append('cluster', cluster)
+          if (namespace) params.append('namespace', namespace)
 
-// Hook to get NetworkPolicies
-export function useNetworkPolicies(cluster?: string, namespace?: string) {
-  const [networkpolicies, setNetworkPolicies] = useState<NetworkPolicy[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/ingresses?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
 
-  const refetch = useCallback(async () => {
-    // If demo mode is enabled, use demo data
-    if (getDemoMode()) {
-      const demoNPs = getDemoNetworkPolicies().filter(np =>
-        (!cluster || np.cluster === cluster) && (!namespace || np.namespace === namespace)
-      )
-      setNetworkPolicies(demoNPs)
-      setIsLoading(false)
-      setError(null)
-      return
-    }
-    setIsLoading(true)
-    if (cluster && !isAgentUnavailable()) {
-      try {
-        const params = new URLSearchParams()
-        params.append('cluster', cluster)
-        if (namespace) params.append('namespace', namespace)
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 15000)
-        const response = await fetch(`${LOCAL_AGENT_URL}/networkpolicies?${params}`, {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        })
-        clearTimeout(timeoutId)
-        if (response.ok) {
-          const data = await response.json()
-          setNetworkPolicies(data.networkpolicies || [])
-          setError(null)
-          setIsLoading(false)
-          reportAgentDataSuccess()
-          return
+          if (response.ok) {
+            const data = await response.json()
+            return (data.ingresses || []) as Ingress[]
+          }
+        } catch {
+          // Fall through to REST API
         }
-      } catch {
-        // Fall through to API
       }
-    }
-    try {
+
+      // Fall back to REST API
+      const token = localStorage.getItem('token')
+      if (!token || token === 'demo-token') {
+        return getDemoIngresses().filter(i =>
+          (!cluster || i.cluster === cluster) && (!namespace || i.namespace === namespace)
+        )
+      }
+
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
-      const { data } = await api.get<{ networkpolicies: NetworkPolicy[] }>(`/api/mcp/networkpolicies?${params}`)
-      setNetworkPolicies(data.networkpolicies || [])
-      setError(null)
-    } catch {
-      setError('Failed to fetch NetworkPolicies')
-      // Only fall back to demo data on error if in demo mode
-      if (getDemoMode()) {
-        setNetworkPolicies(getDemoNetworkPolicies().filter(np =>
-          (!cluster || np.cluster === cluster) && (!namespace || np.namespace === namespace)
-        ))
-      }
-    } finally {
-      setIsLoading(false)
-    }
-  }, [cluster, namespace])
+      const url = `/api/mcp/ingresses?${params}`
 
-  useEffect(() => { refetch() }, [refetch])
-  return { networkpolicies, isLoading, error, refetch }
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      headers['Authorization'] = `Bearer ${token}`
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { ingresses: Ingress[] }
+      return data.ingresses || []
+    },
+  })
+
+  return {
+    ingresses: result.data,
+    isLoading: result.isLoading,
+    error: result.error,
+    refetch: result.refetch,
+  }
 }
+
+// ============================================================================
+// useNetworkPolicies - with IndexedDB caching
+// ============================================================================
+
+export function useNetworkPolicies(cluster?: string, namespace?: string) {
+  const key = `networkPolicies:${cluster || 'all'}:${namespace || 'all'}`
+  const isDemo = getDemoMode()
+
+  const result = useCache({
+    key,
+    category: 'services' as RefreshCategory,
+    initialData: isDemo ? getDemoNetworkPolicies() : [],
+    fetcher: async () => {
+      // In demo mode, return demo data
+      if (getDemoMode()) {
+        return getDemoNetworkPolicies().filter(np =>
+          (!cluster || np.cluster === cluster) && (!namespace || np.namespace === namespace)
+        )
+      }
+
+      // Try local agent first
+      if (cluster && clusterCacheRef.clusters.length > 0) {
+        try {
+          const params = new URLSearchParams()
+          params.append('cluster', cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/networkpolicies?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            return (data.networkpolicies || []) as NetworkPolicy[]
+          }
+        } catch {
+          // Fall through to REST API
+        }
+      }
+
+      // Fall back to REST API
+      const token = localStorage.getItem('token')
+      if (!token || token === 'demo-token') {
+        return getDemoNetworkPolicies().filter(np =>
+          (!cluster || np.cluster === cluster) && (!namespace || np.namespace === namespace)
+        )
+      }
+
+      const params = new URLSearchParams()
+      if (cluster) params.append('cluster', cluster)
+      if (namespace) params.append('namespace', namespace)
+      const url = `/api/mcp/networkpolicies?${params}`
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      headers['Authorization'] = `Bearer ${token}`
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+      const data = await response.json() as { networkpolicies: NetworkPolicy[] }
+      return data.networkpolicies || []
+    },
+  })
+
+  return {
+    networkpolicies: result.data,
+    isLoading: result.isLoading,
+    error: result.error,
+    refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// Demo Data
+// ============================================================================
 
 function getDemoServices(): Service[] {
   return [

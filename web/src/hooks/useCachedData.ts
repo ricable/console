@@ -27,7 +27,14 @@ import type {
   DeploymentIssue,
   Deployment,
   Service,
+  PVC,
+  GPUNode,
+  Operator,
+  OperatorSubscription,
+  HelmRelease,
 } from './useMCP'
+import type { AlertStats } from '../types/alerts'
+import { useAlertsContext } from '../contexts/AlertsContext'
 import type { ProwJob, ProwStatus } from './useProw'
 import type { LLMdServer, LLMdStatus, LLMdModel } from './useLLMd'
 
@@ -360,10 +367,12 @@ export function useCachedPods(
   const { limit = 100, category = 'pods' } = options || {}
   const key = `pods:${cluster || 'all'}:${namespace || 'all'}:${limit}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoPods(),
+    // Only provide demo data as initialData in demo mode - otherwise skeleton shows
+    initialData: isDemo ? getDemoPods() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
@@ -445,12 +454,13 @@ export function useCachedEvents(
   const { limit = 20, category = 'realtime' } = options || {}
   const key = `events:${cluster || 'all'}:${namespace || 'all'}:${limit}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoEvents(),
+    initialData: isDemo ? getDemoEvents() : [],
     enabled: true,
-    persist: !isDemoMode(), // Don't persist demo data
+    persist: !isDemo, // Don't persist demo data
     fetcher: async () => {
       // In demo mode, return fresh demo data with current timestamps
       if (getDemoMode()) {
@@ -486,14 +496,15 @@ export function useCachedPodIssues(
   const { category = 'pods' } = options || {}
   const key = `podIssues:${cluster || 'all'}:${namespace || 'all'}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoPodIssues(),
+    initialData: isDemo ? getDemoPodIssues() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoPodIssues()
       }
 
@@ -554,14 +565,15 @@ export function useCachedDeploymentIssues(
   const { category = 'deployments' } = options || {}
   const key = `deploymentIssues:${cluster || 'all'}:${namespace || 'all'}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoDeploymentIssues(),
+    initialData: isDemo ? getDemoDeploymentIssues() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoDeploymentIssues()
       }
 
@@ -634,14 +646,15 @@ export function useCachedDeployments(
   const { category = 'deployments' } = options || {}
   const key = `deployments:${cluster || 'all'}:${namespace || 'all'}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoDeployments(),
+    initialData: isDemo ? getDemoDeployments() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoDeployments()
       }
 
@@ -747,14 +760,15 @@ export function useCachedServices(
   const { category = 'services' } = options || {}
   const key = `services:${cluster || 'all'}:${namespace || 'all'}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category,
-    initialData: getDemoServices(),
+    initialData: isDemo ? getDemoServices() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoServices()
       }
 
@@ -942,14 +956,15 @@ export function useCachedProwJobs(
 ): CachedHookResult<ProwJob[]> & { jobs: ProwJob[]; status: ProwStatus; formatTimeAgo: typeof formatTimeAgo } {
   const key = `prowjobs:${prowCluster}:${namespace}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category: 'gitops',
-    initialData: getDemoProwJobs(),
+    initialData: isDemo ? getDemoProwJobs() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoProwJobs()
       }
       return fetchProwJobs(prowCluster, namespace)
@@ -1192,14 +1207,15 @@ export function useCachedLLMdServers(
 ): CachedHookResult<LLMdServer[]> & { servers: LLMdServer[]; status: LLMdStatus } {
   const key = `llmd-servers:${clusters.join(',')}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category: 'gitops',
-    initialData: getDemoLLMdServers(),
+    initialData: isDemo ? getDemoLLMdServers() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoLLMdServers()
       }
       return fetchLLMdServers(clusters)
@@ -1255,14 +1271,15 @@ export function useCachedLLMdModels(
 ): CachedHookResult<LLMdModel[]> & { models: LLMdModel[] } {
   const key = `llmd-models:${clusters.join(',')}`
 
+  const isDemo = getDemoMode()
   const result = useCache({
     key,
     category: 'gitops',
-    initialData: getDemoLLMdModels(),
+    initialData: isDemo ? getDemoLLMdModels() : [],
     enabled: true,
     fetcher: async () => {
       // If demo mode is explicitly enabled, return demo data immediately
-      if (getDemoMode()) {
+      if (isDemo) {
         return getDemoLLMdModels()
       }
       return fetchLLMdModels(clusters)
@@ -1279,5 +1296,516 @@ export function useCachedLLMdModels(
     consecutiveFailures: result.consecutiveFailures,
     lastRefresh: result.lastRefresh,
     refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// PVC Cached Hook
+// ============================================================================
+
+// Demo PVCs - cluster names must match getDemoClusters() in shared.ts
+const getDemoPVCs = (): PVC[] => [
+  { name: 'postgres-data', namespace: 'data', cluster: 'eks-prod-us-east-1', status: 'Bound', storageClass: 'gp3', capacity: '100Gi', accessModes: ['ReadWriteOnce'], volumeName: 'pvc-abc123', age: '40d' },
+  { name: 'redis-data', namespace: 'data', cluster: 'eks-prod-us-east-1', status: 'Bound', storageClass: 'gp3', capacity: '20Gi', accessModes: ['ReadWriteOnce'], volumeName: 'pvc-def456', age: '40d' },
+  { name: 'prometheus-data', namespace: 'monitoring', cluster: 'gke-staging', status: 'Bound', storageClass: 'standard', capacity: '50Gi', accessModes: ['ReadWriteOnce'], volumeName: 'pvc-ghi789', age: '20d' },
+  { name: 'grafana-data', namespace: 'monitoring', cluster: 'gke-staging', status: 'Bound', storageClass: 'standard', capacity: '10Gi', accessModes: ['ReadWriteOnce'], volumeName: 'pvc-jkl012', age: '20d' },
+  { name: 'model-cache', namespace: 'ml', cluster: 'vllm-gpu-cluster', status: 'Bound', storageClass: 'fast-ssd', capacity: '500Gi', accessModes: ['ReadWriteMany'], volumeName: 'pvc-mno345', age: '15d' },
+  { name: 'training-data', namespace: 'ml', cluster: 'vllm-gpu-cluster', status: 'Pending', storageClass: 'fast-ssd', capacity: '1Ti', accessModes: ['ReadWriteMany'], age: '1d' },
+  { name: 'logs-archive', namespace: 'logging', cluster: 'eks-prod-us-east-1', status: 'Bound', storageClass: 'cold-storage', capacity: '200Gi', accessModes: ['ReadWriteOnce'], volumeName: 'pvc-pqr678', age: '60d' },
+]
+
+/**
+ * Hook for fetching PVCs with caching
+ */
+export function useCachedPVCs(
+  cluster?: string,
+  namespace?: string,
+  options?: { category?: RefreshCategory }
+): CachedHookResult<PVC[]> & { pvcs: PVC[] } {
+  const { category = 'services' } = options || {}
+  const key = `pvcs:${cluster || 'all'}:${namespace || 'all'}`
+
+  const isDemo = getDemoMode()
+  const result = useCache({
+    key,
+    category,
+    initialData: isDemo ? getDemoPVCs() : [],
+    enabled: true,
+    fetcher: async () => {
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (isDemo) {
+        return getDemoPVCs().filter(p =>
+          (!cluster || p.cluster === cluster) && (!namespace || p.namespace === namespace)
+        )
+      }
+
+      // Try agent first (fast, no backend needed)
+      if (clusterCacheRef.clusters.length > 0 && cluster) {
+        try {
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          const params = new URLSearchParams()
+          params.append('cluster', clusterInfo?.context || cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/pvcs?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            return ((data.pvcs || []) as PVC[]).map(p => ({
+              ...p,
+              cluster: cluster,
+            }))
+          }
+        } catch {
+          // Fall through to kubectl proxy
+        }
+
+        // Try kubectl proxy
+        try {
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          const pvcData = await kubectlProxy.getPVCs(clusterInfo?.context || cluster, namespace)
+          return pvcData.map(p => ({
+            name: p.name,
+            namespace: p.namespace,
+            cluster: cluster,
+            status: p.status,
+            capacity: p.capacity,
+            storageClass: p.storageClass,
+          })) as PVC[]
+        } catch {
+          // Fall through to REST API
+        }
+      }
+
+      // Fall back to REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        const data = await fetchAPI<{ pvcs: PVC[] }>('pvcs', { cluster, namespace })
+        return data.pvcs || []
+      }
+
+      return getDemoPVCs().filter(p =>
+        (!cluster || p.cluster === cluster) && (!namespace || p.namespace === namespace)
+      )
+    },
+  })
+
+  return {
+    pvcs: result.data,
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh,
+    refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// Helm Releases Cached Hook
+// ============================================================================
+
+// Demo Helm releases - cluster names must match getDemoClusters() in shared.ts
+const getDemoHelmReleases = (): HelmRelease[] => [
+  { name: 'prometheus', namespace: 'monitoring', revision: '3', updated: new Date(Date.now() - 86400000).toISOString(), status: 'deployed', chart: 'prometheus-25.8.0', app_version: '2.47.0', cluster: 'eks-prod-us-east-1' },
+  { name: 'grafana', namespace: 'monitoring', revision: '2', updated: new Date(Date.now() - 172800000).toISOString(), status: 'deployed', chart: 'grafana-7.0.8', app_version: '10.2.0', cluster: 'eks-prod-us-east-1' },
+  { name: 'nginx-ingress', namespace: 'ingress', revision: '5', updated: new Date(Date.now() - 3600000).toISOString(), status: 'deployed', chart: 'ingress-nginx-4.8.3', app_version: '1.9.4', cluster: 'eks-prod-us-east-1' },
+  { name: 'cert-manager', namespace: 'cert-manager', revision: '1', updated: new Date(Date.now() - 604800000).toISOString(), status: 'deployed', chart: 'cert-manager-1.13.2', app_version: '1.13.2', cluster: 'openshift-prod' },
+  { name: 'redis', namespace: 'data', revision: '2', updated: new Date(Date.now() - 259200000).toISOString(), status: 'deployed', chart: 'redis-18.4.0', app_version: '7.2.3', cluster: 'gke-staging' },
+  { name: 'postgresql', namespace: 'data', revision: '4', updated: new Date(Date.now() - 432000000).toISOString(), status: 'deployed', chart: 'postgresql-13.2.24', app_version: '16.1.0', cluster: 'gke-staging' },
+  { name: 'api-gateway', namespace: 'production', revision: '8', updated: new Date(Date.now() - 7200000).toISOString(), status: 'deployed', chart: 'api-gateway-2.1.0', app_version: '2.1.0', cluster: 'eks-prod-us-east-1' },
+  { name: 'ml-pipeline', namespace: 'ml', revision: '1', updated: new Date(Date.now() - 1800000).toISOString(), status: 'pending', chart: 'kubeflow-1.8.0', app_version: '1.8.0', cluster: 'vllm-gpu-cluster' },
+  { name: 'broken-app', namespace: 'testing', revision: '3', updated: new Date(Date.now() - 600000).toISOString(), status: 'failed', chart: 'custom-app-0.1.0', app_version: '0.1.0', cluster: 'gke-staging' },
+  { name: 'loki', namespace: 'monitoring', revision: '2', updated: new Date(Date.now() - 518400000).toISOString(), status: 'deployed', chart: 'loki-5.38.0', app_version: '2.9.2', cluster: 'openshift-prod' },
+]
+
+/**
+ * Hook for fetching Helm releases with caching
+ */
+export function useCachedHelmReleases(
+  cluster?: string,
+  options?: { category?: RefreshCategory }
+): CachedHookResult<HelmRelease[]> & { releases: HelmRelease[] } {
+  const { category = 'gitops' } = options || {}
+  const key = `helmReleases:${cluster || 'all'}`
+
+  const isDemo = getDemoMode()
+  const result = useCache({
+    key,
+    category,
+    initialData: isDemo ? getDemoHelmReleases() : [],
+    enabled: true,
+    fetcher: async () => {
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (isDemo) {
+        const releases = getDemoHelmReleases()
+        return cluster ? releases.filter(r => r.cluster === cluster) : releases
+      }
+
+      // Fall back to REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        const params = new URLSearchParams()
+        if (cluster) params.append('cluster', cluster)
+        const url = `/api/gitops/helm-releases?${params}`
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+        headers['Authorization'] = `Bearer ${token}`
+
+        const response = await fetch(url, { method: 'GET', headers })
+        if (!response.ok) {
+          throw new Error(`API error: ${response.status}`)
+        }
+        const data = await response.json() as { releases: HelmRelease[] }
+        return data.releases || []
+      }
+
+      const releases = getDemoHelmReleases()
+      return cluster ? releases.filter(r => r.cluster === cluster) : releases
+    },
+  })
+
+  return {
+    releases: result.data,
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh,
+    refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// Operators Cached Hook
+// ============================================================================
+
+// Demo operators - cluster names must match getDemoClusters() in shared.ts
+function getDemoOperatorsData(cluster: string): Operator[] {
+  const hash = cluster.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const operatorCount = 3 + (hash % 5)
+
+  const baseOperators: Operator[] = [
+    { name: 'prometheus-operator', namespace: 'monitoring', version: 'v0.65.1', status: 'Succeeded', cluster },
+    { name: 'cert-manager', namespace: 'cert-manager', version: 'v1.12.0', status: 'Succeeded', upgradeAvailable: 'v1.13.0', cluster },
+    { name: 'elasticsearch-operator', namespace: 'elastic-system', version: 'v2.8.0', status: hash % 3 === 0 ? 'Failed' : 'Succeeded', cluster },
+    { name: 'strimzi-kafka-operator', namespace: 'kafka', version: 'v0.35.0', status: hash % 4 === 0 ? 'Installing' : 'Succeeded', cluster },
+    { name: 'argocd-operator', namespace: 'argocd', version: 'v0.6.0', status: hash % 5 === 0 ? 'Failed' : 'Succeeded', cluster },
+    { name: 'jaeger-operator', namespace: 'observability', version: 'v1.47.0', status: 'Succeeded', cluster },
+    { name: 'kiali-operator', namespace: 'istio-system', version: 'v1.72.0', status: hash % 2 === 0 ? 'Upgrading' : 'Succeeded', upgradeAvailable: hash % 2 === 0 ? 'v1.73.0' : undefined, cluster },
+  ]
+
+  return baseOperators.slice(0, operatorCount)
+}
+
+function getDemoOperatorSubscriptionsData(cluster: string): OperatorSubscription[] {
+  const hash = cluster.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const subCount = 2 + (hash % 4)
+
+  const baseSubscriptions: OperatorSubscription[] = [
+    { name: 'prometheus-operator', namespace: 'monitoring', channel: 'stable', source: 'operatorhubio-catalog', installPlanApproval: 'Automatic', currentCSV: 'prometheusoperator.v0.65.1', cluster },
+    { name: 'cert-manager', namespace: 'cert-manager', channel: 'stable', source: 'operatorhubio-catalog', installPlanApproval: 'Manual', currentCSV: 'cert-manager.v1.12.0', pendingUpgrade: hash % 2 === 0 ? 'cert-manager.v1.13.0' : undefined, cluster },
+    { name: 'strimzi-kafka-operator', namespace: 'kafka', channel: 'stable', source: 'operatorhubio-catalog', installPlanApproval: hash % 3 === 0 ? 'Manual' : 'Automatic', currentCSV: 'strimzi-cluster-operator.v0.35.0', pendingUpgrade: hash % 4 === 0 ? 'strimzi-cluster-operator.v0.36.0' : undefined, cluster },
+    { name: 'argocd-operator', namespace: 'argocd', channel: 'alpha', source: 'operatorhubio-catalog', installPlanApproval: 'Manual', currentCSV: 'argocd-operator.v0.6.0', pendingUpgrade: hash % 5 === 0 ? 'argocd-operator.v0.7.0' : undefined, cluster },
+    { name: 'jaeger-operator', namespace: 'observability', channel: 'stable', source: 'operatorhubio-catalog', installPlanApproval: 'Automatic', currentCSV: 'jaeger-operator.v1.47.0', cluster },
+  ]
+
+  return baseSubscriptions.slice(0, subCount)
+}
+
+const getDemoAllOperators = (): Operator[] => {
+  const clusterNames = ['eks-prod-us-east-1', 'gke-staging', 'openshift-prod', 'vllm-gpu-cluster']
+  return clusterNames.flatMap(c => getDemoOperatorsData(c))
+}
+
+const getDemoAllOperatorSubscriptions = (): OperatorSubscription[] => {
+  const clusterNames = ['eks-prod-us-east-1', 'gke-staging', 'openshift-prod', 'vllm-gpu-cluster']
+  return clusterNames.flatMap(c => getDemoOperatorSubscriptionsData(c))
+}
+
+/**
+ * Hook for fetching operators with caching
+ */
+export function useCachedOperators(
+  cluster?: string,
+  options?: { category?: RefreshCategory }
+): CachedHookResult<Operator[]> & { operators: Operator[] } {
+  const { category = 'gitops' } = options || {}
+  const key = `operators:${cluster || 'all'}`
+
+  const isDemo = getDemoMode()
+  const result = useCache({
+    key,
+    category,
+    initialData: isDemo ? getDemoAllOperators() : [],
+    enabled: true,
+    fetcher: async () => {
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (isDemo) {
+        if (cluster) {
+          return getDemoOperatorsData(cluster)
+        }
+        return getDemoAllOperators()
+      }
+
+      // Try REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        if (cluster) {
+          const data = await fetchAPI<{ operators: Operator[] }>('operators', { cluster })
+          return (data.operators || []).map(op => ({ ...op, cluster }))
+        }
+
+        // Fetch from all clusters
+        const clusters = clusterCacheRef.clusters.filter(c => c.reachable !== false && !c.name.includes('/'))
+        if (clusters.length === 0) return getDemoAllOperators()
+
+        const allOperators: Operator[] = []
+        for (const c of clusters) {
+          try {
+            const data = await fetchAPI<{ operators: Operator[] }>('operators', { cluster: c.name })
+            allOperators.push(...(data.operators || []).map(op => ({ ...op, cluster: c.name })))
+          } catch {
+            // Skip clusters where operator API is unavailable
+          }
+        }
+        return allOperators.length > 0 ? allOperators : getDemoAllOperators()
+      }
+
+      return cluster ? getDemoOperatorsData(cluster) : getDemoAllOperators()
+    },
+  })
+
+  return {
+    operators: result.data,
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh,
+    refetch: result.refetch,
+  }
+}
+
+/**
+ * Hook for fetching operator subscriptions with caching
+ */
+export function useCachedOperatorSubscriptions(
+  cluster?: string,
+  options?: { category?: RefreshCategory }
+): CachedHookResult<OperatorSubscription[]> & { subscriptions: OperatorSubscription[] } {
+  const { category = 'gitops' } = options || {}
+  const key = `operatorSubscriptions:${cluster || 'all'}`
+
+  const isDemo = getDemoMode()
+  const result = useCache({
+    key,
+    category,
+    initialData: isDemo ? getDemoAllOperatorSubscriptions() : [],
+    enabled: true,
+    fetcher: async () => {
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (isDemo) {
+        if (cluster) {
+          return getDemoOperatorSubscriptionsData(cluster)
+        }
+        return getDemoAllOperatorSubscriptions()
+      }
+
+      // Try REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        if (cluster) {
+          const data = await fetchAPI<{ subscriptions: OperatorSubscription[] }>('operator-subscriptions', { cluster })
+          return (data.subscriptions || []).map(sub => ({ ...sub, cluster }))
+        }
+
+        // Fetch from all clusters
+        const clusters = clusterCacheRef.clusters.filter(c => c.reachable !== false && !c.name.includes('/'))
+        if (clusters.length === 0) return getDemoAllOperatorSubscriptions()
+
+        const allSubscriptions: OperatorSubscription[] = []
+        for (const c of clusters) {
+          try {
+            const data = await fetchAPI<{ subscriptions: OperatorSubscription[] }>('operator-subscriptions', { cluster: c.name })
+            allSubscriptions.push(...(data.subscriptions || []).map(sub => ({ ...sub, cluster: c.name })))
+          } catch {
+            // Skip clusters where operator subscription API is unavailable
+          }
+        }
+        return allSubscriptions.length > 0 ? allSubscriptions : getDemoAllOperatorSubscriptions()
+      }
+
+      return cluster ? getDemoOperatorSubscriptionsData(cluster) : getDemoAllOperatorSubscriptions()
+    },
+  })
+
+  return {
+    subscriptions: result.data,
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh,
+    refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// GPU Nodes Cached Hook
+// ============================================================================
+
+// Demo GPU nodes - cluster names must match getDemoClusters() in shared.ts
+const getDemoGPUNodesData = (): GPUNode[] => [
+  // vllm-gpu-cluster - Large GPU cluster for AI/ML workloads
+  { name: 'gpu-node-1', cluster: 'vllm-gpu-cluster', gpuType: 'NVIDIA A100', gpuCount: 8, gpuAllocated: 6 },
+  { name: 'gpu-node-2', cluster: 'vllm-gpu-cluster', gpuType: 'NVIDIA A100', gpuCount: 8, gpuAllocated: 8 },
+  { name: 'gpu-node-3', cluster: 'vllm-gpu-cluster', gpuType: 'NVIDIA A100', gpuCount: 8, gpuAllocated: 4 },
+  { name: 'gpu-node-4', cluster: 'vllm-gpu-cluster', gpuType: 'NVIDIA H100', gpuCount: 8, gpuAllocated: 7 },
+  // EKS - Production ML inference
+  { name: 'eks-gpu-1', cluster: 'eks-prod-us-east-1', gpuType: 'NVIDIA A10G', gpuCount: 4, gpuAllocated: 3 },
+  { name: 'eks-gpu-2', cluster: 'eks-prod-us-east-1', gpuType: 'NVIDIA A10G', gpuCount: 4, gpuAllocated: 4 },
+  // GKE - Training workloads
+  { name: 'gke-gpu-pool-1', cluster: 'gke-staging', gpuType: 'NVIDIA T4', gpuCount: 2, gpuAllocated: 1 },
+  { name: 'gke-gpu-pool-2', cluster: 'gke-staging', gpuType: 'NVIDIA T4', gpuCount: 2, gpuAllocated: 2 },
+  // AKS - Dev/test GPUs
+  { name: 'aks-gpu-node', cluster: 'aks-dev-westeu', gpuType: 'NVIDIA V100', gpuCount: 2, gpuAllocated: 1 },
+  // OpenShift - Enterprise ML
+  { name: 'ocp-gpu-worker-1', cluster: 'openshift-prod', gpuType: 'NVIDIA A100', gpuCount: 4, gpuAllocated: 4 },
+  { name: 'ocp-gpu-worker-2', cluster: 'openshift-prod', gpuType: 'NVIDIA A100', gpuCount: 4, gpuAllocated: 2 },
+]
+
+/**
+ * Hook for fetching GPU nodes with caching
+ */
+export function useCachedGPUNodes(
+  cluster?: string,
+  options?: { category?: RefreshCategory }
+): CachedHookResult<GPUNode[]> & { nodes: GPUNode[] } {
+  const { category = 'pods' } = options || {}
+  const key = `gpuNodes:${cluster || 'all'}`
+
+  const isDemo = getDemoMode()
+  const result = useCache({
+    key,
+    category,
+    initialData: isDemo ? getDemoGPUNodesData() : [],
+    enabled: true,
+    fetcher: async () => {
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (isDemo) {
+        const nodes = getDemoGPUNodesData()
+        return cluster ? nodes.filter(n => n.cluster === cluster) : nodes
+      }
+
+      // Try agent first (fast, no backend needed)
+      if (clusterCacheRef.clusters.length > 0) {
+        try {
+          const params = new URLSearchParams()
+          if (cluster) params.append('cluster', cluster)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 30000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/gpu-nodes?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            const nodes = (data.nodes || []) as GPUNode[]
+            if (nodes.length > 0) {
+              return cluster ? nodes.filter(n => n.cluster === cluster) : nodes
+            }
+          }
+        } catch {
+          // Fall through to REST API
+        }
+      }
+
+      // Fall back to REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        const params = new URLSearchParams()
+        if (cluster) params.append('cluster', cluster)
+        const data = await fetchAPI<{ nodes: GPUNode[] }>('gpu-nodes', { cluster })
+        return data.nodes || []
+      }
+
+      const nodes = getDemoGPUNodesData()
+      return cluster ? nodes.filter(n => n.cluster === cluster) : nodes
+    },
+  })
+
+  return {
+    nodes: result.data,
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh,
+    refetch: result.refetch,
+  }
+}
+
+// ============================================================================
+// Alerts Cached Hook (wraps context for consistency)
+// ============================================================================
+
+/**
+ * Hook for accessing alerts with context-based state
+ * Note: Alerts use context provider for real-time updates, so this hook
+ * wraps the context to provide a consistent interface with other cached hooks.
+ */
+export function useCachedAlerts(): CachedHookResult<AlertStats> & { stats: AlertStats } {
+  const { stats } = useAlertsContext()
+
+  // Default stats when no data available
+  const defaultStats: AlertStats = {
+    total: 0,
+    firing: 0,
+    resolved: 0,
+    acknowledged: 0,
+    critical: 0,
+    warning: 0,
+    info: 0,
+  }
+
+  const effectiveStats = stats || defaultStats
+
+  return {
+    stats: effectiveStats,
+    data: effectiveStats,
+    isLoading: false,
+    isRefreshing: false,
+    error: null,
+    isFailed: false,
+    consecutiveFailures: 0,
+    lastRefresh: Date.now(),
+    refetch: async () => {
+      // Context handles its own refresh
+    },
   }
 }

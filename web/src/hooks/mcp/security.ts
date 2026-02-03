@@ -1,241 +1,194 @@
-import { useState, useEffect, useCallback } from 'react'
-import { MIN_REFRESH_INDICATOR_MS, REFRESH_INTERVAL_MS, getEffectiveInterval } from './shared'
+import { useCache, type RefreshCategory } from '../../lib/cache'
+import { getDemoMode } from '../useDemoMode'
+import { clusterCacheRef, LOCAL_AGENT_URL } from './shared'
 import type { SecurityIssue, GitOpsDrift } from './types'
 
-// Check if in demo mode
-function isDemoMode(): boolean {
-  const token = localStorage.getItem('token')
-  return !token || token === 'demo-token'
-}
+// ============================================================================
+// useSecurityIssues - with IndexedDB caching
+// ============================================================================
 
-// Hook to get security issues
 export function useSecurityIssues(cluster?: string, namespace?: string) {
-  // Initialize with demo data if in demo mode to prevent loading flash
-  const [issues, setIssues] = useState<SecurityIssue[]>(() => isDemoMode() ? getDemoSecurityIssues() : [])
-  const [isLoading, setIsLoading] = useState(() => !isDemoMode())
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(() => isDemoMode() ? new Date() : null)
-  const [error, setError] = useState<string | null>(null)
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(() => isDemoMode() ? new Date() : null)
-  const [isUsingDemoData, setIsUsingDemoData] = useState(() => isDemoMode())
+  const key = `securityIssues:${cluster || 'all'}:${namespace || 'all'}`
+  const isDemo = getDemoMode()
 
-  const refetch = useCallback(async (silent = false) => {
-    // Skip API calls when using demo token
-    if (isDemoMode()) {
-      setIssues(getDemoSecurityIssues())
-      const now = new Date()
-      setLastUpdated(now)
-      setLastRefresh(now)
-      setIsLoading(false)
-      if (!silent) {
-        setIsRefreshing(true)
-        setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
-      } else {
-        setIsRefreshing(false)
+  const result = useCache({
+    key,
+    category: 'pods' as RefreshCategory,
+    // Only provide demo data as initialData in demo mode
+    // Otherwise start empty so skeleton shows while loading
+    initialData: isDemo ? getDemoSecurityIssues() : [],
+    fetcher: async () => {
+      // In demo mode, return demo data
+      if (getDemoMode()) {
+        return getDemoSecurityIssues()
       }
-      setIsUsingDemoData(true)
-      return
-    }
 
-    // For silent (background) refreshes, don't update loading states - prevents UI flashing
-    if (!silent) {
-      setIsRefreshing(true)
-      // Only show loading spinner if no cached data
-      setIssues(prev => {
-        if (prev.length === 0) {
-          setIsLoading(true)
+      // Try local agent first
+      if (clusterCacheRef.clusters.length > 0 && cluster) {
+        try {
+          const params = new URLSearchParams()
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          params.append('cluster', clusterInfo?.context || cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/security-issues?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            return ((data.issues || []) as SecurityIssue[]).map(i => ({
+              ...i,
+              cluster: cluster,
+            }))
+          }
+        } catch {
+          // Fall through to REST API
         }
-        return prev
-      })
-    }
-    let hadNoData = false
-    setIssues(prev => {
-      hadNoData = prev.length === 0
-      return prev
-    })
-    try {
+      }
+
+      // Fall back to REST API
+      const token = localStorage.getItem('token')
+      if (!token || token === 'demo-token') {
+        return getDemoSecurityIssues()
+      }
+
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
       const url = `/api/mcp/security-issues?${params}`
 
-      // Use direct fetch to bypass the global circuit breaker
-      const token = localStorage.getItem('token')
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (token) headers['Authorization'] = `Bearer ${token}`
-      const response = await fetch(url, { method: 'GET', headers })
+      headers['Authorization'] = `Bearer ${token}`
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
       }
       const data = await response.json() as { issues: SecurityIssue[] }
-      setIssues(data.issues || [])
-      setError(null)
-      const now = new Date()
-      setLastUpdated(now)
-      setConsecutiveFailures(0)
-      setLastRefresh(now)
-      setIsUsingDemoData(false)
-    } catch (err) {
-      // Only set demo data if we're in demo mode AND don't have existing data AND not silent
-      // In live mode, show error state instead of falling back to demo data
-      setConsecutiveFailures(prev => prev + 1)
-      setLastRefresh(new Date())
-      if (!silent && hadNoData) {
-        setError('Failed to fetch security issues')
-        // Only fall back to demo data if in demo mode
-        if (isDemoMode()) {
-          setIssues(getDemoSecurityIssues())
-          setIsUsingDemoData(true)
-        }
-      }
-    } finally {
-      if (!silent) {
-        setIsLoading(false)
-      }
-      setIsRefreshing(false)
-    }
-  }, [cluster, namespace])
-
-  useEffect(() => {
-    refetch()
-  }, [cluster, namespace]) // Only refetch on parameter changes, not on refetch function change
-
-  // Listen for demo data clear event (when switching from demo to live mode)
-  useEffect(() => {
-    const handleClearDemoData = () => {
-      // Reset to loading state and clear data
-      setIssues([])
-      setIsLoading(true)
-      setIsUsingDemoData(false)
-      setLastUpdated(null)
-      setLastRefresh(null)
-      // Refetch will be triggered by the mode change
-    }
-
-    window.addEventListener('kc-clear-demo-data', handleClearDemoData)
-    return () => window.removeEventListener('kc-clear-demo-data', handleClearDemoData)
-  }, [])
+      return data.issues || []
+    },
+  })
 
   return {
-    issues,
-    isLoading,
-    isRefreshing,
-    lastUpdated,
-    error,
-    refetch,
-    consecutiveFailures,
-    isFailed: consecutiveFailures >= 3,
-    lastRefresh,
-    isUsingDemoData,
+    issues: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    lastUpdated: result.lastRefresh ? new Date(result.lastRefresh) : null,
+    error: result.error,
+    refetch: result.refetch,
+    consecutiveFailures: result.consecutiveFailures,
+    isFailed: result.isFailed,
+    lastRefresh: result.lastRefresh ? new Date(result.lastRefresh) : null,
+    isUsingDemoData: getDemoMode(),
   }
 }
 
-// Hook to get GitOps drifts
-export function useGitOpsDrifts(cluster?: string, namespace?: string) {
-  const [drifts, setDrifts] = useState<GitOpsDrift[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [consecutiveFailures, setConsecutiveFailures] = useState(0)
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+// ============================================================================
+// useGitOpsDrifts - with IndexedDB caching
+// ============================================================================
 
-  const refetch = useCallback(async (silent = false) => {
-    // For silent (background) refreshes, don't update loading states - prevents UI flashing
-    if (!silent) {
-      setIsRefreshing(true)
-      // Only show loading spinner if no cached data
-      setDrifts(prev => {
-        if (prev.length === 0) {
-          setIsLoading(true)
+export function useGitOpsDrifts(cluster?: string, namespace?: string) {
+  const key = `gitopsDrifts:${cluster || 'all'}:${namespace || 'all'}`
+  const isDemo = getDemoMode()
+
+  const result = useCache({
+    key,
+    category: 'gitops' as RefreshCategory,
+    // Only provide demo data as initialData in demo mode
+    initialData: isDemo ? getDemoGitOpsDrifts() : [],
+    fetcher: async () => {
+      // In demo mode, return demo data
+      if (getDemoMode()) {
+        return getDemoGitOpsDrifts()
+      }
+
+      // Try local agent first
+      if (clusterCacheRef.clusters.length > 0 && cluster) {
+        try {
+          const params = new URLSearchParams()
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          params.append('cluster', clusterInfo?.context || cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/gitops/drifts?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            return ((data.drifts || []) as GitOpsDrift[]).map(d => ({
+              ...d,
+              cluster: cluster,
+            }))
+          }
+        } catch {
+          // Fall through to REST API
         }
-        return prev
-      })
-    }
-    try {
+      }
+
+      // Fall back to REST API
+      const token = localStorage.getItem('token')
+      if (!token || token === 'demo-token') {
+        return getDemoGitOpsDrifts()
+      }
+
       const params = new URLSearchParams()
       if (cluster) params.append('cluster', cluster)
       if (namespace) params.append('namespace', namespace)
       const url = `/api/gitops/drifts?${params}`
 
-      // Skip API calls when using demo token
-      const token = localStorage.getItem('token')
-      if (!token || token === 'demo-token') {
-        setDrifts(getDemoGitOpsDrifts())
-        setLastRefresh(new Date())
-        setIsLoading(false)
-        if (!silent) {
-          setIsRefreshing(true)
-          setTimeout(() => setIsRefreshing(false), MIN_REFRESH_INDICATOR_MS)
-        } else {
-          setIsRefreshing(false)
-        }
-        return
-      }
-
-      // Use direct fetch to bypass the global circuit breaker
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       headers['Authorization'] = `Bearer ${token}`
-      const response = await fetch(url, { method: 'GET', headers })
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000)
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
       if (!response.ok) {
         throw new Error(`API error: ${response.status}`)
       }
       const data = await response.json() as { drifts: GitOpsDrift[] }
-      setDrifts(data.drifts || [])
-      setError(null)
-      const now = new Date()
-      setConsecutiveFailures(0)
-      setLastRefresh(now)
-    } catch (err) {
-      setConsecutiveFailures(prev => prev + 1)
-      setLastRefresh(new Date())
-      if (!silent) {
-        setError('Failed to fetch GitOps drifts')
-        // Only fall back to demo data if in demo mode
-        if (isDemoMode()) {
-          setDrifts(getDemoGitOpsDrifts())
-        }
-      }
-    } finally {
-      if (!silent) {
-        setIsLoading(false)
-      }
-      setIsRefreshing(false)
-    }
-  }, [cluster, namespace])
-
-  useEffect(() => {
-    refetch(false)
-    // Poll every 30 seconds
-    const interval = setInterval(() => refetch(true), getEffectiveInterval(REFRESH_INTERVAL_MS))
-    return () => clearInterval(interval)
-  }, [refetch])
-
-  // Listen for demo data clear event (when switching from demo to live mode)
-  useEffect(() => {
-    const handleClearDemoData = () => {
-      // Reset to loading state and clear data
-      setDrifts([])
-      setIsLoading(true)
-      setLastRefresh(null)
-      // Refetch will be triggered by the mode change
-    }
-
-    window.addEventListener('kc-clear-demo-data', handleClearDemoData)
-    return () => window.removeEventListener('kc-clear-demo-data', handleClearDemoData)
-  }, [])
+      return data.drifts || []
+    },
+  })
 
   return {
-    drifts,
-    isLoading,
-    isRefreshing,
-    error,
-    refetch: () => refetch(false),
-    isFailed: consecutiveFailures >= 3,
-    consecutiveFailures,
-    lastRefresh,
+    drifts: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error,
+    refetch: result.refetch,
+    isFailed: result.isFailed,
+    consecutiveFailures: result.consecutiveFailures,
+    lastRefresh: result.lastRefresh ? new Date(result.lastRefresh) : null,
   }
 }
+
+// ============================================================================
+// Demo Data
+// ============================================================================
 
 // Demo data - cluster names must match getDemoClusters() in shared.ts
 function getDemoGitOpsDrifts(): GitOpsDrift[] {
