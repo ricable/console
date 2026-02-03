@@ -144,6 +144,44 @@ function getAgentClusters(): Array<{ name: string; context?: string }> {
     .map(c => ({ name: c.name, context: c.context }))
 }
 
+/** Fetch pods from all clusters via agent HTTP endpoint */
+async function fetchPodsViaAgent(namespace?: string, limit = 100): Promise<PodInfo[]> {
+  const clusters = getAgentClusters()
+  if (clusters.length === 0) return []
+
+  const results = await Promise.allSettled(
+    clusters.map(async ({ name, context }) => {
+      const params = new URLSearchParams()
+      params.append('cluster', context || name)
+      if (namespace) params.append('namespace', namespace)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+      const response = await fetch(`${LOCAL_AGENT_URL}/pods?${params}`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) throw new Error(`Agent returned ${response.status}`)
+      const data = await response.json()
+      // Always use the short name — agent echoes back context path as cluster
+      return ((data.pods || []) as PodInfo[]).map(p => ({
+        ...p,
+        cluster: name,
+      }))
+    })
+  )
+
+  const items: PodInfo[] = []
+  for (const r of results) {
+    if (r.status === 'fulfilled') items.push(...r.value)
+  }
+  return items
+    .sort((a, b) => (b.restarts || 0) - (a.restarts || 0))
+    .slice(0, limit)
+}
+
 /** Fetch pod issues from all clusters via agent kubectl proxy */
 async function fetchPodIssuesViaAgent(namespace?: string): Promise<PodIssue[]> {
   const clusters = getAgentClusters()
@@ -326,21 +364,60 @@ export function useCachedPods(
     key,
     category,
     initialData: getDemoPods(),
-    enabled: !isDemoMode(),
+    enabled: true,
     fetcher: async () => {
-      let pods: PodInfo[]
-      if (cluster) {
-        // Fetch from specific cluster
-        const data = await fetchAPI<{ pods: PodInfo[] }>('pods', { cluster, namespace })
-        pods = (data.pods || []).map(p => ({ ...p, cluster }))
-      } else {
-        // Fetch from all clusters
-        pods = await fetchFromAllClusters<PodInfo>('pods', 'pods', { namespace })
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (getDemoMode()) {
+        return getDemoPods()
       }
-      // Sort by restarts (descending) and limit
-      return pods
-        .sort((a, b) => (b.restarts || 0) - (a.restarts || 0))
-        .slice(0, limit)
+
+      // Try agent first (fast, no backend needed)
+      if (clusterCacheRef.clusters.length > 0) {
+        if (cluster) {
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          const params = new URLSearchParams()
+          params.append('cluster', clusterInfo?.context || cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/pods?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            const pods = ((data.pods || []) as PodInfo[]).map(p => ({
+              ...p,
+              cluster: cluster,
+            }))
+            return pods
+              .sort((a, b) => (b.restarts || 0) - (a.restarts || 0))
+              .slice(0, limit)
+          }
+        }
+        return fetchPodsViaAgent(namespace, limit)
+      }
+
+      // Fall back to REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        let pods: PodInfo[]
+        if (cluster) {
+          const data = await fetchAPI<{ pods: PodInfo[] }>('pods', { cluster, namespace })
+          pods = (data.pods || []).map(p => ({ ...p, cluster }))
+        } else {
+          pods = await fetchFromAllClusters<PodInfo>('pods', 'pods', { namespace })
+        }
+        return pods
+          .sort((a, b) => (b.restarts || 0) - (a.restarts || 0))
+          .slice(0, limit)
+      }
+
+      return getDemoPods()
     },
   })
 
@@ -624,6 +701,41 @@ export function useCachedDeployments(
   }
 }
 
+/** Fetch services from all clusters via agent HTTP endpoint */
+async function fetchServicesViaAgent(namespace?: string): Promise<Service[]> {
+  const clusters = getAgentClusters()
+  if (clusters.length === 0) return []
+
+  const results = await Promise.allSettled(
+    clusters.map(async ({ name, context }) => {
+      const params = new URLSearchParams()
+      params.append('cluster', context || name)
+      if (namespace) params.append('namespace', namespace)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 15000)
+      const response = await fetch(`${LOCAL_AGENT_URL}/services?${params}`, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) throw new Error(`Agent returned ${response.status}`)
+      const data = await response.json()
+      return ((data.services || []) as Service[]).map(s => ({
+        ...s,
+        cluster: name,
+      }))
+    })
+  )
+
+  const items: Service[] = []
+  for (const r of results) {
+    if (r.status === 'fulfilled') items.push(...r.value)
+  }
+  return items
+}
+
 /**
  * Hook for fetching services with caching
  */
@@ -639,10 +751,49 @@ export function useCachedServices(
     key,
     category,
     initialData: getDemoServices(),
-    enabled: !isDemoMode(),
+    enabled: true,
     fetcher: async () => {
-      const data = await fetchAPI<{ services: Service[] }>('services', { cluster, namespace })
-      return data.services || []
+      // If demo mode is explicitly enabled, return demo data immediately
+      if (getDemoMode()) {
+        return getDemoServices()
+      }
+
+      // Try agent first (fast, no backend needed)
+      if (clusterCacheRef.clusters.length > 0) {
+        if (cluster) {
+          const clusterInfo = clusterCacheRef.clusters.find(c => c.name === cluster)
+          const params = new URLSearchParams()
+          params.append('cluster', clusterInfo?.context || cluster)
+          if (namespace) params.append('namespace', namespace)
+
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 15000)
+          const response = await fetch(`${LOCAL_AGENT_URL}/services?${params}`, {
+            signal: controller.signal,
+            headers: { Accept: 'application/json' },
+          })
+          clearTimeout(timeoutId)
+
+          if (response.ok) {
+            const data = await response.json()
+            return ((data.services || []) as Service[]).map(s => ({
+              ...s,
+              cluster: cluster,
+            }))
+          }
+        }
+        return fetchServicesViaAgent(namespace)
+      }
+
+      // Fall back to REST API
+      const token = getToken()
+      const hasRealToken = token && token !== 'demo-token'
+      if (hasRealToken && !isBackendUnavailable()) {
+        const data = await fetchAPI<{ services: Service[] }>('services', { cluster, namespace })
+        return data.services || []
+      }
+
+      return getDemoServices()
     },
   })
 

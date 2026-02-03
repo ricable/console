@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback } from 'react'
+import { useCache } from '../lib/cache'
 import { getDemoMode } from './useDemoMode'
 import { clusterCacheRef } from './mcp/shared'
 
@@ -55,20 +56,24 @@ function authHeaders(): Record<string, string> {
   return headers
 }
 
-
 const AGENT_URL = 'http://127.0.0.1:8585'
 
-/** Fetch workloads from the local agent (fallback when backend is down) */
+// Demo workloads for demo mode
+const DEMO_WORKLOADS: Workload[] = [
+  { name: 'nginx-ingress', namespace: 'ingress-system', type: 'Deployment', status: 'Running', replicas: 3, readyReplicas: 3, image: 'nginx/nginx-ingress:3.4.0', cluster: 'eks-prod-us-east-1', targetClusters: ['eks-prod-us-east-1'], createdAt: new Date().toISOString() },
+  { name: 'api-gateway', namespace: 'production', type: 'Deployment', status: 'Running', replicas: 2, readyReplicas: 2, image: 'company/api-gateway:v2.5.1', cluster: 'eks-prod-us-east-1', targetClusters: ['eks-prod-us-east-1'], createdAt: new Date().toISOString() },
+  { name: 'postgres-primary', namespace: 'databases', type: 'StatefulSet', status: 'Running', replicas: 1, readyReplicas: 1, image: 'postgres:15.4', cluster: 'gke-staging', targetClusters: ['gke-staging'], createdAt: new Date().toISOString() },
+  { name: 'ml-worker', namespace: 'ml-workloads', type: 'Deployment', status: 'Degraded', replicas: 4, readyReplicas: 2, image: 'company/ml-worker:latest', cluster: 'vllm-gpu-cluster', targetClusters: ['vllm-gpu-cluster'], createdAt: new Date().toISOString() },
+]
+
+/** Fetch workloads from the local agent */
 async function fetchWorkloadsViaAgent(opts?: {
   cluster?: string
   namespace?: string
-}): Promise<Workload[] | null> {
-  // Skip agent requests entirely in demo mode (no local agent on Netlify)
-  if (getDemoMode()) return null
-
+}): Promise<Workload[]> {
   const clusters = clusterCacheRef.clusters
     .filter(c => c.reachable !== false && !c.name.includes('/'))
-  if (clusters.length === 0) return null
+  if (clusters.length === 0) return []
 
   const targets = opts?.cluster
     ? clusters.filter(c => c.name === opts.cluster)
@@ -116,117 +121,94 @@ async function fetchWorkloadsViaAgent(opts?: {
   for (const r of results) {
     if (r.status === 'fulfilled') items.push(...r.value)
   }
-  return items.length > 0 ? items : null
+  return items
 }
 
-// Fetch all workloads across clusters.
-// Pass enabled=false to skip fetching (returns undefined data with isLoading=false).
+// Fetch all workloads across clusters with caching.
+// Pass enabled=false to skip fetching (returns cached/demo data with isLoading=false).
 export function useWorkloads(options?: {
   cluster?: string
   namespace?: string
   type?: string
 }, enabled = true) {
-  const [data, setData] = useState<Workload[] | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState(enabled)
-  const [error, setError] = useState<Error | null>(null)
+  const key = `workloads:${options?.cluster || 'all'}:${options?.namespace || 'all'}:${options?.type || 'all'}`
 
-  // Clear stale data immediately when options change so the dropdown
-  // doesn't briefly show workloads from a previous cluster/namespace.
-  useEffect(() => {
-    setData(undefined)
-  }, [options?.cluster, options?.namespace, options?.type])
-
-  const fetchData = useCallback(async () => {
-    if (!enabled) return
-    setIsLoading(true)
-    setError(null)
-
-    // Try agent first (fast, no backend needed)
-    try {
-      const agentData = await fetchWorkloadsViaAgent(options)
-      if (agentData) {
-        setData(agentData)
-        return
+  const result = useCache({
+    key,
+    category: 'deployments',
+    initialData: DEMO_WORKLOADS,
+    enabled,
+    fetcher: async () => {
+      // In demo mode, return demo data
+      if (getDemoMode()) {
+        return DEMO_WORKLOADS
       }
-    } catch {
-      // Agent failed, try REST below
-    }
 
-    // Fall back to REST API
-    try {
-      const params = new URLSearchParams()
-      if (options?.cluster) params.set('cluster', options.cluster)
-      if (options?.namespace) params.set('namespace', options.namespace)
-      if (options?.type) params.set('type', options.type)
-
-      const queryString = params.toString()
-      const url = `/api/workloads${queryString ? `?${queryString}` : ''}`
-
-      const res = await fetch(url, { headers: authHeaders() })
-      if (!res.ok) {
-        throw new Error(`Failed to fetch workloads: ${res.statusText}`)
+      // Try agent first (fast, no backend needed)
+      if (clusterCacheRef.clusters.length > 0) {
+        const agentData = await fetchWorkloadsViaAgent(options)
+        if (agentData.length > 0) {
+          return agentData
+        }
       }
-      const result = await res.json()
-      setData(result.items || result)
-    } catch {
-      setError(new Error('No data source available'))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [options?.cluster, options?.namespace, options?.type, enabled])
 
-  useEffect(() => {
-    if (!enabled) {
-      setData(undefined)
-      setIsLoading(false)
-      return
-    }
-    fetchData()
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [fetchData, enabled])
+      // Fall back to REST API
+      try {
+        const params = new URLSearchParams()
+        if (options?.cluster) params.set('cluster', options.cluster)
+        if (options?.namespace) params.set('namespace', options.namespace)
+        if (options?.type) params.set('type', options.type)
 
-  return { data, isLoading, error, refetch: fetchData }
+        const queryString = params.toString()
+        const url = `/api/workloads${queryString ? `?${queryString}` : ''}`
+
+        const res = await fetch(url, { headers: authHeaders() })
+        if (!res.ok) {
+          throw new Error(`Failed to fetch workloads: ${res.statusText}`)
+        }
+        const data = await res.json()
+        return (data.items || data) as Workload[]
+      } catch {
+        // If both agent and REST fail, return demo data
+        return DEMO_WORKLOADS
+      }
+    },
+  })
+
+  return {
+    data: result.data,
+    isLoading: result.isLoading,
+    isRefreshing: result.isRefreshing,
+    error: result.error ? new Error(result.error) : null,
+    refetch: result.refetch,
+  }
 }
 
 // Fetch cluster capabilities
 export function useClusterCapabilities() {
-  const [data, setData] = useState<ClusterCapability[] | undefined>(undefined)
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<Error | null>(null)
-
-  const fetchData = useCallback(async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
+  const result = useCache({
+    key: 'cluster-capabilities',
+    category: 'clusters',
+    initialData: [] as ClusterCapability[],
+    fetcher: async () => {
       const res = await fetch('/api/workloads/capabilities', { headers: authHeaders() })
       if (!res.ok) {
         throw new Error(`Failed to fetch capabilities: ${res.statusText}`)
       }
-      const capabilities = await res.json()
-      setData(capabilities)
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'))
-    } finally {
-      setIsLoading(false)
-    }
-  }, [])
+      return await res.json() as ClusterCapability[]
+    },
+  })
 
-  useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 60000)
-    return () => clearInterval(interval)
-  }, [fetchData])
-
-  return { data, isLoading, error, refetch: fetchData }
+  return {
+    data: result.data,
+    isLoading: result.isLoading,
+    error: result.error ? new Error(result.error) : null,
+    refetch: result.refetch,
+  }
 }
 
 // Deploy workload to clusters
 export function useDeployWorkload() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
   const mutate = useCallback(async (
     request: DeployRequest,
     options?: {
@@ -234,9 +216,6 @@ export function useDeployWorkload() {
       onError?: (error: Error) => void
     }
   ) => {
-    setIsLoading(true)
-    setError(null)
-
     try {
       const res = await fetch('/api/workloads/deploy', {
         method: 'POST',
@@ -252,22 +231,16 @@ export function useDeployWorkload() {
       return result
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error')
-      setError(error)
       options?.onError?.(error)
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }, [])
 
-  return { mutate, isLoading, error }
+  return { mutate, isLoading: false, error: null }
 }
 
 // Scale workload
 export function useScaleWorkload() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
   const mutate = useCallback(async (
     request: {
       workloadName: string
@@ -280,9 +253,6 @@ export function useScaleWorkload() {
       onError?: (error: Error) => void
     }
   ) => {
-    setIsLoading(true)
-    setError(null)
-
     try {
       const res = await fetch('/api/workloads/scale', {
         method: 'POST',
@@ -298,22 +268,16 @@ export function useScaleWorkload() {
       return result
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error')
-      setError(error)
       options?.onError?.(error)
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }, [])
 
-  return { mutate, isLoading, error }
+  return { mutate, isLoading: false, error: null }
 }
 
 // Delete workload
 export function useDeleteWorkload() {
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
-
   const mutate = useCallback(async (
     params: {
       cluster: string
@@ -325,9 +289,6 @@ export function useDeleteWorkload() {
       onError?: (error: Error) => void
     }
   ) => {
-    setIsLoading(true)
-    setError(null)
-
     try {
       const res = await fetch(`/api/workloads/${params.cluster}/${params.namespace}/${params.name}`, {
         method: 'DELETE',
@@ -340,13 +301,10 @@ export function useDeleteWorkload() {
       options?.onSuccess?.()
     } catch (err) {
       const error = err instanceof Error ? err : new Error('Unknown error')
-      setError(error)
       options?.onError?.(error)
       throw error
-    } finally {
-      setIsLoading(false)
     }
   }, [])
 
-  return { mutate, isLoading, error }
+  return { mutate, isLoading: false, error: null }
 }

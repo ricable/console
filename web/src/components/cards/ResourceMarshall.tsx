@@ -159,8 +159,8 @@ export function ResourceMarshall() {
             <option value="">
               {wlLoading ? 'Loading...' : 'Select workload...'}
             </option>
-            {workloads?.map(w => (
-              <option key={`${w.type}-${w.name}`} value={w.name}>
+            {workloads?.map((w, idx) => (
+              <option key={`${w.cluster || idx}-${w.namespace || ''}-${w.type}-${w.name}`} value={w.name}>
                 {w.name} ({w.type})
               </option>
             ))}

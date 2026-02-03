@@ -14,7 +14,6 @@ import {
   Plus,
   ArrowUpRight,
   GripVertical,
-  Loader2,
 } from 'lucide-react'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { useCardData, commonComparators, CardSearchInput, CardControlsRow, CardPaginationFooter } from '../../lib/cards'
@@ -645,9 +644,28 @@ export function WorkloadDeployment(_props: WorkloadDeploymentProps) {
       {/* Workload list */}
       <div className="flex-1 overflow-auto">
         {workloadsLoading && workloads.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 p-4">
-            <Loader2 className="h-8 w-8 mb-2 animate-spin opacity-50" />
-            <p className="text-sm">Loading workloads...</p>
+          <div className="divide-y divide-gray-100 dark:divide-gray-700">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="p-3 animate-pulse">
+                <div className="flex items-start gap-2">
+                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded mt-0.5" />
+                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="flex-1 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded" />
+                    </div>
+                    <div className="h-3 w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+                  </div>
+                  <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+                <div className="mt-2 ml-10 h-3 w-64 bg-gray-200 dark:bg-gray-700 rounded" />
+                <div className="mt-2 ml-10 flex gap-1">
+                  <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                  <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filteredWorkloads.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 dark:text-gray-400 p-4">
