@@ -3,7 +3,7 @@ import { Server, Check, Cpu, HardDrive, Layers, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { useClusterCapabilities, ClusterCapability } from '../../hooks/useWorkloads'
-import { getDemoMode } from '../../hooks/useDemoMode'
+import { useReportCardDataState } from './CardDataContext'
 
 // Demo cluster data (fallback when no real clusters)
 const DEMO_CLUSTERS: ClusterCapability[] = [
@@ -60,11 +60,22 @@ export function ClusterDropZone({
 }: ClusterDropZoneProps) {
   const { data: realClusters, isLoading } = useClusterCapabilities()
 
+  const hasData = (realClusters?.length ?? 0) > 0 || DEMO_CLUSTERS.length > 0
+
+  // Report state to CardWrapper for refresh animation
+  useReportCardDataState({
+    isFailed: false,
+    consecutiveFailures: 0,
+    isLoading: isLoading && !hasData,
+    isRefreshing: isLoading && hasData,
+    hasData,
+  })
+
   if (!isDragging || !draggedWorkload) return null
 
-  // Use demo data only in demo mode
-  const isDemo = getDemoMode()
-  const clusters = isDemo ? DEMO_CLUSTERS : (realClusters || [])
+  // Use real clusters if available, otherwise demo data
+  const clusters = realClusters && realClusters.length > 0 ? realClusters : DEMO_CLUSTERS
+  const isDemo = !realClusters || realClusters.length === 0
 
   // Filter out clusters where workload is already deployed and unavailable clusters
   const availableClusters = clusters.filter(

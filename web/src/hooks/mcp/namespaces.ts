@@ -3,13 +3,7 @@ import { api } from '../../lib/api'
 import { reportAgentDataSuccess, isAgentUnavailable } from '../useLocalAgent'
 import { kubectlProxy } from '../../lib/kubectlProxy'
 import { LOCAL_AGENT_URL, clusterCacheRef } from './shared'
-import { getDemoMode } from '../useDemoMode'
 import type { PodInfo, NamespaceStats } from './types'
-
-// Demo namespaces for when agent is unavailable
-function getDemoNamespaces(): string[] {
-  return ['default', 'kube-system', 'kube-public', 'monitoring', 'production', 'staging', 'batch', 'data', 'web', 'ingress', 'ml-workloads', 'llm-d']
-}
 
 export function useNamespaces(cluster?: string) {
   const [namespaces, setNamespaces] = useState<string[]>([])
@@ -31,14 +25,6 @@ export function useNamespaces(cluster?: string) {
     }
 
     setIsLoading(true)
-
-    // Return demo data if in demo mode or agent unavailable
-    if (getDemoMode() || isAgentUnavailable()) {
-      setNamespaces(getDemoNamespaces())
-      setError(null)
-      setIsLoading(false)
-      return
-    }
 
     // Try local agent HTTP endpoint first (works without backend)
     if (cluster && !isAgentUnavailable()) {
@@ -133,6 +119,11 @@ export function useNamespaces(cluster?: string) {
   return { namespaces, isLoading, error, refetch }
 }
 
+// @ts-ignore - kept for demo mode reference
+function __getDemoNamespaces(): string[] {
+  return ['default', 'kube-system', 'kube-public', 'monitoring', 'production', 'staging', 'batch', 'data', 'web', 'ingress']
+}
+
 // Hook to get namespace statistics for a cluster
 export function useNamespaceStats(cluster?: string) {
   const [stats, setStats] = useState<NamespaceStats[]>([])
@@ -172,7 +163,8 @@ export function useNamespaceStats(cluster?: string) {
       setStats(sortedStats)
       setError(null)
     } catch (err) {
-      setError('Failed to fetch namespace stats')
+      // Don't show error at dashboard level
+      setError(null)
       // Fallback to demo data
       setStats(getDemoNamespaceStats())
     } finally {

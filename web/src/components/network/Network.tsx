@@ -13,12 +13,11 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useServices } from '../../hooks/useMCP'
+import { useCachedServices } from '../../hooks/useCachedData'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
-import { UnifiedStatsSection, NETWORK_STATS_CONFIG } from '../../lib/unified/stats'
-import type { StatBlockValue } from '../ui/StatsOverview'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -137,8 +136,12 @@ function NetworkDragPreviewCard({ card }: { card: DashboardCard }) {
 
 export function Network() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { services, isLoading: servicesLoading, isRefreshing: servicesRefreshing, lastUpdated, refetch, error } = useServices()
+  // Use cached hooks for stale-while-revalidate pattern
+  const { services, isLoading: servicesLoading, isRefreshing: servicesRefreshing, lastRefresh, refetch, error } = useCachedServices()
   const { showIndicator, triggerRefresh } = useRefreshIndicator(refetch)
+
+  // Derive lastUpdated from cache timestamp
+  const lastUpdated = lastRefresh ? new Date(lastRefresh) : null
   const isRefreshing = servicesRefreshing || showIndicator
 
   const {
@@ -287,7 +290,7 @@ export function Network() {
   } : null
 
   return (
-    <div className="">
+    <div className="pt-16">
       {/* Header */}
       <DashboardHeader
         title="Network"
@@ -313,12 +316,13 @@ export function Network() {
       )}
 
       {/* Stats Overview - configurable */}
-      <UnifiedStatsSection
-        config={NETWORK_STATS_CONFIG}
+      <StatsOverview
+        dashboardType="network"
         getStatValue={getStatValue}
         hasData={services.length > 0 || !showSkeletons}
         isLoading={showSkeletons}
         lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-network-stats-collapsed"
       />
 
       {/* Dashboard Cards Section */}

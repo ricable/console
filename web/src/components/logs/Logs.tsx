@@ -13,12 +13,12 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useClusters, useEvents, useWarningEvents } from '../../hooks/useMCP'
+import { useClusters } from '../../hooks/useMCP'
+import { useCachedEvents } from '../../hooks/useCachedData'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
-import { UnifiedStatsSection, EVENTS_STATS_CONFIG } from '../../lib/unified/stats'
-import type { StatBlockValue } from '../ui/StatsOverview'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -136,12 +136,21 @@ function LogsDragPreviewCard({ card }: { card: DashboardCard }) {
 
 export function Logs() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { clusters, isLoading, isRefreshing: dataRefreshing, lastUpdated, refetch } = useClusters()
-  const { showIndicator, triggerRefresh } = useRefreshIndicator(refetch)
-  const isRefreshing = dataRefreshing || showIndicator
+  const { clusters, isLoading: clustersLoading, isRefreshing: clustersRefreshing, refetch: refetchClusters } = useClusters()
+  // Use cached hooks for stale-while-revalidate pattern
+  const { events, isLoading: eventsLoading, isRefreshing: eventsRefreshing, lastRefresh, refetch: refetchEvents } = useCachedEvents()
+  // Derive warning events from all events (cached equivalent for useWarningEvents)
+  const warningEvents = events.filter(e => e.type === 'Warning')
+  // Derive lastUpdated from cache timestamp
+  const lastUpdated = lastRefresh ? new Date(lastRefresh) : null
+  const isLoading = clustersLoading || eventsLoading
+  const handleRefresh = useCallback(() => {
+    refetchClusters()
+    refetchEvents()
+  }, [refetchClusters, refetchEvents])
+  const { showIndicator, triggerRefresh } = useRefreshIndicator(handleRefresh)
+  const isRefreshing = clustersRefreshing || eventsRefreshing || showIndicator
   const isFetching = isLoading || isRefreshing || showIndicator
-  const { events } = useEvents()
-  const { events: warningEvents } = useWarningEvents()
   const { drillToEvents: _drillToEvents, drillToAllEvents, drillToAllClusters } = useDrillDownActions()
   const { getStatValue: getUniversalStatValue } = useUniversalStats()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
@@ -172,7 +181,7 @@ export function Logs() {
   } = useDashboard({
     storageKey: LOGS_CARDS_KEY,
     defaultCards: DEFAULT_LOGS_CARDS,
-    onRefresh: refetch,
+    onRefresh: handleRefresh,
   })
 
   // Handle addCard URL param
@@ -309,7 +318,7 @@ export function Logs() {
   } : null
 
   return (
-    <div className="">
+    <div className="pt-16">
       {/* Header */}
       <DashboardHeader
         title="Logs & Events"
@@ -324,12 +333,13 @@ export function Logs() {
       />
 
       {/* Stats Overview */}
-      <UnifiedStatsSection
-        config={EVENTS_STATS_CONFIG}
+      <StatsOverview
+        dashboardType="events"
         getStatValue={getStatValue}
         hasData={reachableClusters.length > 0}
         isLoading={isLoading && clusters.length === 0}
         lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-logs-stats-collapsed"
       />
 
       {/* Dashboard Cards Section */}

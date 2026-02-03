@@ -8,14 +8,26 @@ import { useDrillDownActions } from '../../../hooks/useDrillDown'
 import { cn } from '../../../lib/cn'
 import { useApiKeyCheck, ApiKeyPromptModal } from './shared'
 import type { ConsoleMissionCardProps } from './shared'
+import { useReportCardDataState } from '../CardDataContext'
 
 // Card 4: Offline Detection - Detect offline nodes and unavailable GPUs
 export function ConsoleOfflineDetectionCard(_props: ConsoleMissionCardProps) {
   const { startMission, missions } = useMissions()
-  const { nodes: gpuNodes } = useGPUNodes()
+  const { nodes: gpuNodes, isLoading } = useGPUNodes()
   const { selectedClusters, isAllClustersSelected, customFilter } = useGlobalFilters()
   const { drillToCluster, drillToNode } = useDrillDownActions()
   const { showKeyPrompt, checkKeyAndRun, goToSettings, dismissPrompt } = useApiKeyCheck()
+
+  const hasData = gpuNodes.length > 0
+
+  // Report state to CardWrapper for refresh animation
+  useReportCardDataState({
+    isFailed: false,
+    consecutiveFailures: 0,
+    isLoading: isLoading && !hasData,
+    isRefreshing: isLoading && hasData,
+    hasData,
+  })
 
   // Get all nodes from direct API fetch
   const [allNodes, setAllNodes] = useState<Array<{ name: string; cluster?: string; status: string; roles: string[]; unschedulable?: boolean }>>([])
@@ -23,14 +35,8 @@ export function ConsoleOfflineDetectionCard(_props: ConsoleMissionCardProps) {
 
   // Fetch nodes from local agent (no auth required)
   useEffect(() => {
-    // In demo mode, use demo data (no local agent on Netlify)
+    // Skip agent requests in demo mode (no local agent on Netlify)
     if (getDemoMode()) {
-      // Demo data - cluster names must match getDemoClusters() in shared.ts
-      setAllNodes([
-        { name: 'gpu-node-3', cluster: 'vllm-gpu-cluster', status: 'NotReady', roles: ['worker'], unschedulable: false },
-        { name: 'worker-node-7', cluster: 'eks-prod-us-east-1', status: 'Ready', roles: ['worker'], unschedulable: true },
-        { name: 'edge-node-2', cluster: 'edge-retail-na', status: 'Unknown', roles: ['edge'], unschedulable: false },
-      ])
       setNodesLoading(false)
       return
     }

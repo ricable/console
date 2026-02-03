@@ -12,14 +12,14 @@ import {
   rectSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { usePodIssues, useClusters } from '../../hooks/useMCP'
+import { useClusters } from '../../hooks/useMCP'
+import { useCachedPodIssues } from '../../hooks/useCachedData'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { StatusIndicator } from '../charts/StatusIndicator'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { Skeleton } from '../ui/Skeleton'
-import { UnifiedStatsSection, PODS_STATS_CONFIG } from '../../lib/unified/stats'
-import type { StatBlockValue } from '../ui/StatsOverview'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
@@ -141,8 +141,12 @@ function PodDragPreviewCard({ card }: { card: DashboardCard }) {
 
 export function Pods() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastUpdated, refetch: refetchPodIssues } = usePodIssues()
+  // Use cached hooks for stale-while-revalidate pattern
+  const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastRefresh: podIssuesLastRefresh, refetch: refetchPodIssues } = useCachedPodIssues()
   const { clusters, isLoading: clustersLoading, refetch: refetchClusters } = useClusters()
+
+  // Derive lastUpdated from cache timestamp
+  const lastUpdated = podIssuesLastRefresh ? new Date(podIssuesLastRefresh) : null
   const handleRefreshAll = useCallback(() => { refetchPodIssues(); refetchClusters() }, [refetchPodIssues, refetchClusters])
   const { showIndicator, triggerRefresh } = useRefreshIndicator(handleRefreshAll)
   const { drillToPod, drillToAllPods, drillToAllClusters } = useDrillDownActions()
@@ -311,7 +315,7 @@ export function Pods() {
   } : null
 
   return (
-    <div className="">
+    <div className="pt-16">
       {/* Header */}
       <DashboardHeader
         title="Pods"
@@ -326,12 +330,13 @@ export function Pods() {
       />
 
       {/* Stats Overview */}
-      <UnifiedStatsSection
-        config={PODS_STATS_CONFIG}
+      <StatsOverview
+        dashboardType="pods"
         getStatValue={getStatValue}
         hasData={!showSkeletons}
         isLoading={showSkeletons}
         lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-pods-stats-collapsed"
       />
 
       {/* Dashboard Cards Section */}

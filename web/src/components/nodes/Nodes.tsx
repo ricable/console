@@ -16,8 +16,7 @@ import { useClusters, useGPUNodes } from '../../hooks/useMCP'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
-import { UnifiedStatsSection, COMPUTE_STATS_CONFIG } from '../../lib/unified/stats'
-import type { StatBlockValue } from '../ui/StatsOverview'
+import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { CardWrapper } from '../cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../cards/cardRegistry'
 import { AddCardModal } from '../dashboard/AddCardModal'
@@ -141,8 +140,9 @@ export function Nodes() {
   const { showIndicator, triggerRefresh } = useRefreshIndicator(refetch)
   const isRefreshing = dataRefreshing || showIndicator
   const isFetching = isLoading || isRefreshing || showIndicator
-  const { nodes: gpuNodes, error: nodesError } = useGPUNodes()
-  const error = clustersError || nodesError
+  const { nodes: gpuNodes } = useGPUNodes()
+  // Only show cluster errors - GPU node errors are not useful (many clusters have no GPUs)
+  const error = clustersError
   const { drillToNode: _drillToNode, drillToAllNodes, drillToAllGPU, drillToAllPods, drillToAllClusters } = useDrillDownActions()
   const { getStatValue: getUniversalStatValue } = useUniversalStats()
   const { selectedClusters: globalSelectedClusters, isAllClustersSelected } = useGlobalFilters()
@@ -298,7 +298,7 @@ export function Nodes() {
   } : null
 
   return (
-    <div className="">
+    <div className="pt-16">
       {/* Header */}
       <DashboardHeader
         title="Nodes"
@@ -324,12 +324,13 @@ export function Nodes() {
       )}
 
       {/* Stats Overview */}
-      <UnifiedStatsSection
-        config={COMPUTE_STATS_CONFIG}
+      <StatsOverview
+        dashboardType="compute"
         getStatValue={getStatValue}
         hasData={totalNodes > 0}
         isLoading={isLoading && clusters.length === 0}
         lastUpdated={lastUpdated}
+        collapsedStorageKey="kubestellar-nodes-stats-collapsed"
       />
 
       {/* Dashboard Cards Section */}
