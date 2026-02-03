@@ -118,8 +118,15 @@ test.describe('Keyboard Navigation Accessibility', () => {
     const focused = page.locator(':focus')
     const hasFocus = await focused.isVisible().catch(() => false)
     
-    // At least one element should be focusable
-    expect(hasFocus || true).toBeTruthy()
+    // At least one element should be focusable (may vary by browser)
+    if (!hasFocus) {
+      // Try one more time - some browsers need a moment
+      await page.waitForTimeout(100)
+      const secondCheck = await focused.isVisible().catch(() => false)
+      expect(secondCheck || hasFocus).toBeTruthy()
+    } else {
+      expect(hasFocus).toBeTruthy()
+    }
   })
 
   test('GPU Reservations keyboard navigation', async ({ page }) => {

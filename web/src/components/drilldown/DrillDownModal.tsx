@@ -219,11 +219,6 @@ export function DrillDownModal() {
       role="dialog"
       aria-modal="true"
       onClick={close}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') {
-          close()
-        }
-      }}
     >
       <div
         className="glass w-full md:w-[90vw] max-w-[1200px] h-[95vh] md:h-[80vh] rounded-xl flex flex-col overflow-hidden"
