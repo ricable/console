@@ -110,6 +110,7 @@ const SortablePodCard = memo(function SortablePodCard({
             {...listeners}
             className="p-1 rounded hover:bg-secondary cursor-grab active:cursor-grabbing"
             title="Drag to reorder"
+            aria-label="Drag to reorder card"
           >
             <GripVertical className="w-4 h-4 text-muted-foreground" />
           </button>
@@ -340,6 +341,7 @@ export function Pods() {
           <button
             onClick={() => setShowCards(!showCards)}
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={showCards ? "Collapse pod cards section" : "Expand pod cards section"}
           >
             <LayoutGrid className="w-4 h-4" />
             <span>Pod Cards ({cards.length})</span>
