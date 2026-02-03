@@ -339,6 +339,12 @@ export function Pods() {
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setShowCards(!showCards)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setShowCards(!showCards)
+              }
+            }}
             className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             <LayoutGrid className="w-4 h-4" />
@@ -361,6 +367,12 @@ export function Pods() {
                 </p>
                 <button
                   onClick={() => setShowAddCard(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setShowAddCard(true)
+                    }
+                  }}
                   className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-colors"
                 >
                   <Plus className="w-4 h-4" />
@@ -465,7 +477,15 @@ export function Pods() {
           {filteredPodIssues.map((issue, i) => (
             <div
               key={i}
+              role="button"
+              tabIndex={0}
               onClick={() => drillToPod(issue.cluster || '', issue.namespace, issue.name)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  drillToPod(issue.cluster || '', issue.namespace, issue.name)
+                }
+              }}
               className={`glass p-4 rounded-lg cursor-pointer transition-all hover:scale-[1.01] border-l-4 ${
                 issue.reason === 'CrashLoopBackOff' || issue.reason === 'OOMKilled' ? 'border-l-red-500' :
                 issue.reason === 'Pending' || issue.reason === 'ContainerCreating' ? 'border-l-yellow-500' :

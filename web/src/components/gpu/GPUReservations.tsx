@@ -263,6 +263,12 @@ export function GPUReservations() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as ViewTab)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setActiveTab(tab.id as ViewTab)
+                }
+              }}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[2px] transition-colors',
                 activeTab === tab.id
@@ -284,6 +290,12 @@ export function GPUReservations() {
         <div className="ml-auto pb-2">
           <button
             onClick={() => setShowNewReservationForm(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setShowNewReservationForm(true)
+              }
+            }}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -482,6 +494,12 @@ export function GPUReservations() {
             <div className="flex items-center justify-between mb-4">
               <button
                 onClick={prevMonth}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    prevMonth()
+                  }
+                }}
                 className="p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 <ChevronLeft className="w-5 h-5" />
@@ -491,6 +509,12 @@ export function GPUReservations() {
               </h3>
               <button
                 onClick={nextMonth}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    nextMonth()
+                  }
+                }}
                 className="p-2 rounded-lg hover:bg-secondary transition-colors"
               >
                 <ChevronRight className="w-5 h-5" />
@@ -536,6 +560,12 @@ export function GPUReservations() {
                         <button
                           key={res.id}
                           onClick={() => setSelectedReservation(res)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault()
+                              setSelectedReservation(res)
+                            }
+                          }}
                           className={cn(
                             'w-full text-left px-1.5 py-0.5 rounded text-xs truncate',
                             res.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
@@ -563,6 +593,12 @@ export function GPUReservations() {
                 <h3 className="text-lg font-medium text-foreground">{selectedReservation.name}</h3>
                 <button
                   onClick={() => setSelectedReservation(null)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedReservation(null)
+                    }
+                  }}
                   className="p-1 rounded hover:bg-secondary transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -865,6 +901,12 @@ export function GPUReservations() {
             <button
               type="button"
               onClick={() => setShowNewReservationForm(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setShowNewReservationForm(false)
+                }
+              }}
               className="px-4 py-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel

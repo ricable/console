@@ -585,6 +585,12 @@ export function GitOps() {
         <div className="flex gap-2">
           <button
             onClick={() => setStatusFilter('all')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setStatusFilter('all')
+              }
+            }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === 'all'
                 ? 'bg-primary text-primary-foreground'
@@ -595,6 +601,12 @@ export function GitOps() {
           </button>
           <button
             onClick={() => setStatusFilter('synced')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setStatusFilter('synced')
+              }
+            }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === 'synced'
                 ? 'bg-green-500 text-white'
@@ -605,6 +617,12 @@ export function GitOps() {
           </button>
           <button
             onClick={() => setStatusFilter('drifted')}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                setStatusFilter('drifted')
+              }
+            }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === 'drifted'
                 ? 'bg-yellow-500 text-white'
@@ -688,6 +706,12 @@ export function GitOps() {
                   </ul>
                   <button
                     onClick={() => handleSync(app)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleSync(app)
+                      }
+                    }}
                     className="mt-2 px-3 py-1 rounded bg-yellow-500/20 text-yellow-400 text-xs hover:bg-yellow-500/30 transition-colors flex items-center gap-1.5"
                   >
                     <RefreshCw className="w-3 h-3" />

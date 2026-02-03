@@ -448,6 +448,12 @@ export function SyncDialog({
             <>
               <button
                 onClick={handleClose}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    handleClose()
+                  }
+                }}
                 className="px-4 py-2 rounded-lg text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
                 Cancel
