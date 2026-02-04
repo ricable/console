@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Check, AlertTriangle, Play, Loader2, ChevronRight, GitBranch, Box, Server, Shield, Settings, Database, Network, Layers, Container, FileText, Puzzle, X } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
+import { TOOLTIPS } from '../../lib/tooltips'
 
 // Sync phases
 type SyncPhase = 'detection' | 'plan' | 'execution' | 'complete'
@@ -34,6 +35,15 @@ function formatResourceKind(kind: string): string {
   if (kind.toLowerCase() === 'clusterrole') return 'ClusterRole'
   if (kind.toLowerCase() === 'clusterrolebinding') return 'ClusterRoleBinding'
   return kind
+}
+
+// Get tooltip for resource kind
+function getResourceKindTooltip(kind: string): string | undefined {
+  if (!kind) return undefined
+  if (kind.toLowerCase() === 'customresourcedefinition') return TOOLTIPS.CRD
+  if (kind.toLowerCase().includes('configmap')) return TOOLTIPS.ConfigMap
+  if (kind.toLowerCase().includes('secret')) return TOOLTIPS.Secret
+  return undefined
 }
 
 interface DriftedResource {
@@ -357,7 +367,10 @@ export function SyncDialog({
                     <div key={i} className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
                       <div className="flex items-center gap-2 text-sm">
                         {getResourceIcon(r.kind)}
-                        <span className="px-1.5 py-0.5 rounded text-xs font-medium bg-card text-muted-foreground">
+                        <span 
+                          className="px-1.5 py-0.5 rounded text-xs font-medium bg-card text-muted-foreground"
+                          title={getResourceKindTooltip(r.kind)}
+                        >
                           {formatResourceKind(r.kind)}
                         </span>
                         <span className="font-medium text-foreground truncate">{r.name}</span>
@@ -390,7 +403,12 @@ export function SyncDialog({
                           {item.action.toUpperCase()}
                         </span>
                         {getResourceIcon(kind)}
-                        <span className="text-muted-foreground text-xs">{formatResourceKind(kind)}</span>
+                        <span 
+                          className="text-muted-foreground text-xs"
+                          title={getResourceKindTooltip(kind)}
+                        >
+                          {formatResourceKind(kind)}
+                        </span>
                         <span className="text-foreground truncate">{name}</span>
                       </div>
                     )

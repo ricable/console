@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle, AlertTriangle, Clock, Loader2, WifiOff } from 'lucide-react'
+import { TOOLTIPS } from '../../lib/tooltips'
 
 export type Status = 'healthy' | 'error' | 'warning' | 'critical' | 'pending' | 'loading' | 'unknown' | 'unreachable'
 
@@ -15,15 +16,16 @@ const statusConfig: Record<Status, {
   color: string
   bg: string
   label: string
+  tooltip: string
 }> = {
-  healthy: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500', label: 'Healthy' },
-  error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500', label: 'Error' },
-  warning: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Warning' },
-  critical: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-600', label: 'Critical' },
-  pending: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500', label: 'Pending' },
-  loading: { icon: Loader2, color: 'text-purple-400', bg: 'bg-purple-500', label: 'Loading' },
-  unknown: { icon: AlertTriangle, color: 'text-gray-400', bg: 'bg-gray-500', label: 'Unknown' },
-  unreachable: { icon: WifiOff, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Offline' },
+  healthy: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500', label: 'Healthy', tooltip: TOOLTIPS.STATUS_HEALTHY },
+  error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500', label: 'Error', tooltip: TOOLTIPS.STATUS_ERROR },
+  warning: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Warning', tooltip: TOOLTIPS.STATUS_WARNING },
+  critical: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-600', label: 'Critical', tooltip: TOOLTIPS.STATUS_CRITICAL },
+  pending: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500', label: 'Pending', tooltip: TOOLTIPS.STATUS_PENDING },
+  loading: { icon: Loader2, color: 'text-purple-400', bg: 'bg-purple-500', label: 'Loading', tooltip: TOOLTIPS.STATUS_LOADING },
+  unknown: { icon: AlertTriangle, color: 'text-gray-400', bg: 'bg-gray-500', label: 'Unknown', tooltip: TOOLTIPS.STATUS_UNKNOWN },
+  unreachable: { icon: WifiOff, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Offline', tooltip: TOOLTIPS.STATUS_UNREACHABLE },
 }
 
 const sizes = {
@@ -44,7 +46,7 @@ export function StatusIndicator({
   const Icon = config.icon
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-2" title={config.tooltip}>
       <div className="relative">
         <Icon
           className={`${sizeConfig.icon} ${config.color} ${
@@ -76,7 +78,7 @@ export function StatusDot({ status, size = 'md', pulse = false }: StatusDotProps
   const sizeConfig = sizes[size]
 
   return (
-    <div className="relative">
+    <div className="relative" title={config.tooltip}>
       <div className={`${sizeConfig.dot} ${config.bg} rounded-full`} />
       {pulse && (
         <span

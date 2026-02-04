@@ -4,6 +4,7 @@ import { BaseModal } from '../../lib/modals'
 import { CardFactoryModal } from './CardFactoryModal'
 import { StatBlockFactoryModal } from './StatBlockFactoryModal'
 import { getAllDynamicCards, onRegistryChange } from '../../lib/dynamic-cards'
+import { TOOLTIPS } from '../../lib/tooltips'
 
 // Card catalog - all available cards organized by category
 const CARD_CATALOG = {
@@ -786,6 +787,47 @@ function CardPreview({ card }: { card: HoveredCard }) {
   )
 }
 
+// Helper function to wrap technical abbreviations with tooltips
+function renderDescriptionWithTooltips(description: string) {
+  const abbrevMap: Record<string, string> = {
+    'CPU': TOOLTIPS.CPU,
+    'GPU': TOOLTIPS.GPU,
+    'RBAC': TOOLTIPS.RBAC,
+    'CRD': TOOLTIPS.CRD,
+    'PVC': TOOLTIPS.PVC,
+    'ConfigMaps': TOOLTIPS.ConfigMaps,
+    'Secrets': TOOLTIPS.Secrets,
+    'OLM': TOOLTIPS.OLM,
+  }
+  
+  // Create a regex pattern to match all abbreviations
+  const pattern = new RegExp(`\\b(${Object.keys(abbrevMap).join('|')})\\b`, 'g')
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  
+  description.replace(pattern, (match: string, abbrev: string, index: number) => {
+    // Add text before the abbreviation
+    if (index > lastIndex) {
+      parts.push(description.substring(lastIndex, index))
+    }
+    // Add the abbreviation with tooltip
+    parts.push(
+      <span key={index} title={abbrevMap[abbrev]} className="border-b border-dotted border-muted-foreground/30 cursor-help">
+        {abbrev}
+      </span>
+    )
+    lastIndex = index + match.length
+    return match
+  })
+  
+  // Add remaining text
+  if (lastIndex < description.length) {
+    parts.push(description.substring(lastIndex))
+  }
+  
+  return parts.length > 0 ? <>{parts}</> : description
+}
+
 export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = [] }: AddCardModalProps) {
   const [activeTab, setActiveTab] = useState<'ai' | 'browse'>('browse')
   const [showCardFactory, setShowCardFactory] = useState(false)
@@ -1078,7 +1120,7 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
                                   </span>
                                 </div>
                                 <p className="text-xs text-muted-foreground line-clamp-2">
-                                  {card.description}
+                                  {renderDescriptionWithTooltips(card.description)}
                                 </p>
                                 {isAlreadyAdded && (
                                   <span className="text-xs text-muted-foreground">(Added)</span>
@@ -1255,7 +1297,7 @@ export function AddCardModal({ isOpen, onClose, onAddCards, existingCardTypes = 
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        {card.description}
+                        {renderDescriptionWithTooltips(card.description)}
                       </p>
                       <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded bg-secondary text-muted-foreground capitalize">
                         {card.visualization}

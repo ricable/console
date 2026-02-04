@@ -22,6 +22,7 @@ import { DonutChart } from '../charts/PieChart'
 import { BarChart } from '../charts/BarChart'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { cn } from '../../lib/cn'
+import { TOOLTIPS } from '../../lib/tooltips'
 
 type ViewTab = 'overview' | 'calendar' | 'quotas' | 'requests'
 
@@ -633,7 +634,7 @@ export function GPUReservations() {
                     {/* GPU Quota */}
                     <div>
                       <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-muted-foreground">GPU</span>
+                        <span className="text-muted-foreground" title={TOOLTIPS.GPU}>GPU</span>
                         <span className="text-foreground">{quota.gpuUsed}/{quota.gpuLimit}</span>
                       </div>
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">
@@ -650,7 +651,7 @@ export function GPUReservations() {
                     {/* CPU Quota */}
                     <div>
                       <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="text-muted-foreground">CPU (cores)</span>
+                        <span className="text-muted-foreground" title={TOOLTIPS.CPU}>CPU (cores)</span>
                         <span className="text-foreground">{quota.cpuUsed}/{quota.cpuLimit}</span>
                       </div>
                       <div className="h-2 bg-secondary rounded-full overflow-hidden">

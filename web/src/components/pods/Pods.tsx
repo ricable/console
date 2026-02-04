@@ -10,6 +10,7 @@ import { ClusterBadge } from '../ui/ClusterBadge'
 import { Skeleton } from '../ui/Skeleton'
 import { StatBlockValue } from '../ui/StatsOverview'
 import { DashboardPage } from '../../lib/dashboards'
+import { TOOLTIPS } from '../../lib/tooltips'
 
 const PODS_CARDS_KEY = 'kubestellar-pods-cards'
 
@@ -183,7 +184,18 @@ export function Pods() {
 
                 <div className="flex items-center gap-6">
                   <div className="text-right">
-                    <div className="text-sm font-medium text-orange-400">{issue.reason || 'Unknown'}</div>
+                    <div 
+                      className="text-sm font-medium text-orange-400"
+                      title={
+                        issue.reason === 'CrashLoopBackOff' ? TOOLTIPS.CrashLoopBackOff :
+                        issue.reason === 'OOMKilled' ? TOOLTIPS.OOMKilled :
+                        issue.reason === 'Pending' ? TOOLTIPS.Pending :
+                        issue.reason === 'ContainerCreating' ? TOOLTIPS.ContainerCreating :
+                        undefined
+                      }
+                    >
+                      {issue.reason || 'Unknown'}
+                    </div>
                     <div className="text-xs text-muted-foreground">{issue.status || 'Unknown status'}</div>
                   </div>
                   {(issue.restarts || 0) > 0 && (
