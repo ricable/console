@@ -41,6 +41,7 @@ type AIPrediction struct {
 	Severity       string `json:"severity"`       // warning, critical
 	Name           string `json:"name"`           // affected resource name
 	Cluster        string `json:"cluster"`        // cluster name
+	Namespace      string `json:"namespace,omitempty"` // namespace if applicable
 	Reason         string `json:"reason"`         // brief summary
 	ReasonDetailed string `json:"reasonDetailed"` // full explanation
 	Confidence     int    `json:"confidence"`     // 0-100
@@ -323,11 +324,12 @@ type ClusterSummary struct {
 
 // PodIssueSummary is a simplified pod issue for AI
 type PodIssueSummary struct {
-	Name     string `json:"name"`
-	Cluster  string `json:"cluster"`
-	Restarts int    `json:"restarts"`
-	Status   string `json:"status"`
-	Age      string `json:"age"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	Cluster   string `json:"cluster"`
+	Restarts  int    `json:"restarts"`
+	Status    string `json:"status"`
+	Age       string `json:"age"`
 }
 
 // GPUNodeSummary is a simplified GPU node for AI
@@ -403,10 +405,11 @@ func (w *PredictionWorker) gatherClusterData(ctx context.Context) (*ClusterAnaly
 			}
 			for _, p := range pods {
 				data.PodIssues = append(data.PodIssues, PodIssueSummary{
-					Name:     p.Name,
-					Cluster:  cluster.Name,
-					Restarts: p.Restarts,
-					Status:   p.Status,
+					Name:      p.Name,
+					Namespace: p.Namespace,
+					Cluster:   cluster.Name,
+					Restarts:  p.Restarts,
+					Status:    p.Status,
 				})
 			}
 		}
@@ -489,6 +492,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
       "severity": "warning" | "critical",
       "name": "affected-resource-name",
       "cluster": "cluster-name",
+      "namespace": "namespace-name-if-applicable",
       "reason": "Brief 1-line summary (max 80 chars)",
       "reasonDetailed": "Full explanation with context, metrics observed, and recommended actions",
       "confidence": 60-100
@@ -558,6 +562,7 @@ func (w *PredictionWorker) parseAIPredictions(response string, providerName stri
 			Severity       string `json:"severity"`
 			Name           string `json:"name"`
 			Cluster        string `json:"cluster"`
+			Namespace      string `json:"namespace"`
 			Reason         string `json:"reason"`
 			ReasonDetailed string `json:"reasonDetailed"`
 			Confidence     int    `json:"confidence"`
@@ -576,6 +581,7 @@ func (w *PredictionWorker) parseAIPredictions(response string, providerName stri
 			Severity:       p.Severity,
 			Name:           p.Name,
 			Cluster:        p.Cluster,
+			Namespace:      p.Namespace,
 			Reason:         p.Reason,
 			ReasonDetailed: p.ReasonDetailed,
 			Confidence:     p.Confidence,
