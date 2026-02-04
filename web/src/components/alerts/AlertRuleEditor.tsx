@@ -15,7 +15,8 @@ import {
   TEMPERATURE_MIN,
   TEMPERATURE_MAX,
   WIND_SPEED_MIN,
-  WIND_SPEED_MAX
+  WIND_SPEED_MAX,
+  RESTART_COUNT_MIN
 } from '../../constants/thresholds'
 
 interface AlertRuleEditorProps {
@@ -91,8 +92,8 @@ export function AlertRuleEditor({ isOpen = true, rule, onSave, onCancel }: Alert
     }
 
     if (conditionType === 'pod_crash') {
-      if (threshold < ALERT_PERCENTAGE_MIN) {
-        newErrors.threshold = `Restart count must be at least ${ALERT_PERCENTAGE_MIN}`
+      if (threshold < RESTART_COUNT_MIN) {
+        newErrors.threshold = `Restart count must be at least ${RESTART_COUNT_MIN}`
       }
     }
 

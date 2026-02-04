@@ -32,6 +32,10 @@ export const WIND_SPEED_MIN = 1
 /** Maximum wind speed threshold for high wind alerts (mph) */
 export const WIND_SPEED_MAX = 200
 
+// Restart count thresholds
+/** Minimum restart count threshold for pod crash alerts */
+export const RESTART_COUNT_MIN = 1
+
 // Text display thresholds
 /** Maximum name length before truncation */
 export const NAME_LENGTH_MAX = 30

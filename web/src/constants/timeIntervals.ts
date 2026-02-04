@@ -36,7 +36,7 @@ export const TIME_DISPLAY_DATE_THRESHOLD_DAYS = 7
 
 // Auto-reload and snooze durations
 /** Duration to snooze agent setup dialog (24 hours in milliseconds) */
-export const AGENT_SETUP_SNOOZE_DURATION_MS = 24 * 60 * 60 * 1000
+export const AGENT_SETUP_SNOOZE_DURATION_MS = HOURS_PER_DAY * MS_PER_HOUR
 
 /** Minimum time between auto-reloads to prevent infinite loops (30 seconds in milliseconds) */
 export const CHUNK_ERROR_RELOAD_TIMEOUT_MS = 30_000
