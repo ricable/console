@@ -804,21 +804,26 @@ function renderDescriptionWithTooltips(description: string) {
   const pattern = new RegExp(`\\b(${Object.keys(abbrevMap).join('|')})\\b`, 'g')
   const parts: React.ReactNode[] = []
   let lastIndex = 0
+  let matchCounter = 0
   
-  description.replace(pattern, (match: string, abbrev: string, index: number) => {
+  // Use matchAll for clearer intent
+  const matches = description.matchAll(pattern)
+  for (const match of matches) {
+    const abbrev = match[1]
+    const index = match.index!
+    
     // Add text before the abbreviation
     if (index > lastIndex) {
       parts.push(description.substring(lastIndex, index))
     }
-    // Add the abbreviation with tooltip
+    // Add the abbreviation with tooltip - use unique key
     parts.push(
-      <span key={index} title={abbrevMap[abbrev]} className="border-b border-dotted border-muted-foreground/30 cursor-help">
+      <span key={`abbrev-${index}-${matchCounter++}`} title={abbrevMap[abbrev]} className="border-b border-dotted border-muted-foreground/30 cursor-help">
         {abbrev}
       </span>
     )
-    lastIndex = index + match.length
-    return match
-  })
+    lastIndex = index + match[0].length
+  }
   
   // Add remaining text
   if (lastIndex < description.length) {
