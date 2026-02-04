@@ -366,7 +366,7 @@ export function Events() {
                         <span className="text-xs text-muted-foreground">({groupEvents.length} events)</span>
                       </div>
                       <div className="ml-12 space-y-3">
-                        {groupEvents.slice(0, 10).map((event, i) => (
+                        {groupEvents.slice(0, EVENT_SUMMARY_DISPLAY_LIMIT).map((event, i) => (
                           <div key={`${event.object}-${event.reason}-${i}`} className={cn('relative p-4 rounded-lg border-l-4', event.type === 'Warning' ? 'bg-yellow-500/5 border-l-yellow-500' : 'bg-green-500/5 border-l-green-500')}>
                             <div className={cn('absolute -left-[2.125rem] top-5 w-2 h-2 rounded-full', event.type === 'Warning' ? 'bg-yellow-400' : 'bg-green-400')} />
                             <div className="flex items-start justify-between gap-4">

@@ -15,6 +15,8 @@ import {
 import { useAuth } from '../../lib/auth'
 import {
   MS_PER_MINUTE,
+  MINUTES_PER_HOUR,
+  HOURS_PER_DAY,
   TIME_DISPLAY_HOUR_THRESHOLD_MINS,
   TIME_DISPLAY_DAY_THRESHOLD_HOURS,
   TIME_DISPLAY_DATE_THRESHOLD_DAYS
@@ -35,8 +37,8 @@ function formatRelativeTime(dateString: string | undefined): string {
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / MS_PER_MINUTE)
-  const diffHours = Math.floor(diffMins / TIME_DISPLAY_HOUR_THRESHOLD_MINS)
-  const diffDays = Math.floor(diffHours / TIME_DISPLAY_DAY_THRESHOLD_HOURS)
+  const diffHours = Math.floor(diffMins / MINUTES_PER_HOUR)
+  const diffDays = Math.floor(diffHours / HOURS_PER_DAY)
 
   if (diffMins < 1) return 'Just now'
   if (diffMins < TIME_DISPLAY_HOUR_THRESHOLD_MINS) return `${diffMins}m ago`

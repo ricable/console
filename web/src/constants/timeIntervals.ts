@@ -17,6 +17,13 @@ export const MS_PER_HOUR = 60 * MS_PER_MINUTE
 /** Milliseconds in one day */
 export const MS_PER_DAY = 24 * MS_PER_HOUR
 
+// Time conversion constants
+/** Minutes in one hour */
+export const MINUTES_PER_HOUR = 60
+
+/** Hours in one day */
+export const HOURS_PER_DAY = 24
+
 // Time display thresholds
 /** Threshold for switching from minutes to hours display */
 export const TIME_DISPLAY_HOUR_THRESHOLD_MINS = 60
