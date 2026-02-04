@@ -87,7 +87,7 @@ export function AlertRuleEditor({ isOpen = true, rule, onSave, onCancel }: Alert
 
     if (conditionType === 'gpu_usage' || conditionType === 'memory_pressure') {
       if (threshold < ALERT_PERCENTAGE_MIN || threshold > ALERT_PERCENTAGE_MAX) {
-        newErrors.threshold = `Threshold must be between ${ALERT_PERCENTAGE_MIN} and ${ALERT_PERCENTAGE_MAX}`
+        newErrors.threshold = `Threshold must be between ${ALERT_PERCENTAGE_MIN}% and ${ALERT_PERCENTAGE_MAX}%`
       }
     }
 
@@ -99,10 +99,10 @@ export function AlertRuleEditor({ isOpen = true, rule, onSave, onCancel }: Alert
 
     if (conditionType === 'weather_alerts') {
       if (weatherCondition === 'extreme_heat' && (temperatureThreshold < TEMPERATURE_MIN || temperatureThreshold > TEMPERATURE_MAX)) {
-        newErrors.temperatureThreshold = `Temperature must be between ${TEMPERATURE_MIN} and ${TEMPERATURE_MAX}`
+        newErrors.temperatureThreshold = `Temperature must be between ${TEMPERATURE_MIN}°C and ${TEMPERATURE_MAX}°C`
       }
       if (weatherCondition === 'high_wind' && (windSpeedThreshold < WIND_SPEED_MIN || windSpeedThreshold > WIND_SPEED_MAX)) {
-        newErrors.windSpeedThreshold = `Wind speed must be between ${WIND_SPEED_MIN} and ${WIND_SPEED_MAX}`
+        newErrors.windSpeedThreshold = `Wind speed must be between ${WIND_SPEED_MIN} and ${WIND_SPEED_MAX} mph`
       }
     }
 

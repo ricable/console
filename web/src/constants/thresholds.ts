@@ -33,7 +33,7 @@ export const WIND_SPEED_MIN = 1
 export const WIND_SPEED_MAX = 200
 
 // Restart count thresholds
-/** Minimum restart count threshold for pod crash alerts */
+/** Minimum restart count threshold for pod crash alerts (no maximum - unlimited restarts can occur) */
 export const RESTART_COUNT_MIN = 1
 
 // Text display thresholds
