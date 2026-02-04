@@ -16,6 +16,7 @@ import { useAlerts, useSlackNotification, useSlackWebhooks } from '../../hooks/u
 import { useMissions } from '../../hooks/useMissions'
 import { getSeverityIcon, getSeverityColor } from '../../types/alerts'
 import type { Alert } from '../../types/alerts'
+import { MS_PER_MINUTE, TIME_DISPLAY_HOUR_THRESHOLD_MINS, TIME_DISPLAY_DAY_THRESHOLD_HOURS } from '../../constants/timeIntervals'
 
 interface AlertDetailProps {
   alert: Alert
@@ -27,13 +28,13 @@ function formatRelativeTime(dateString: string): string {
   const date = new Date(dateString)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+  const diffMins = Math.floor(diffMs / MS_PER_MINUTE)
+  const diffHours = Math.floor(diffMins / TIME_DISPLAY_HOUR_THRESHOLD_MINS)
+  const diffDays = Math.floor(diffHours / TIME_DISPLAY_DAY_THRESHOLD_HOURS)
 
   if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} minutes ago`
-  if (diffHours < 24) return `${diffHours} hours ago`
+  if (diffMins < TIME_DISPLAY_HOUR_THRESHOLD_MINS) return `${diffMins} minutes ago`
+  if (diffHours < TIME_DISPLAY_DAY_THRESHOLD_HOURS) return `${diffHours} hours ago`
   return `${diffDays} days ago`
 }
 

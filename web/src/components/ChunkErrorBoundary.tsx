@@ -1,5 +1,6 @@
 import { Component, type ReactNode, type ErrorInfo } from 'react'
 import { RefreshCw } from 'lucide-react'
+import { CHUNK_ERROR_RELOAD_TIMEOUT_MS } from '../constants/timeIntervals'
 
 interface Props {
   children: ReactNode
@@ -42,7 +43,7 @@ export class ChunkErrorBoundary extends Component<Props, State> {
     const key = 'chunk-reload-ts'
     const lastReload = sessionStorage.getItem(key)
     const now = Date.now()
-    if (!lastReload || now - parseInt(lastReload) > 30_000) {
+    if (!lastReload || now - parseInt(lastReload) > CHUNK_ERROR_RELOAD_TIMEOUT_MS) {
       sessionStorage.setItem(key, String(now))
       window.location.reload()
     }

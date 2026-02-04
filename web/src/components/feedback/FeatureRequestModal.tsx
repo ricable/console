@@ -13,6 +13,12 @@ import {
   type NotificationType,
 } from '../../hooks/useFeatureRequests'
 import { useAuth } from '../../lib/auth'
+import {
+  MS_PER_MINUTE,
+  TIME_DISPLAY_HOUR_THRESHOLD_MINS,
+  TIME_DISPLAY_DAY_THRESHOLD_HOURS,
+  TIME_DISPLAY_DATE_THRESHOLD_DAYS
+} from '../../constants/timeIntervals'
 
 interface FeatureRequestModalProps {
   isOpen: boolean
@@ -28,14 +34,14 @@ function formatRelativeTime(dateString: string | undefined): string {
   if (isNaN(date.getTime())) return ''
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
+  const diffMins = Math.floor(diffMs / MS_PER_MINUTE)
+  const diffHours = Math.floor(diffMins / TIME_DISPLAY_HOUR_THRESHOLD_MINS)
+  const diffDays = Math.floor(diffHours / TIME_DISPLAY_DAY_THRESHOLD_HOURS)
 
   if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins}m ago`
-  if (diffHours < 24) return `${diffHours}h ago`
-  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffMins < TIME_DISPLAY_HOUR_THRESHOLD_MINS) return `${diffMins}m ago`
+  if (diffHours < TIME_DISPLAY_DAY_THRESHOLD_HOURS) return `${diffHours}h ago`
+  if (diffDays < TIME_DISPLAY_DATE_THRESHOLD_DAYS) return `${diffDays}d ago`
   return date.toLocaleDateString()
 }
 

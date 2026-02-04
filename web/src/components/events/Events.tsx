@@ -11,6 +11,8 @@ import { cn } from '../../lib/cn'
 import { formatStat } from '../../lib/formatStats'
 import { StatBlockValue } from '../ui/StatsOverview'
 import { DashboardPage } from '../../lib/dashboards'
+import { EVENT_FETCH_LIMIT } from '../../constants/limits'
+import { EVENT_TIMELINE_HOURS, EVENT_SUMMARY_DISPLAY_LIMIT, MS_PER_HOUR } from '../../constants/timeIntervals'
 
 const EVENTS_CARDS_KEY = 'kubestellar-events-cards'
 
@@ -70,8 +72,7 @@ export function Events() {
   const { getStatValue: getUniversalStatValue } = useUniversalStats()
 
   // Get events
-  const EVENT_LIMIT = 100
-  const { events: allEvents, isLoading, isRefreshing: refreshingAll, lastRefresh: allUpdated, refetch: refetchAll } = useCachedEvents(undefined, undefined, { limit: EVENT_LIMIT })
+  const { events: allEvents, isLoading, isRefreshing: refreshingAll, lastRefresh: allUpdated, refetch: refetchAll } = useCachedEvents(undefined, undefined, { limit: EVENT_FETCH_LIMIT })
   const warningEvents = useMemo(() => allEvents.filter(e => e.type === 'Warning'), [allEvents])
   const lastUpdated = allUpdated ? new Date(allUpdated) : null
 
@@ -159,9 +160,9 @@ export function Events() {
     }))
     const now = new Date()
     const hourlyData: { name: string; value: number; color?: string }[] = []
-    for (let i = 23; i >= 0; i--) {
-      const hourStart = new Date(now.getTime() - i * 60 * 60 * 1000)
-      const hourEnd = new Date(hourStart.getTime() + 60 * 60 * 1000)
+    for (let i = EVENT_TIMELINE_HOURS - 1; i >= 0; i--) {
+      const hourStart = new Date(now.getTime() - i * MS_PER_HOUR)
+      const hourEnd = new Date(hourStart.getTime() + MS_PER_HOUR)
       const hourTotal = globalFilteredAllEvents.filter(e => e.lastSeen && new Date(e.lastSeen) >= hourStart && new Date(e.lastSeen) < hourEnd).length
       const hourWarnings = globalFilteredAllEvents.filter(e => e.lastSeen && new Date(e.lastSeen) >= hourStart && new Date(e.lastSeen) < hourEnd && e.type === 'Warning').length
       hourlyData.push({ name: hourStart.getHours().toString().padStart(2, '0') + ':00', value: hourTotal, color: hourWarnings > hourTotal / 2 ? '#f59e0b' : '#9333ea' })
@@ -185,7 +186,7 @@ export function Events() {
 
   const formatEventStat = useCallback((count: number) => {
     const formatted = formatStat(count)
-    return count >= EVENT_LIMIT ? `${formatted}+` : formatted
+    return count >= EVENT_FETCH_LIMIT ? `${formatted}+` : formatted
   }, [])
 
   // Stats value getter
@@ -385,7 +386,7 @@ export function Events() {
                             </div>
                           </div>
                         ))}
-                        {groupEvents.length > 10 && <button onClick={() => setActiveTab('list')} className="text-sm text-purple-400 hover:text-purple-300 ml-4">View {groupEvents.length - 10} more events...</button>}
+                        {groupEvents.length > EVENT_SUMMARY_DISPLAY_LIMIT && <button onClick={() => setActiveTab('list')} className="text-sm text-purple-400 hover:text-purple-300 ml-4">View {groupEvents.length - EVENT_SUMMARY_DISPLAY_LIMIT} more events...</button>}
                       </div>
                     </div>
                   )

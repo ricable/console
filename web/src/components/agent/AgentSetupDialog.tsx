@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react'
 import { Download } from 'lucide-react'
 import { useLocalAgent } from '@/hooks/useLocalAgent'
 import { BaseModal } from '../../lib/modals'
+import { AGENT_SETUP_SNOOZE_DURATION_MS } from '../../constants/timeIntervals'
 
 const DISMISSED_KEY = 'kc-agent-setup-dismissed'
 const SNOOZED_KEY = 'kc-agent-setup-snoozed'
-const SNOOZE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
 
 export function AgentSetupDialog() {
   const { status, isConnected } = useLocalAgent()
@@ -42,7 +42,7 @@ export function AgentSetupDialog() {
   }
 
   const handleSnooze = () => {
-    localStorage.setItem(SNOOZED_KEY, String(Date.now() + SNOOZE_DURATION))
+    localStorage.setItem(SNOOZED_KEY, String(Date.now() + AGENT_SETUP_SNOOZE_DURATION_MS))
     setShow(false)
   }
 

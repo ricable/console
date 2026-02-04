@@ -9,6 +9,14 @@ import type {
   AlertSeverity,
   AlertConditionType,
 } from '../../types/alerts'
+import {
+  ALERT_PERCENTAGE_MIN,
+  ALERT_PERCENTAGE_MAX,
+  TEMPERATURE_MIN,
+  TEMPERATURE_MAX,
+  WIND_SPEED_MIN,
+  WIND_SPEED_MAX
+} from '../../constants/thresholds'
 
 interface AlertRuleEditorProps {
   isOpen?: boolean
@@ -77,23 +85,23 @@ export function AlertRuleEditor({ isOpen = true, rule, onSave, onCancel }: Alert
     }
 
     if (conditionType === 'gpu_usage' || conditionType === 'memory_pressure') {
-      if (threshold < 1 || threshold > 100) {
-        newErrors.threshold = 'Threshold must be between 1 and 100'
+      if (threshold < ALERT_PERCENTAGE_MIN || threshold > ALERT_PERCENTAGE_MAX) {
+        newErrors.threshold = `Threshold must be between ${ALERT_PERCENTAGE_MIN} and ${ALERT_PERCENTAGE_MAX}`
       }
     }
 
     if (conditionType === 'pod_crash') {
-      if (threshold < 1) {
-        newErrors.threshold = 'Restart count must be at least 1'
+      if (threshold < ALERT_PERCENTAGE_MIN) {
+        newErrors.threshold = `Restart count must be at least ${ALERT_PERCENTAGE_MIN}`
       }
     }
 
     if (conditionType === 'weather_alerts') {
-      if (weatherCondition === 'extreme_heat' && (temperatureThreshold < -50 || temperatureThreshold > 150)) {
-        newErrors.temperatureThreshold = 'Temperature must be between -50 and 150'
+      if (weatherCondition === 'extreme_heat' && (temperatureThreshold < TEMPERATURE_MIN || temperatureThreshold > TEMPERATURE_MAX)) {
+        newErrors.temperatureThreshold = `Temperature must be between ${TEMPERATURE_MIN} and ${TEMPERATURE_MAX}`
       }
-      if (weatherCondition === 'high_wind' && (windSpeedThreshold < 1 || windSpeedThreshold > 200)) {
-        newErrors.windSpeedThreshold = 'Wind speed must be between 1 and 200'
+      if (weatherCondition === 'high_wind' && (windSpeedThreshold < WIND_SPEED_MIN || windSpeedThreshold > WIND_SPEED_MAX)) {
+        newErrors.windSpeedThreshold = `Wind speed must be between ${WIND_SPEED_MIN} and ${WIND_SPEED_MAX}`
       }
     }
 

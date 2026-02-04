@@ -22,6 +22,7 @@ import { DonutChart } from '../charts/PieChart'
 import { BarChart } from '../charts/BarChart'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { cn } from '../../lib/cn'
+import { UTILIZATION_CRITICAL_THRESHOLD, UTILIZATION_WARNING_THRESHOLD } from '../../constants/thresholds'
 
 type ViewTab = 'overview' | 'calendar' | 'quotas' | 'requests'
 
@@ -370,8 +371,8 @@ export function GPUReservations() {
                       strokeLinecap="round"
                       strokeDasharray={`${stats.utilizationPercent * 3.52} 352`}
                       className={cn(
-                        stats.utilizationPercent > 80 ? 'text-red-500' :
-                        stats.utilizationPercent > 50 ? 'text-yellow-500' :
+                        stats.utilizationPercent > UTILIZATION_CRITICAL_THRESHOLD ? 'text-red-500' :
+                        stats.utilizationPercent > UTILIZATION_WARNING_THRESHOLD ? 'text-yellow-500' :
                         'text-green-500'
                       )}
                     />
@@ -640,7 +641,7 @@ export function GPUReservations() {
                         <div
                           className={cn(
                             'h-full rounded-full transition-all',
-                            gpuPercent > 80 ? 'bg-red-500' : gpuPercent > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                            gpuPercent > UTILIZATION_CRITICAL_THRESHOLD ? 'bg-red-500' : gpuPercent > UTILIZATION_WARNING_THRESHOLD ? 'bg-yellow-500' : 'bg-green-500'
                           )}
                           style={{ width: `${gpuPercent}%` }}
                         />
@@ -657,7 +658,7 @@ export function GPUReservations() {
                         <div
                           className={cn(
                             'h-full rounded-full transition-all',
-                            cpuPercent > 80 ? 'bg-red-500' : cpuPercent > 50 ? 'bg-yellow-500' : 'bg-green-500'
+                            cpuPercent > UTILIZATION_CRITICAL_THRESHOLD ? 'bg-red-500' : cpuPercent > UTILIZATION_WARNING_THRESHOLD ? 'bg-yellow-500' : 'bg-green-500'
                           )}
                           style={{ width: `${cpuPercent}%` }}
                         />
