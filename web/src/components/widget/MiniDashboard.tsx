@@ -81,7 +81,7 @@ export function MiniDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isInstalled, setIsInstalled] = useState(false)
+  const [isInstalled, setIsInstalled] = useState(() => isStandalone())
   const [isSafariBrowser] = useState(() => isSafari())
 
   // Fetch data from MCP hooks
@@ -187,18 +187,33 @@ export function MiniDashboard() {
 
   // PWA install prompt
   useEffect(() => {
+    // If already in standalone mode, don't set up install prompt
+    if (isStandalone()) {
+      setIsInstalled(true)
+      setInstallPrompt(null)
+      return
+    }
+
     const handler = (e: BeforeInstallPromptEvent) => {
       e.preventDefault()
       setInstallPrompt(e)
     }
     window.addEventListener('beforeinstallprompt', handler as EventListener)
 
-    // Check if already installed (standalone mode or Safari's navigator.standalone)
-    if (isStandalone()) {
-      setIsInstalled(true)
+    // Listen for display mode changes (in case user installs while viewing)
+    const mediaQuery = window.matchMedia('(display-mode: standalone)')
+    const handleDisplayModeChange = (e: MediaQueryListEvent) => {
+      if (e.matches) {
+        setIsInstalled(true)
+        setInstallPrompt(null)
+      }
     }
+    mediaQuery.addEventListener('change', handleDisplayModeChange)
 
-    return () => window.removeEventListener('beforeinstallprompt', handler as EventListener)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler as EventListener)
+      mediaQuery.removeEventListener('change', handleDisplayModeChange)
+    }
   }, [])
 
   const handleInstall = async () => {
@@ -212,18 +227,19 @@ export function MiniDashboard() {
   }
 
   // Open URL in system browser (not in PWA)
-  // Uses full URL with noopener to force external browser
+  // Use a different origin (127.0.0.1 vs localhost) to force browser window
   const openInBrowser = useCallback((path: string) => {
-    const fullUrl = `${window.location.origin}${path}`
-    // Create a temporary link with target="_blank" and rel="noopener"
-    // This forces the system to open in default browser
-    const link = document.createElement('a')
-    link.href = fullUrl
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    // Swap localhost <-> 127.0.0.1 to force Chrome to open in browser
+    const currentHost = window.location.host
+    let targetOrigin = window.location.origin
+
+    if (currentHost.includes('localhost')) {
+      targetOrigin = window.location.origin.replace('localhost', '127.0.0.1')
+    } else if (currentHost.includes('127.0.0.1')) {
+      targetOrigin = window.location.origin.replace('127.0.0.1', 'localhost')
+    }
+
+    window.open(`${targetOrigin}${path}`, '_blank')
   }, [])
 
   // Open full dashboard in new window
@@ -231,8 +247,23 @@ export function MiniDashboard() {
     openInBrowser('/dashboard')
   }
 
+  // Try to resize window to widget size when running as standalone PWA
+  useEffect(() => {
+    if (isStandalone() && window.resizeTo) {
+      // Target size: 540x360 (wider, less tall)
+      try {
+        window.resizeTo(540, 360)
+      } catch {
+        // Browser may not allow resizing - that's ok
+      }
+    }
+  }, [])
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white p-4">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-gray-800 text-white flex items-center justify-center p-2">
+      {/* Fixed-size widget container */}
+      <div className="w-[520px] h-[320px] flex flex-col bg-gray-900/50 rounded-xl border border-gray-700/50 overflow-hidden">
+        <div className="flex-1 p-4 overflow-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -342,8 +373,10 @@ export function MiniDashboard() {
         </div>
       )}
 
-      {/* Footer / Install Prompt */}
-      <div className="fixed bottom-0 left-0 right-0 p-3 bg-gray-900/90 border-t border-gray-800">
+        </div>{/* End scrollable content */}
+
+        {/* Footer / Install Prompt */}
+        <div className="p-3 bg-gray-900/90 border-t border-gray-700/50 flex-shrink-0">
         {!isInstalled && installPrompt ? (
           <button
             onClick={handleInstall}
@@ -377,8 +410,7 @@ export function MiniDashboard() {
         )}
       </div>
 
-      {/* Padding for fixed footer */}
-      <div className="h-16" />
+        </div>{/* End fixed-size container */}
     </div>
   )
 }
