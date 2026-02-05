@@ -41,22 +41,25 @@ export function Pods() {
   const isRefreshing = podIssuesRefreshing
   const showSkeletons = podIssues.length === 0 && isLoading
 
-  // Filter pod issues by global cluster selection
+  // Filter pod issues by global cluster selection (supports multi-cluster environments)
+  // Each issue may come from different clusters; filter based on selected clusters
   const filteredPodIssues = useMemo(() => {
     let filtered = podIssues
 
+    // Apply multi-cluster filter: only show issues from selected clusters
     if (!isAllClustersSelected) {
       filtered = filtered.filter(issue =>
         issue.cluster && globalSelectedClusters.includes(issue.cluster)
       )
     }
 
+    // Apply custom text filter across multiple fields (name, namespace, cluster, reason)
     if (customFilter.trim()) {
       const query = customFilter.toLowerCase()
       filtered = filtered.filter(issue =>
         issue.name.toLowerCase().includes(query) ||
         issue.namespace.toLowerCase().includes(query) ||
-        (issue.cluster && issue.cluster.toLowerCase().includes(query)) ||
+        (issue.cluster && issue.cluster.toLowerCase().includes(query)) || // cluster is optional
         (issue.reason && issue.reason.toLowerCase().includes(query))
       )
     }
@@ -157,6 +160,7 @@ export function Pods() {
           {filteredPodIssues.map((issue, i) => (
             <div
               key={i}
+              // Drill-down requires cluster context (multi-cluster aware)
               onClick={() => issue.cluster && drillToPod(issue.cluster, issue.namespace, issue.name)}
               className={`glass p-4 rounded-lg cursor-pointer transition-all hover:scale-[1.01] border-l-4 ${
                 issue.reason === 'CrashLoopBackOff' || issue.reason === 'OOMKilled' ? 'border-l-red-500' :
