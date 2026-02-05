@@ -17,6 +17,7 @@ import type {
 } from '../types'
 import { UnifiedStatsSection } from '../stats'
 import { DashboardGrid } from './DashboardGrid'
+import { DashboardHealthIndicator } from '../../../components/dashboard/DashboardHealthIndicator'
 
 /**
  * UnifiedDashboard - Renders a complete dashboard from config
@@ -137,6 +138,9 @@ export function UnifiedDashboard({
               Updated {lastUpdated.toLocaleTimeString()}
             </span>
           )}
+
+          {/* Health indicator */}
+          <DashboardHealthIndicator size="sm" />
 
           {/* Refresh button */}
           {features.autoRefresh !== false && (

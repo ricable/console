@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { RefreshCw, Hourglass, AlertTriangle } from 'lucide-react'
 import { getRememberPosition, setRememberPosition } from '../../hooks/useLastRoute'
+import { DashboardHealthIndicator } from '../dashboard/DashboardHealthIndicator'
 
 interface DashboardHeaderProps {
   /** Dashboard title text or ReactNode */
@@ -98,6 +99,7 @@ export function DashboardHeader({
       {/* Right side: controls + timestamp below */}
       <div className="flex flex-col items-end gap-0.5">
         <div className="flex items-center gap-3">
+          <DashboardHealthIndicator size="sm" />
           {rightExtra}
           <label
             htmlFor={`remember-position-${autoRefreshId || 'default'}`}

@@ -4,6 +4,7 @@ import { useMissions } from '../../hooks/useMissions'
 import { useMobile } from '../../hooks/useMobile'
 import { ResetMode } from '../../hooks/useDashboardReset'
 import { ResetDialog } from './ResetDialog'
+import { DashboardHealthDot } from './DashboardHealthIndicator'
 
 interface FloatingDashboardActionsProps {
   onAddCard: () => void
@@ -107,7 +108,7 @@ export function FloatingDashboardActions({
         {/* FAB toggle - smaller on mobile */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className={`flex items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
+          className={`relative flex items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
             isMobile ? 'w-8 h-8' : 'w-10 h-10'
           } ${
             isOpen
@@ -117,6 +118,11 @@ export function FloatingDashboardActions({
           title={isOpen ? 'Close menu' : 'Dashboard actions'}
         >
           <Plus className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-foreground`} />
+          {!isOpen && (
+            <div className="absolute -top-1 -right-1">
+              <DashboardHealthDot />
+            </div>
+          )}
         </button>
       </div>
 

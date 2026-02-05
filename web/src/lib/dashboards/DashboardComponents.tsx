@@ -9,6 +9,7 @@ import { CardWrapper } from '../../components/cards/CardWrapper'
 import { CARD_COMPONENTS, DEMO_DATA_CARDS } from '../../components/cards/cardRegistry'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { useMobile } from '../../hooks/useMobile'
+import { DashboardHealthIndicator } from '../../components/dashboard/DashboardHealthIndicator'
 
 // ============================================================================
 // Icon Resolver
@@ -187,6 +188,7 @@ export function DashboardHeader({
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <DashboardHealthIndicator size="sm" />
           {onAutoRefreshChange && (
             <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground" title="Auto-refresh every 30s">
               <input

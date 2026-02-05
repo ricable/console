@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { LayoutDashboard, FileText, Layout, ChevronRight, Check, ChevronDown } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
 import { DASHBOARD_TEMPLATES, TEMPLATE_CATEGORIES, DashboardTemplate } from './templates'
+import { DashboardHealthIndicator } from './DashboardHealthIndicator'
 
 interface CreateDashboardModalProps {
   isOpen: boolean
@@ -68,6 +69,7 @@ export function CreateDashboardModal({
         icon={LayoutDashboard}
         onClose={onClose}
         showBack={false}
+        extra={<DashboardHealthIndicator size="sm" />}
       />
 
       <BaseModal.Content>

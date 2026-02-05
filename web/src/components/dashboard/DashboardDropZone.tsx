@@ -2,6 +2,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { LayoutDashboard, Plus, Check } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { Dashboard } from '../../hooks/useDashboards'
+import { DashboardHealthIndicator } from './DashboardHealthIndicator'
 
 interface DashboardDropZoneProps {
   dashboards: Dashboard[]
@@ -24,9 +25,12 @@ export function DashboardDropZone({
   return (
     <div className="fixed right-6 top-24 z-50 animate-fade-in-up">
       <div className="glass rounded-xl border border-border/50 p-4 w-64 shadow-2xl">
-        <div className="flex items-center gap-2 mb-3 text-sm font-medium text-foreground">
-          <LayoutDashboard className="w-4 h-4 text-purple-400" />
-          Move to Dashboard
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <LayoutDashboard className="w-4 h-4 text-purple-400" />
+            Move to Dashboard
+          </div>
+          <DashboardHealthIndicator size="sm" showLabel={false} />
         </div>
 
         {otherDashboards.length === 0 ? (
