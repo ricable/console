@@ -439,7 +439,6 @@ function WidgetPreview({ config }: { config: WidgetConfig | null }) {
   const previewStyle = {
     backgroundColor: 'rgba(17, 24, 39, 0.9)',
     borderRadius: '12px',
-    padding: '16px',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     color: '#f9fafb',
     fontFamily: 'Inter, sans-serif',
@@ -448,7 +447,7 @@ function WidgetPreview({ config }: { config: WidgetConfig | null }) {
   if (config.type === 'card' && config.cardType) {
     const card = WIDGET_CARDS[config.cardType]
     return (
-      <div style={{ ...previewStyle, width: card?.defaultSize.width, height: card?.defaultSize.height }}>
+      <div className="p-4" style={{ ...previewStyle, width: card?.defaultSize.width, height: card?.defaultSize.height }}>
         <div className="text-sm font-medium mb-2">{card?.displayName}</div>
         <div className="text-2xl font-bold text-purple-400">—</div>
         <div className="text-xs text-gray-400 mt-1">Preview</div>
@@ -458,18 +457,17 @@ function WidgetPreview({ config }: { config: WidgetConfig | null }) {
 
   if (config.type === 'stat' && config.statIds) {
     return (
-      <div style={{ ...previewStyle, display: 'flex', gap: '8px' }}>
+      <div className="p-4 flex gap-2" style={previewStyle}>
         {config.statIds.map((id) => {
           const stat = WIDGET_STATS[id]
           return (
             <div
               key={id}
+              className="py-2 px-3 text-center"
               style={{
-                padding: '8px 12px',
                 backgroundColor: 'rgba(31, 41, 55, 0.5)',
                 borderRadius: '8px',
                 borderTop: `3px solid ${stat?.color || '#9333ea'}`,
-                textAlign: 'center',
               }}
             >
               <div style={{ fontSize: '18px', fontWeight: 700, color: stat?.color || '#fff' }}>—</div>
@@ -485,6 +483,7 @@ function WidgetPreview({ config }: { config: WidgetConfig | null }) {
     const template = WIDGET_TEMPLATES[config.templateId]
     return (
       <div
+        className="p-4"
         style={{
           ...previewStyle,
           width: Math.min(template?.size.width || 300, 300),

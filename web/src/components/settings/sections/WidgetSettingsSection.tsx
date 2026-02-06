@@ -337,11 +337,11 @@ export function WidgetSettingsSection() {
         <div className="text-xs text-muted-foreground mb-3">Preview</div>
         <div className="flex justify-center">
           <div
+            className="p-3"
             style={{
               backgroundColor: 'rgba(17, 24, 39, 0.95)',
               borderRadius: '12px',
               border: '1px solid rgba(255, 255, 255, 0.1)',
-              padding: '12px',
               minWidth: '200px',
               fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
             }}
