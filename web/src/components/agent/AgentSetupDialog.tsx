@@ -11,7 +11,7 @@ const SNOOZE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
 
 export function AgentSetupDialog() {
   const { status, isConnected } = useLocalAgent()
-  const [show, setShow] = useState(false)
+  const [isOpen, setIsOpen] = useState(false)
   const [copied, setCopied] = useState(false)
 
   const installCommand = 'brew install kubestellar/tap/kc-agent && kc-agent'
@@ -32,7 +32,7 @@ export function AgentSetupDialog() {
     if (snoozedUntil && Date.now() < parseInt(snoozedUntil)) return
 
     // Show the dialog
-    setShow(true)
+    setIsOpen(true)
   }, [status, isConnected])
 
   const copyToClipboard = async () => {
@@ -43,18 +43,18 @@ export function AgentSetupDialog() {
 
   const handleSnooze = () => {
     localStorage.setItem(SNOOZED_KEY, String(Date.now() + SNOOZE_DURATION))
-    setShow(false)
+    setIsOpen(false)
   }
 
   const handleDismiss = (rememberChoice: boolean) => {
     if (rememberChoice) {
       localStorage.setItem(DISMISSED_KEY, 'true')
     }
-    setShow(false)
+    setIsOpen(false)
   }
 
   return (
-    <BaseModal isOpen={show} onClose={() => handleDismiss(false)} size="md">
+    <BaseModal isOpen={isOpen} onClose={() => handleDismiss(false)} size="md">
       <BaseModal.Header
         title="Welcome to KubeStellar Console"
         description="To access your local clusters and Claude Code, install our lightweight agent."

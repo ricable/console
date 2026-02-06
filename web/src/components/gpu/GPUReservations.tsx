@@ -128,7 +128,7 @@ export function GPUReservations() {
   const { isDemoMode: _isDemoMode } = useDemoMode()
   const [activeTab, setActiveTab] = useState<ViewTab>('overview')
   const [currentMonth, setCurrentMonth] = useState(new Date())
-  const [showNewReservationForm, setShowNewReservationForm] = useState(false)
+  const [isNewReservationOpen, setIsNewReservationOpen] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<GPUReservation | null>(null)
 
   // This page uses mock data for reservations, quotas, and team usage
@@ -288,7 +288,7 @@ export function GPUReservations() {
 
         <div className="ml-auto pb-2">
           <button
-            onClick={() => setShowNewReservationForm(true)}
+            onClick={() => setIsNewReservationOpen(true)}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-purple-500 text-white text-sm font-medium hover:bg-purple-600 transition-colors"
           >
             <Plus className="w-4 h-4" />
@@ -784,11 +784,11 @@ export function GPUReservations() {
       )}
 
       {/* New Reservation Modal */}
-      <BaseModal isOpen={showNewReservationForm} onClose={() => setShowNewReservationForm(false)} size="md">
+      <BaseModal isOpen={isNewReservationOpen} onClose={() => setIsNewReservationOpen(false)} size="md">
         <BaseModal.Header
           title="New GPU Reservation"
           icon={Calendar}
-          onClose={() => setShowNewReservationForm(false)}
+          onClose={() => setIsNewReservationOpen(false)}
           showBack={false}
         />
 
@@ -869,7 +869,7 @@ export function GPUReservations() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setShowNewReservationForm(false)}
+              onClick={() => setIsNewReservationOpen(false)}
               className="px-4 py-2 rounded-lg bg-secondary text-muted-foreground hover:text-foreground transition-colors"
             >
               Cancel

@@ -488,11 +488,11 @@ function ClusterOPAModal({
 }) {
   const [activeTab, setActiveTab] = useState<OPAModalTab>('policies')
   const [showCreateMenu, setShowCreateMenu] = useState(false)
-  const [showTemplateModal, setShowTemplateModal] = useState(false)
-  const [showYamlEditor, setShowYamlEditor] = useState(false)
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false)
+  const [isYamlEditorOpen, setIsYamlEditorOpen] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null)
   const [yamlContent, setYamlContent] = useState('')
-  const [deleteConfirm, setDeleteConfirm] = useState<Policy | null>(null)
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<Policy | null>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
 
   // Close create menu when clicking outside
@@ -558,8 +558,8 @@ Let's start by discussing what kind of policy I need.`,
   const handleUseTemplate = (template: typeof POLICY_TEMPLATES[0]) => {
     setYamlContent(template.template)
     setEditingPolicy(null)
-    setShowTemplateModal(false)
-    setShowYamlEditor(true)
+    setIsTemplateModalOpen(false)
+    setIsYamlEditorOpen(true)
   }
 
   // Edit policy with AI
@@ -590,7 +590,7 @@ What would you like to modify about this policy?`,
   const handleEditYaml = async (policy: Policy) => {
     setEditingPolicy(policy)
     setYamlContent('# Loading policy YAML...\n# Fetching from cluster: ' + clusterName)
-    setShowYamlEditor(true)  // Show modal immediately
+    setIsYamlEditorOpen(true)  // Show modal immediately
 
     // Fetch the current YAML in background
     const cmd = ['get', policy.kind.toLowerCase(), policy.name, '-o', 'yaml']
@@ -615,7 +615,7 @@ What would you like to modify about this policy?`,
   // Apply YAML changes via AI (validates and applies safely)
   const handleApplyYaml = () => {
     const action = editingPolicy ? 'update' : 'create'
-    setShowYamlEditor(false)
+    setIsYamlEditorOpen(false)
     onClose()
     startMission({
       title: editingPolicy ? `Apply Policy: ${editingPolicy.name}` : 'Apply OPA Policy',
@@ -662,7 +662,7 @@ Please proceed with applying this policy.`,
         ['delete', policy.kind.toLowerCase(), policy.name],
         { context: clusterName, timeout: 15000 }
       )
-      setDeleteConfirm(null)
+      setIsDeleteConfirmOpen(null)
       onRefresh()
     } catch (err) {
       console.error('Failed to delete policy:', err)
@@ -670,7 +670,7 @@ Please proceed with applying this policy.`,
   }
 
   // Disable parent modal's Escape handler when a child modal is open
-  const hasChildModalOpen = showTemplateModal || showYamlEditor || !!deleteConfirm
+  const hasChildModalOpen = isTemplateModalOpen || isYamlEditorOpen || !!isDeleteConfirmOpen
 
   return (
     <>
@@ -731,7 +731,7 @@ Please proceed with applying this policy.`,
                     </div>
                   </button>
                   <button
-                    onClick={() => { setShowCreateMenu(false); setShowTemplateModal(true) }}
+                    onClick={() => { setShowCreateMenu(false); setIsTemplateModalOpen(true) }}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-secondary transition-colors flex items-center gap-2"
                   >
                     <LayoutTemplate className="w-4 h-4 text-blue-400" />
@@ -741,7 +741,7 @@ Please proceed with applying this policy.`,
                     </div>
                   </button>
                   <button
-                    onClick={() => { setShowCreateMenu(false); setYamlContent(''); setEditingPolicy(null); setShowYamlEditor(true) }}
+                    onClick={() => { setShowCreateMenu(false); setYamlContent(''); setEditingPolicy(null); setIsYamlEditorOpen(true) }}
                     className="w-full px-3 py-2 text-left text-sm hover:bg-secondary transition-colors flex items-center gap-2"
                   >
                     <FileCode className="w-4 h-4 text-green-400" />
@@ -816,7 +816,7 @@ Please proceed with applying this policy.`,
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(policy) }}
+                          onClick={(e) => { e.stopPropagation(); setIsDeleteConfirmOpen(policy) }}
                           className="p-1.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
                           title="Delete policy"
                         >
@@ -911,12 +911,12 @@ Please proceed with applying this policy.`,
       </BaseModal>
 
       {/* Template Selection Modal */}
-      <BaseModal isOpen={showTemplateModal} onClose={() => setShowTemplateModal(false)} size="md">
+      <BaseModal isOpen={isTemplateModalOpen} onClose={() => setIsTemplateModalOpen(false)} size="md">
         <BaseModal.Header
           title="Policy Templates"
           description="Choose a template to start with"
           icon={LayoutTemplate}
-          onClose={() => setShowTemplateModal(false)}
+          onClose={() => setIsTemplateModalOpen(false)}
           showBack={false}
         />
         <BaseModal.Content className="max-h-[50vh]">
@@ -939,12 +939,12 @@ Please proceed with applying this policy.`,
       </BaseModal>
 
       {/* YAML Editor Modal */}
-      <BaseModal isOpen={showYamlEditor} onClose={() => setShowYamlEditor(false)} size="lg">
+      <BaseModal isOpen={isYamlEditorOpen} onClose={() => setIsYamlEditorOpen(false)} size="lg">
         <BaseModal.Header
           title={editingPolicy ? `Edit: ${editingPolicy.name}` : 'Create Policy'}
           description="Edit the YAML and apply to cluster"
           icon={FileCode}
-          onClose={() => setShowYamlEditor(false)}
+          onClose={() => setIsYamlEditorOpen(false)}
           showBack={false}
         />
         <BaseModal.Content className="!overflow-visible">
@@ -970,7 +970,7 @@ Please proceed with applying this policy.`,
         </BaseModal.Content>
         <BaseModal.Footer>
           <button
-            onClick={() => setShowYamlEditor(false)}
+            onClick={() => setIsYamlEditorOpen(false)}
             className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Cancel
@@ -987,27 +987,27 @@ Please proceed with applying this policy.`,
       </BaseModal>
 
       {/* Delete Confirmation Modal */}
-      <BaseModal isOpen={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} size="sm">
+      <BaseModal isOpen={!!isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(null)} size="sm">
         <BaseModal.Header
           title="Delete Policy"
           description="This action cannot be undone"
           icon={Trash2}
-          onClose={() => setDeleteConfirm(null)}
+          onClose={() => setIsDeleteConfirmOpen(null)}
           showBack={false}
         />
         <BaseModal.Content>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete the policy <span className="text-foreground font-medium">{deleteConfirm?.name}</span>?
+              Are you sure you want to delete the policy <span className="text-foreground font-medium">{isDeleteConfirmOpen?.name}</span>?
             </p>
-            {deleteConfirm && deleteConfirm.violations > 0 && (
+            {isDeleteConfirmOpen && isDeleteConfirmOpen.violations > 0 && (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
                 <div className="flex items-center gap-2 text-amber-400 mb-1">
                   <AlertTriangle className="w-4 h-4" />
                   <span className="font-medium">Warning</span>
                 </div>
                 <p className="text-muted-foreground">
-                  This policy has {deleteConfirm.violations} active violations that will be cleared.
+                  This policy has {isDeleteConfirmOpen.violations} active violations that will be cleared.
                 </p>
               </div>
             )}
@@ -1015,14 +1015,14 @@ Please proceed with applying this policy.`,
         </BaseModal.Content>
         <BaseModal.Footer>
           <button
-            onClick={() => setDeleteConfirm(null)}
+            onClick={() => setIsDeleteConfirmOpen(null)}
             className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>
           <div className="flex-1" />
           <button
-            onClick={() => deleteConfirm && handleDelete(deleteConfirm)}
+            onClick={() => isDeleteConfirmOpen && handleDelete(isDeleteConfirmOpen)}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
