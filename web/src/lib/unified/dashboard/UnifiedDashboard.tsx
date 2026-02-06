@@ -71,9 +71,8 @@ export function UnifiedDashboard({
   }, [])
 
   // Handle card configuration
-  const handleConfigureCard = useCallback((cardId: string) => {
+  const handleConfigureCard = useCallback((_cardId: string) => {
     // TODO: Open configuration modal
-    console.log('Configure card:', cardId)
   }, [])
 
   // Handle refresh
@@ -88,7 +87,6 @@ export function UnifiedDashboard({
   // Handle add card
   const handleAddCard = useCallback(() => {
     // TODO: Open add card modal
-    console.log('Add card')
   }, [])
 
   // Handle reset to defaults
