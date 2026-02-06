@@ -11,7 +11,8 @@
  */
 
 import { useMemo, useCallback, ReactNode } from 'react'
-import { AlertTriangle, Info } from 'lucide-react'
+import { AlertTriangle, Info, LucideIcon } from 'lucide-react'
+import * as Icons from 'lucide-react'
 import type {
   UnifiedCardConfig,
   UnifiedCardProps,
@@ -188,7 +189,8 @@ function renderContent(
       )
 
     case 'custom':
-      // TODO: Load from component registry
+      // Future enhancement: Load custom components from a component registry
+      // For now, showing placeholder for custom component types
       return (
         <PlaceholderVisualization
           type={`custom: ${content.componentName}`}
@@ -259,6 +261,15 @@ function LoadingState({
 }
 
 /**
+ * Get icon component from icon name string
+ */
+function getIconComponent(iconName?: string): LucideIcon {
+  if (!iconName) return Info
+  const icon = (Icons as unknown as Record<string, LucideIcon>)[iconName]
+  return icon || Info
+}
+
+/**
  * Empty state component
  */
 function EmptyState({
@@ -266,10 +277,10 @@ function EmptyState({
 }: {
   config?: UnifiedCardConfig['emptyState']
 }) {
-  // TODO: Use dynamic icon lookup based on config?.icon (using Info for now)
   const title = config?.title ?? 'No data'
   const message = config?.message
   const variant = config?.variant ?? 'neutral'
+  const IconComponent = getIconComponent(config?.icon)
 
   const variantColors = {
     success: 'text-green-400',
@@ -281,7 +292,7 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center p-6 text-center">
       <div className={`mb-2 ${variantColors[variant]}`}>
-        <Info className="w-8 h-8" />
+        <IconComponent className="w-8 h-8" />
       </div>
       <div className="text-sm font-medium text-gray-300">{title}</div>
       {message && (
@@ -328,7 +339,8 @@ function InlineStats({
   stats: NonNullable<UnifiedCardConfig['stats']>
   data: unknown[] | undefined
 }) {
-  // TODO: Implement value resolution from stats config
+  // Future enhancement: Implement dynamic value resolution from stats config
+  // For now, displaying placeholder values
   return (
     <div className="flex items-center gap-3 px-2 py-1.5 border-b border-gray-800">
       {stats.map((stat) => (

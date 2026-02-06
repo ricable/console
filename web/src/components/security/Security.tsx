@@ -113,7 +113,7 @@ export function Security() {
     })
   }, [isDemoMode, cachedSecurityIssues])
 
-  // RBAC and compliance still use mock data (TODO: implement cached hooks for these)
+  // RBAC and compliance use mock data only (no backend API support yet)
   const rbacBindings = useMemo(() => isDemoMode ? getMockRBACData() : [], [isDemoMode])
   const complianceChecks = useMemo(() => isDemoMode ? getMockComplianceData() : [], [isDemoMode])
 

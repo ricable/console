@@ -289,7 +289,8 @@ function useContextDataSourceInternal(contextKey: string | null): UseDataSourceR
   return useMemo(
     () => {
       if (!contextKey) return EMPTY_RESULT
-      // TODO: Implement context registry similar to hook registry
+      // Future enhancement: Implement context registry for reading data from React contexts
+      // Similar to hook registry but for context-based data sources
       return {
         data: undefined,
         isLoading: false,

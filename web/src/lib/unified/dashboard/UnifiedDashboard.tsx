@@ -71,7 +71,7 @@ export function UnifiedDashboard({
 
   // Handle card configuration
   const handleConfigureCard = useCallback((cardId: string) => {
-    // TODO: Open configuration modal
+    // Future enhancement: Open configuration modal for per-card settings
     console.log('Configure card:', cardId)
   }, [])
 
@@ -86,7 +86,7 @@ export function UnifiedDashboard({
 
   // Handle add card
   const handleAddCard = useCallback(() => {
-    // TODO: Open add card modal
+    // Future enhancement: Open modal to select and add cards from registry
     console.log('Add card')
   }, [])
 
