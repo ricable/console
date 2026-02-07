@@ -4,10 +4,22 @@ import { Cpu, MemoryStick, Server } from 'lucide-react'
 import { useClusters, useGPUNodes } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { useChartFilters, CardClusterFilter } from '../../lib/cards'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
 import { Skeleton } from '../ui/Skeleton'
 
+// Demo data for offline/demo mode
+function getDemoResourceUsage() {
+  return {
+    cpu: { total: 128, used: 87 },     // ~68% usage
+    memory: { total: 512, used: 384 }, // ~75% usage
+    gpu: { total: 8, used: 6 },        // ~75% usage
+    clusterCount: 4,
+  }
+}
+
 export function ResourceUsage() {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { isLoading: clustersLoading } = useClusters()
   const { nodes: allGPUNodes } = useGPUNodes()
   const { drillToResources } = useDrillDownActions()
@@ -30,8 +42,12 @@ export function ResourceUsage() {
     return allGPUNodes.filter(n => clusterNames.has(n.cluster.split('/')[0]))
   }, [allGPUNodes, clusters])
 
-  // Calculate totals from real cluster data
+  // Calculate totals from real cluster data or use demo data
   const totals = useMemo(() => {
+    if (shouldUseDemoData) {
+      return getDemoResourceUsage()
+    }
+    
     // Sum capacity from all clusters
     const totalCPUs = clusters.reduce((sum, c) => sum + (c.cpuCores || 0), 0)
     const totalMemoryGB = clusters.reduce((sum, c) => sum + (c.memoryGB || 0), 0)
@@ -48,8 +64,9 @@ export function ResourceUsage() {
       cpu: { total: totalCPUs, used: Math.round(usedCPUs) },
       memory: { total: Math.round(totalMemoryGB), used: Math.round(usedMemoryGB) },
       gpu: { total: totalGPUs, used: allocatedGPUs },
+      clusterCount: clusters.length,
     }
-  }, [clusters, gpuNodes])
+  }, [clusters, gpuNodes, shouldUseDemoData])
 
   // Open resources drill down showing all clusters
   const handleDrillDown = () => {
@@ -58,8 +75,8 @@ export function ResourceUsage() {
 
   // Report state to CardWrapper for refresh animation
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: clustersLoading,
-    hasAnyData: clusters.length > 0,
+    isLoading: shouldUseDemoData ? false : clustersLoading,
+    hasAnyData: shouldUseDemoData ? true : clusters.length > 0,
   })
 
   if (showSkeleton) {
@@ -108,12 +125,12 @@ export function ResourceUsage() {
           {localClusterFilter.length > 0 && (
             <span className="flex items-center gap-1 text-xs text-muted-foreground bg-secondary/50 px-1.5 py-0.5 rounded">
               <Server className="w-3 h-3" />
-              {clusters.length}/{availableClusters.length}
+              {shouldUseDemoData ? totals.clusterCount : clusters.length}/{availableClusters.length}
             </span>
           )}
           {localClusterFilter.length === 0 && (
             <span className="text-xs text-muted-foreground">
-              {clusters.length} cluster{clusters.length !== 1 ? 's' : ''}
+              {shouldUseDemoData ? totals.clusterCount : clusters.length} cluster{(shouldUseDemoData ? totals.clusterCount : clusters.length) !== 1 ? 's' : ''}
             </span>
           )}
         </div>

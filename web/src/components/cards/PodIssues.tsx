@@ -4,13 +4,74 @@ import type { PodIssue } from '../../hooks/useMCP'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { LimitedAccessWarning } from '../ui/LimitedAccessWarning'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
+import { useMemo } from 'react'
 import {
   useCardData, commonComparators, getStatusColors,
   CardSkeleton, CardEmptyState, CardSearchInput,
   CardControlsRow, CardListItem, CardPaginationFooter,
   CardAIActions,
 } from '../../lib/cards'
+
+// Demo data for offline/demo mode
+function getDemoPodIssues(): PodIssue[] {
+  return [
+    {
+      name: 'api-server-7d8f9c6b5-x2k4m',
+      namespace: 'production',
+      cluster: 'eks-prod-us-east-1',
+      status: 'CrashLoopBackOff',
+      reason: 'Error',
+      issues: ['Container crashed', 'Exit code 1'],
+      restarts: 5,
+    },
+    {
+      name: 'worker-deployment-8f9d6c7b5-p3k2n',
+      namespace: 'batch',
+      cluster: 'vllm-gpu-cluster',
+      status: 'OOMKilled',
+      reason: 'OOMKilled',
+      issues: ['Out of memory', 'Memory limit exceeded'],
+      restarts: 3,
+    },
+    {
+      name: 'redis-cache-6c7b5d8f9-m4n1k',
+      namespace: 'data',
+      cluster: 'gke-staging',
+      status: 'ImagePullBackOff',
+      reason: 'ImagePullBackOff',
+      issues: ['Failed to pull image', 'Tag not found'],
+      restarts: 0,
+    },
+    {
+      name: 'nginx-ingress-5b6c7d8f9-l2j3h',
+      namespace: 'ingress',
+      cluster: 'openshift-prod',
+      status: 'Pending',
+      reason: 'Unschedulable',
+      issues: ['Insufficient CPU', 'No nodes available'],
+      restarts: 0,
+    },
+    {
+      name: 'monitoring-agent-4a5b6c7d8-k1h2g',
+      namespace: 'monitoring',
+      cluster: 'eks-prod-us-east-1',
+      status: 'CrashLoopBackOff',
+      reason: 'Error',
+      issues: ['Config file missing', 'Exit code 2'],
+      restarts: 8,
+    },
+    {
+      name: 'legacy-app-3z4y5x6w7-j9g8f',
+      namespace: 'legacy',
+      cluster: 'vllm-gpu-cluster',
+      status: 'OOMKilled',
+      reason: 'OOMKilled',
+      issues: ['Memory limit exceeded'],
+      restarts: 12,
+    },
+  ]
+}
 
 type SortByOption = 'status' | 'name' | 'restarts' | 'cluster'
 
@@ -29,20 +90,25 @@ const getIssueIcon = (status: string): { icon: typeof MemoryStick; tooltip: stri
 }
 
 export function PodIssues() {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const {
-    issues: rawIssues,
+    issues: liveIssues,
     isLoading: hookLoading,
     isFailed,
     consecutiveFailures,
     error
   } = useCachedPodIssues()
+  
+  // Use demo data when in demo mode, otherwise use live data
+  const rawIssues = useMemo(() => shouldUseDemoData ? getDemoPodIssues() : liveIssues, [shouldUseDemoData, liveIssues])
 
   // Report loading state to CardWrapper for skeleton/refresh behavior
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: hookLoading,
+    isLoading: shouldUseDemoData ? false : hookLoading,
     hasAnyData: rawIssues.length > 0,
-    isFailed,
-    consecutiveFailures,
+    isFailed: shouldUseDemoData ? false : isFailed,
+    consecutiveFailures: shouldUseDemoData ? 0 : consecutiveFailures,
   })
   const { drillToPod } = useDrillDownActions()
 
