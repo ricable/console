@@ -78,12 +78,13 @@ export function useLocalClusterTools() {
     if (inDemoMode) {
       setIsLoading(true)
       // Simulate loading delay for realism
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setClusters(DEMO_CLUSTERS)
         setError(null)
         setIsLoading(false)
       }, 300)
-      return
+      // Return cleanup function (though unlikely to be needed in practice)
+      return () => clearTimeout(timeoutId)
     }
 
     if (!isConnected) {

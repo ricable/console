@@ -101,8 +101,9 @@ export function LocalClustersSection() {
     }
   }
 
-  // Show demo mode badge when in demo mode
-  const showDemoModeBadge = isDemoMode && (isConnected || installedTools.length > 0)
+  // Show demo mode badge when in demo mode and we have data to show
+  // (installedTools check ensures demo data has loaded)
+  const showDemoModeBadge = isDemoMode && installedTools.length > 0
 
   return (
     <div id="local-clusters-settings" className="glass rounded-xl p-6">
