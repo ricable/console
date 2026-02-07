@@ -34,7 +34,7 @@
  * ```
  */
 
-import { ReactNode, useRef, useEffect } from 'react'
+import { ReactNode, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft } from 'lucide-react'
 import { useModalNavigation } from './useModalNavigation'
@@ -303,7 +303,7 @@ function ModalTabs({
 
   return (
     <div ref={tabsRef} role="tablist" className={`flex border-b border-border ${className}`}>
-      {tabs.map((tab, index) => {
+      {tabs.map((tab) => {
         const isActive = tab.id === activeTab
         const Icon = tab.icon
 
