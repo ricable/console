@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Bell, X, Check, Clock, Bug, Sparkles, GitPullRequest, Eye } from 'lucide-react'
+import { Bell, X, Check, Clock, Bug, Sparkles, GitPullRequest, Eye, Loader2 } from 'lucide-react'
 import { useNotifications, type Notification, type NotificationType } from '../../hooks/useFeatureRequests'
 
 // Format relative time
@@ -47,6 +47,7 @@ export function NotificationBadge() {
     isLoading,
   } = useNotifications()
   const [isOpen, setIsOpen] = useState(false)
+  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false)
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
@@ -55,7 +56,12 @@ export function NotificationBadge() {
   }
 
   const handleMarkAllRead = async () => {
-    await markAllAsRead()
+    setIsMarkingAllRead(true)
+    try {
+      await markAllAsRead()
+    } finally {
+      setIsMarkingAllRead(false)
+    }
   }
 
   if (isLoading && notifications.length === 0) {
@@ -113,10 +119,15 @@ export function NotificationBadge() {
                 {unreadCount > 0 && (
                   <button
                     onClick={handleMarkAllRead}
-                    className="p-1 rounded text-xs text-muted-foreground hover:text-foreground"
+                    disabled={isMarkingAllRead}
+                    className="p-1 rounded text-xs text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Mark all as read"
                   >
-                    <Check className="w-4 h-4" />
+                    {isMarkingAllRead ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
                   </button>
                 )}
                 <button
