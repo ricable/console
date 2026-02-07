@@ -13,7 +13,7 @@ import {
 import { useClusters } from '../../hooks/useMCP'
 import { useCachedPodIssues } from '../../hooks/useCachedData'
 import { useGlobalFilters } from '../../hooks/useGlobalFilters'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
 import { CardClusterFilter } from '../../lib/cards'
 
 interface HealthPoint {
@@ -25,6 +25,30 @@ interface HealthPoint {
 
 type TimeRange = '15m' | '1h' | '6h' | '24h'
 
+// Demo data for offline/demo mode
+function getDemoPodHealthData(): HealthPoint[] {
+  const now = new Date()
+  const demoHistory: HealthPoint[] = []
+  
+  for (let i = 19; i >= 0; i--) {
+    const time = new Date(now.getTime() - i * 60000)
+    // Simulate realistic pod health variations
+    const baseHealthy = 45
+    const baseIssues = 3
+    const basePending = 2
+    
+    const variance = Math.sin(i / 3) * 2
+    demoHistory.push({
+      time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      healthy: Math.round(baseHealthy + variance),
+      issues: Math.max(0, Math.round(baseIssues + Math.random() * 2 - 1)),
+      pending: Math.max(0, Math.round(basePending + Math.random() * 1 - 0.5)),
+    })
+  }
+  
+  return demoHistory
+}
+
 const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; points: number }[] = [
   { value: '15m', label: '15 min', points: 15 },
   { value: '1h', label: '1 hour', points: 20 },
@@ -33,6 +57,8 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string; points: number }[] 
 ]
 
 export function PodHealthTrend() {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { deduplicatedClusters: clusters, isLoading: clustersLoading } = useClusters()
   const { issues, isLoading: issuesLoading } = useCachedPodIssues()
 
@@ -43,8 +69,8 @@ export function PodHealthTrend() {
 
   // Report state to CardWrapper for refresh animation
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: isLoadingData,
-    hasAnyData: clusters.length > 0 || issues.length > 0,
+    isLoading: shouldUseDemoData ? false : isLoadingData,
+    hasAnyData: shouldUseDemoData ? true : (clusters.length > 0 || issues.length > 0),
   })
   const [timeRange, setTimeRange] = useState<TimeRange>('1h')
   const [localClusterFilter, setLocalClusterFilter] = useState<string[]>([])
@@ -85,6 +111,11 @@ export function PodHealthTrend() {
 
   const historyRef = useRef<HealthPoint[]>(loadSavedHistory())
   const [history, setHistory] = useState<HealthPoint[]>(historyRef.current)
+  
+  // Use demo data when in demo mode
+  const displayHistory = useMemo(() => {
+    return shouldUseDemoData ? getDemoPodHealthData() : history
+  }, [shouldUseDemoData, history])
 
   // Save to localStorage when history changes
   useEffect(() => {
@@ -152,12 +183,21 @@ export function PodHealthTrend() {
 
   // Calculate current stats
   const currentStats = useMemo(() => {
+    if (shouldUseDemoData) {
+      const latest = getDemoPodHealthData()[19]
+      return {
+        healthy: latest.healthy,
+        issues: latest.issues,
+        pending: latest.pending,
+        total: latest.healthy + latest.issues + latest.pending,
+      }
+    }
     const totalPods = filteredClusters.reduce((sum, c) => sum + (c.podCount || 0), 0)
     const issuePods = filteredIssues.length
     const pendingPods = filteredIssues.filter(i => i.status === 'Pending').length
     const healthyPods = Math.max(0, totalPods - issuePods)
     return { healthy: healthyPods, issues: issuePods - pendingPods, pending: pendingPods, total: totalPods }
-  }, [filteredClusters, filteredIssues])
+  }, [filteredClusters, filteredIssues, shouldUseDemoData])
 
   // Check if we have any reachable clusters
   const hasReachableClusters = filteredClusters.some(c => c.reachable !== false && c.nodeCount !== undefined && c.nodeCount > 0)
@@ -165,6 +205,7 @@ export function PodHealthTrend() {
 
   // Add data point to history on each update
   useEffect(() => {
+    if (shouldUseDemoData) return // Don't collect real data in demo mode
     if (clustersLoading || issuesLoading) return
     if (currentStats.total === 0) return
 
@@ -188,10 +229,11 @@ export function PodHealthTrend() {
       historyRef.current = newHistory
       setHistory(newHistory)
     }
-  }, [currentStats, clustersLoading, issuesLoading])
+  }, [currentStats, clustersLoading, issuesLoading, shouldUseDemoData])
 
   // Initialize with a single real data point (no synthetic history)
   useEffect(() => {
+    if (shouldUseDemoData) return
     if (history.length === 0 && currentStats.total > 0) {
       const now = new Date()
       const initialPoint: HealthPoint = {
@@ -203,9 +245,9 @@ export function PodHealthTrend() {
       historyRef.current = [initialPoint]
       setHistory([initialPoint])
     }
-  }, [currentStats, history.length])
+  }, [currentStats, history.length, shouldUseDemoData])
 
-  if (showSkeleton && history.length === 0) {
+  if (showSkeleton && displayHistory.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading pod health...</div>
@@ -293,14 +335,14 @@ export function PodHealthTrend() {
 
       {/* Stacked Area Chart */}
       <div className="flex-1 min-h-[160px]">
-        {history.length === 0 ? (
+        {displayHistory.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
             No pod data available
           </div>
         ) : (
           <div style={{ width: '100%', minHeight: 160, height: 160 }}>
           <ResponsiveContainer width="100%" height={160}>
-            <AreaChart data={history} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+            <AreaChart data={displayHistory} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id="gradientHealthy" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />

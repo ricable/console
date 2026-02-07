@@ -8,7 +8,7 @@ import {
   useCardData,
   CardSearchInput, CardControlsRow, CardPaginationFooter, CardAIActions,
 } from '../../lib/cards'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
 
 interface HelmReleaseStatusProps {
   config?: {
@@ -39,7 +39,82 @@ const SORT_OPTIONS = [
   { value: 'updated' as const, label: 'Updated' },
 ]
 
+// Demo data for offline/demo mode
+function getDemoHelmReleases(): HelmReleaseDisplay[] {
+  const now = new Date()
+  return [
+    {
+      name: 'prometheus',
+      namespace: 'monitoring',
+      chart: 'prometheus',
+      version: '25.8.0',
+      appVersion: '2.48.1',
+      status: 'deployed',
+      updated: new Date(now.getTime() - 2 * 3600000).toISOString(),
+      revision: 3,
+      cluster: 'eks-prod-us-east-1',
+    },
+    {
+      name: 'grafana',
+      namespace: 'monitoring',
+      chart: 'grafana',
+      version: '7.0.8',
+      appVersion: '10.2.3',
+      status: 'deployed',
+      updated: new Date(now.getTime() - 5 * 3600000).toISOString(),
+      revision: 2,
+      cluster: 'eks-prod-us-east-1',
+    },
+    {
+      name: 'nginx-ingress',
+      namespace: 'ingress',
+      chart: 'nginx-ingress',
+      version: '4.8.3',
+      appVersion: '1.9.5',
+      status: 'failed',
+      updated: new Date(now.getTime() - 30 * 60000).toISOString(),
+      revision: 5,
+      cluster: 'gke-staging',
+    },
+    {
+      name: 'cert-manager',
+      namespace: 'cert-manager',
+      chart: 'cert-manager',
+      version: '1.13.3',
+      appVersion: '1.13.3',
+      status: 'deployed',
+      updated: new Date(now.getTime() - 12 * 3600000).toISOString(),
+      revision: 1,
+      cluster: 'gke-staging',
+    },
+    {
+      name: 'argocd',
+      namespace: 'argocd',
+      chart: 'argo-cd',
+      version: '5.51.6',
+      appVersion: '2.9.5',
+      status: 'deployed',
+      updated: new Date(now.getTime() - 24 * 3600000).toISOString(),
+      revision: 4,
+      cluster: 'openshift-prod',
+    },
+    {
+      name: 'vllm-model-server',
+      namespace: 'ml-inference',
+      chart: 'vllm',
+      version: '0.2.1',
+      appVersion: '0.2.6',
+      status: 'pending',
+      updated: new Date(now.getTime() - 5 * 60000).toISOString(),
+      revision: 1,
+      cluster: 'vllm-gpu-cluster',
+    },
+  ]
+}
+
 export function HelmReleaseStatus({ config }: HelmReleaseStatusProps) {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { isLoading: clustersLoading } = useClusters()
   const { drillToHelm } = useDrillDownActions()
 
@@ -55,14 +130,17 @@ export function HelmReleaseStatus({ config }: HelmReleaseStatusProps) {
 
   // Report loading state to CardWrapper for skeleton/refresh behavior
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: clustersLoading || releasesLoading,
-    hasAnyData: allHelmReleases.length > 0,
+    isLoading: shouldUseDemoData ? false : (clustersLoading || releasesLoading),
+    hasAnyData: shouldUseDemoData ? true : allHelmReleases.length > 0,
     isFailed,
     consecutiveFailures,
   })
 
   // Transform API data to display format
   const allReleases = useMemo(() => {
+    if (shouldUseDemoData) {
+      return getDemoHelmReleases()
+    }
     return allHelmReleases.map(r => {
       // Parse chart name and version (e.g., "prometheus-25.8.0" -> chart: "prometheus", version: "25.8.0")
       const chartParts = r.chart.match(/^(.+)-(\d+\.\d+\.\d+.*)$/)
@@ -81,7 +159,7 @@ export function HelmReleaseStatus({ config }: HelmReleaseStatusProps) {
         cluster: r.cluster,
       }
     })
-  }, [allHelmReleases])
+  }, [allHelmReleases, shouldUseDemoData])
 
   // Pre-filter by namespace before passing to useCardData
   const namespacedReleases = useMemo(() => {

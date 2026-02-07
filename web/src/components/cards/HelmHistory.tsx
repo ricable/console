@@ -9,7 +9,7 @@ import {
   useCardData,
   CardSearchInput, CardControlsRow, CardPaginationFooter,
 } from '../../lib/cards'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
 
 interface HelmHistoryProps {
   config?: {
@@ -35,7 +35,56 @@ const STATUS_ORDER: Record<string, number> = {
   superseded: 4,
 }
 
+// Demo data for offline/demo mode
+function getDemoHelmHistory(): HelmHistoryEntry[] {
+  const now = new Date()
+  return [
+    {
+      revision: 5,
+      updated: new Date(now.getTime() - 30 * 60000).toISOString(),
+      status: 'deployed',
+      chart: 'nginx-15.2.0',
+      description: 'Upgrade complete',
+      app_version: '1.25.3',
+    },
+    {
+      revision: 4,
+      updated: new Date(now.getTime() - 120 * 60000).toISOString(),
+      status: 'superseded',
+      chart: 'nginx-15.1.0',
+      description: 'Rollback from failed upgrade',
+      app_version: '1.25.2',
+    },
+    {
+      revision: 3,
+      updated: new Date(now.getTime() - 180 * 60000).toISOString(),
+      status: 'failed',
+      chart: 'nginx-15.2.0',
+      description: 'Image pull error',
+      app_version: '1.25.3',
+    },
+    {
+      revision: 2,
+      updated: new Date(now.getTime() - 6 * 3600000).toISOString(),
+      status: 'superseded',
+      chart: 'nginx-15.0.0',
+      description: 'Initial deployment',
+      app_version: '1.25.1',
+    },
+    {
+      revision: 1,
+      updated: new Date(now.getTime() - 24 * 3600000).toISOString(),
+      status: 'superseded',
+      chart: 'nginx-14.9.0',
+      description: 'Initial install',
+      app_version: '1.25.0',
+    },
+  ]
+}
+
 export function HelmHistory({ config }: HelmHistoryProps) {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { deduplicatedClusters: allClusters } = useClusters()
   const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || '')
   const [selectedRelease, setSelectedRelease] = useState<string>(config?.release || '')
@@ -104,12 +153,18 @@ export function HelmHistory({ config }: HelmHistoryProps) {
     selectedRelease || undefined,
     selectedReleaseNamespace
   )
+  
+  // Use demo data when in demo mode
+  const liveHistory = rawHistory
+  const displayHistory = useMemo(() => {
+    return shouldUseDemoData ? getDemoHelmHistory() : liveHistory
+  }, [shouldUseDemoData, liveHistory])
 
   // Report loading state to CardWrapper for skeleton/refresh behavior
   // Note: Consider "hasAnyData" true when no release selected - we want to show selectors, not empty state
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: historyLoading,
-    hasAnyData: rawHistory.length > 0 || !selectedRelease,
+    isLoading: shouldUseDemoData ? false : historyLoading,
+    hasAnyData: shouldUseDemoData ? true : (displayHistory.length > 0 || !selectedRelease),
     isFailed,
     consecutiveFailures,
   })
@@ -172,7 +227,7 @@ export function HelmHistory({ config }: HelmHistoryProps) {
       sortDirection,
       setSortDirection,
     },
-  } = useCardData<HelmHistoryEntry, SortByOption>(rawHistory, {
+  } = useCardData<HelmHistoryEntry, SortByOption>(displayHistory, {
     filter: {
       searchFields: ['chart', 'status', 'description'] as (keyof HelmHistoryEntry)[],
       customPredicate: (item, query) => String(item.revision).includes(query),
@@ -310,7 +365,7 @@ export function HelmHistory({ config }: HelmHistoryProps) {
         <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
           Select a cluster and release to view history
         </div>
-      ) : (historyLoading || historyRefreshing) && rawHistory.length === 0 ? (
+      ) : (historyLoading || historyRefreshing) && displayHistory.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3">
           <div className="flex items-center gap-2 text-sm text-blue-400">
             <RotateCcw className="w-4 h-4 animate-spin" />
@@ -324,8 +379,8 @@ export function HelmHistory({ config }: HelmHistoryProps) {
           {/* Scope badge - clickable to drill down */}
           <button
             onClick={() => drillToHelm(selectedCluster, selectedReleaseNamespace || 'default', selectedRelease, {
-              history: rawHistory,
-              currentRevision: rawHistory.find(h => h.status === 'deployed')?.revision,
+              history: displayHistory,
+              currentRevision: displayHistory.find(h => h.status === 'deployed')?.revision,
             })}
             className="group flex items-center gap-2 mb-4 p-2 -m-2 rounded-lg hover:bg-secondary/50 transition-colors cursor-pointer min-w-0 max-w-full overflow-hidden"
             title={`Click to view details for ${selectedRelease}`}
@@ -367,7 +422,7 @@ export function HelmHistory({ config }: HelmHistoryProps) {
                         key={idx}
                         className="relative pl-6 group cursor-pointer"
                         onClick={() => drillToHelm(selectedCluster, selectedReleaseNamespace || 'default', selectedRelease, {
-                          history: rawHistory,
+                          history: displayHistory,
                           currentRevision: entry.revision,
                           selectedRevision: entry,
                         })}

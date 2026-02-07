@@ -2,7 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react'
 import { TrendingUp, Clock, Server } from 'lucide-react'
 import { CardClusterFilter } from '../../lib/cards'
 import { Skeleton, SkeletonStats } from '../ui/Skeleton'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
 import {
   AreaChart,
   Area,
@@ -35,7 +35,33 @@ const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
   { value: '24h', label: '24 hours' },
 ]
 
+// Demo data for offline/demo mode
+function getDemoGPUData(): GPUPoint[] {
+  const now = new Date()
+  const demoHistory: GPUPoint[] = []
+  const totalGPUs = 16
+  
+  for (let i = 19; i >= 0; i--) {
+    const time = new Date(now.getTime() - i * 60000)
+    // Simulate GPU allocation variations - higher utilization over time
+    const baseAllocated = 10
+    const variance = Math.sin(i / 4) * 3 + Math.random() * 2
+    const allocated = Math.max(6, Math.min(totalGPUs, Math.round(baseAllocated + variance)))
+    
+    demoHistory.push({
+      time: time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      allocated,
+      available: totalGPUs - allocated,
+      total: totalGPUs,
+    })
+  }
+  
+  return demoHistory
+}
+
 export function GPUUtilization() {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const {
     nodes: gpuNodes,
     isLoading: hookLoading,
@@ -48,8 +74,8 @@ export function GPUUtilization() {
 
   // Report loading state to CardWrapper for skeleton/refresh behavior
   useCardLoadingState({
-    isLoading: hookLoading,
-    hasAnyData: gpuNodes.length > 0,
+    isLoading: shouldUseDemoData ? false : hookLoading,
+    hasAnyData: shouldUseDemoData ? true : gpuNodes.length > 0,
   })
   const [timeRange, setTimeRange] = useState<TimeRange>('1h')
   const [localClusterFilter, setLocalClusterFilter] = useState<string[]>([])
@@ -98,6 +124,11 @@ export function GPUUtilization() {
   // Track historical data points
   const historyRef = useRef<GPUPoint[]>([])
   const [history, setHistory] = useState<GPUPoint[]>([])
+  
+  // Use demo data when in demo mode
+  const displayHistory = useMemo(() => {
+    return shouldUseDemoData ? getDemoGPUData() : history
+  }, [shouldUseDemoData, history])
 
   // Filter by selected clusters AND local filter AND exclude nodes from offline/unreachable clusters
   const filteredNodes = useMemo(() => {
@@ -119,15 +150,25 @@ export function GPUUtilization() {
 
   // Calculate current stats
   const currentStats = useMemo(() => {
+    if (shouldUseDemoData) {
+      const latest = getDemoGPUData()[19]
+      return {
+        total: latest.total,
+        allocated: latest.allocated,
+        available: latest.available,
+        utilization: Math.round((latest.allocated / latest.total) * 100),
+      }
+    }
     const total = filteredNodes.reduce((sum, n) => sum + n.gpuCount, 0)
     const allocated = filteredNodes.reduce((sum, n) => sum + n.gpuAllocated, 0)
     const available = total - allocated
     const utilization = total > 0 ? Math.round((allocated / total) * 100) : 0
     return { total, allocated, available, utilization }
-  }, [filteredNodes])
+  }, [filteredNodes, shouldUseDemoData])
 
   // Add data point to history on each update
   useEffect(() => {
+    if (shouldUseDemoData) return // Don't collect real data in demo mode
     if (isLoading) return
     if (currentStats.total === 0) return
 
@@ -150,10 +191,11 @@ export function GPUUtilization() {
       historyRef.current = newHistory
       setHistory(newHistory)
     }
-  }, [currentStats, isLoading])
+  }, [currentStats, isLoading, shouldUseDemoData])
 
   // Initialize with simulated history
   useEffect(() => {
+    if (shouldUseDemoData) return
     if (history.length === 0 && currentStats.total > 0) {
       const now = new Date()
       const initialPoints: GPUPoint[] = []
@@ -174,7 +216,7 @@ export function GPUUtilization() {
       historyRef.current = initialPoints
       setHistory(initialPoints)
     }
-  }, [currentStats, history.length])
+  }, [currentStats, history.length, shouldUseDemoData])
 
   // Pie chart data
   const pieData = [
@@ -182,7 +224,7 @@ export function GPUUtilization() {
     { name: 'Available', value: currentStats.available, color: '#22c55e' },
   ]
 
-  if (isLoading && history.length === 0 && hasReachableClusters) {
+  if (isLoading && displayHistory.length === 0 && hasReachableClusters) {
     return (
       <div className="h-full flex flex-col min-h-card">
         <div className="flex items-center justify-between mb-2">
@@ -340,14 +382,14 @@ export function GPUUtilization() {
           <TrendingUp className="w-3 h-3 text-muted-foreground" />
           <span className="text-xs text-muted-foreground">Allocation Trend</span>
         </div>
-        {history.length === 0 ? (
+        {displayHistory.length === 0 ? (
           <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
             Collecting data...
           </div>
         ) : (
           <div style={{ width: '100%', minHeight: 100, height: 100 }}>
           <ResponsiveContainer width="100%" height={100}>
-            <AreaChart data={history} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
+            <AreaChart data={displayHistory} margin={{ top: 5, right: 5, left: 0, bottom: 5 }}>
               <defs>
                 <linearGradient id="gradientAllocated" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#9333ea" stopOpacity={0.4} />

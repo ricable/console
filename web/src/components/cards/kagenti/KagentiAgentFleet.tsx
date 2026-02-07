@@ -1,11 +1,88 @@
 import { Bot, ChevronRight, Server } from 'lucide-react'
 import { useKagentiAgents } from '../../../hooks/useMCP'
-import { useCardLoadingState } from '../CardDataContext'
+import { useCardLoadingState, useCardDemoState } from '../CardDataContext'
 import { useCardData, commonComparators, CardSearchInput, CardControlsRow, CardPaginationFooter } from '../../../lib/cards'
 import { Skeleton } from '../../ui/Skeleton'
+import { useMemo } from 'react'
 
 interface KagentiAgentFleetProps {
   config?: { cluster?: string }
+}
+
+// Demo data for offline/demo mode
+function getDemoKagentiAgents() {
+  return [
+    {
+      name: 'kagenti-agent-primary',
+      namespace: 'kagenti-system',
+      cluster: 'eks-prod-us-east-1',
+      framework: 'langchain',
+      status: 'Ready' as const,
+      replicas: 3,
+      readyReplicas: 3,
+      image: 'kagenti/agent:v1.2.3',
+      protocol: 'a2a',
+      labels: { 'app': 'kagenti-agent', 'env': 'prod' },
+      createdAt: new Date(Date.now() - 7 * 24 * 3600000).toISOString(),
+      age: '7d',
+    },
+    {
+      name: 'kagenti-agent-inference',
+      namespace: 'ml-inference',
+      cluster: 'vllm-gpu-cluster',
+      framework: 'vllm',
+      status: 'Ready' as const,
+      replicas: 2,
+      readyReplicas: 2,
+      image: 'kagenti/agent:v1.2.3',
+      protocol: 'mcp',
+      labels: { 'app': 'kagenti-agent', 'env': 'prod' },
+      createdAt: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
+      age: '3d',
+    },
+    {
+      name: 'kagenti-agent-embeddings',
+      namespace: 'kagenti-system',
+      cluster: 'gke-staging',
+      framework: 'sentence-transformers',
+      status: 'Deploying' as const,
+      replicas: 2,
+      readyReplicas: 1,
+      image: 'kagenti/agent:v1.2.2',
+      protocol: 'a2a',
+      labels: { 'app': 'kagenti-agent', 'env': 'staging' },
+      createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
+      age: '2h',
+    },
+    {
+      name: 'kagenti-agent-dev',
+      namespace: 'development',
+      cluster: 'gke-staging',
+      framework: 'langchain',
+      status: 'Deploying' as const,
+      replicas: 1,
+      readyReplicas: 0,
+      image: 'kagenti/agent:v1.3.0-beta',
+      protocol: 'mcp',
+      labels: { 'app': 'kagenti-agent', 'env': 'dev' },
+      createdAt: new Date(Date.now() - 30 * 60000).toISOString(),
+      age: '30m',
+    },
+    {
+      name: 'kagenti-agent-backup',
+      namespace: 'kagenti-system',
+      cluster: 'openshift-prod',
+      framework: 'langchain',
+      status: 'Failed' as const,
+      replicas: 1,
+      readyReplicas: 0,
+      image: 'kagenti/agent:v1.1.0',
+      protocol: 'a2a',
+      labels: { 'app': 'kagenti-agent', 'env': 'prod' },
+      createdAt: new Date(Date.now() - 5 * 24 * 3600000).toISOString(),
+      age: '5d',
+    },
+  ]
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -27,15 +104,23 @@ function StatusBadge({ status }: { status: string }) {
 type SortField = 'name' | 'status' | 'framework' | 'cluster'
 
 export function KagentiAgentFleet({ config }: KagentiAgentFleetProps) {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const {
     data: agents,
     isLoading,
     consecutiveFailures,
   } = useKagentiAgents({ cluster: config?.cluster })
+  
+  // Use demo data when in demo mode
+  const liveAgents = agents
+  const displayAgents = useMemo(() => {
+    return shouldUseDemoData ? getDemoKagentiAgents() : liveAgents
+  }, [shouldUseDemoData, liveAgents])
 
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading,
-    hasAnyData: agents.length > 0,
+    isLoading: shouldUseDemoData ? false : isLoading,
+    hasAnyData: shouldUseDemoData ? true : displayAgents.length > 0,
     isFailed: consecutiveFailures >= 3,
     consecutiveFailures,
   })
@@ -49,7 +134,7 @@ export function KagentiAgentFleet({ config }: KagentiAgentFleetProps) {
     goToPage,
     needsPagination,
     itemsPerPage,
-  } = useCardData(agents, {
+  } = useCardData(displayAgents, {
     filter: {
       searchFields: ['name', 'namespace', 'framework', 'cluster', 'status'],
       clusterField: 'cluster',
