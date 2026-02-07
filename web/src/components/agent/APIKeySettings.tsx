@@ -121,8 +121,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
       await fetchKeysStatus()
       showToast('API key saved successfully', 'success')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save key')
       showToast(err instanceof Error ? err.message : 'Failed to save key', 'error')
+      console.error('Failed to save key:', err)
     } finally {
       setSaving(false)
     }
@@ -155,8 +155,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
       setDeleteConfirmOpen(false)
       setKeyToDelete(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete key')
       showToast(err instanceof Error ? err.message : 'Failed to delete key', 'error')
+      console.error('Failed to delete key:', err)
     } finally {
       setSaving(false)
     }
