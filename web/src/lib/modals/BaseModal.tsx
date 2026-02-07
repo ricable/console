@@ -34,10 +34,11 @@
  * ```
  */
 
-import { ReactNode, useRef } from 'react'
+import { ReactNode, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft } from 'lucide-react'
 import { useModalNavigation } from './useModalNavigation'
+import { useTabKeyNavigation } from '../../hooks/useTabKeyNavigation'
 import {
   BaseModalProps,
   ModalHeaderProps,
@@ -287,17 +288,33 @@ function ModalTabs({
   onTabChange,
   className = '',
 }: ModalTabsProps) {
+  const tabsRef = useRef<HTMLDivElement>(null)
+  
+  // Get active tab index
+  const activeIndex = tabs.findIndex((tab) => tab.id === activeTab)
+  
+  // Arrow key navigation for tabs
+  useTabKeyNavigation({
+    tabCount: tabs.length,
+    activeIndex: activeIndex >= 0 ? activeIndex : 0,
+    onTabChange: (index) => onTabChange(tabs[index].id),
+    containerRef: tabsRef,
+  })
+
   return (
-    <div className={`flex border-b border-border ${className}`}>
-      {tabs.map((tab) => {
+    <div ref={tabsRef} role="tablist" className={`flex border-b border-border ${className}`}>
+      {tabs.map((tab, index) => {
         const isActive = tab.id === activeTab
         const Icon = tab.icon
 
         return (
           <button
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            tabIndex={isActive ? 0 : -1}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${
               isActive
                 ? 'text-purple-400 border-purple-400 bg-purple-500/5'
                 : 'text-muted-foreground hover:text-foreground border-transparent'

@@ -1,9 +1,10 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { Plus, Layout, RotateCcw } from 'lucide-react'
 import { useMissions } from '../../hooks/useMissions'
 import { useMobile } from '../../hooks/useMobile'
 import { ResetMode } from '../../hooks/useDashboardReset'
 import { ResetDialog } from './ResetDialog'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 interface FloatingDashboardActionsProps {
   onAddCard: () => void
@@ -67,6 +68,29 @@ export function FloatingDashboardActions({
 
   const showResetOption = isCustomized && (onReset || onResetToDefaults)
 
+  // Menu items for keyboard navigation
+  const menuItems = useMemo(() => {
+    const items = [
+      { label: 'Add Card', action: onAddCard },
+      { label: 'Templates', action: onOpenTemplates },
+    ]
+    if (showResetOption) {
+      items.unshift({ label: 'Reset', action: () => setShowResetDialog(true) })
+    }
+    return items
+  }, [showResetOption, onAddCard, onOpenTemplates])
+
+  // Arrow key navigation
+  useArrowKeyNavigation({
+    isOpen,
+    itemCount: menuItems.length,
+    onSelect: (index) => {
+      setIsOpen(false)
+      menuItems[index].action()
+    },
+    containerRef: menuRef,
+  })
+
   return (
     <>
       <div ref={menuRef} className={`fixed ${positionClasses} z-40 flex flex-col ${isMobile ? 'items-start' : 'items-end'} gap-1.5 transition-all duration-300`}>
@@ -76,7 +100,9 @@ export function FloatingDashboardActions({
             {showResetOption && (
               <button
                 onClick={() => { setIsOpen(false); setShowResetDialog(true) }}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
+                role="menuitem"
+                tabIndex={0}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary"
                 title="Reset dashboard cards"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -85,8 +111,10 @@ export function FloatingDashboardActions({
             )}
             <button
               onClick={() => { setIsOpen(false); onOpenTemplates() }}
+              role="menuitem"
+              tabIndex={0}
               data-tour="templates"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary"
               title="Browse dashboard templates"
             >
               <Layout className="w-3.5 h-3.5" />
@@ -94,8 +122,10 @@ export function FloatingDashboardActions({
             </button>
             <button
               onClick={() => { setIsOpen(false); onAddCard() }}
+              role="menuitem"
+              tabIndex={0}
               data-tour="add-card"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap focus:outline-none focus:ring-2 focus:ring-primary"
               title="Add a new card"
             >
               <Plus className="w-3.5 h-3.5" />

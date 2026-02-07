@@ -7,6 +7,7 @@ import { AgentIcon } from './AgentIcon'
 import { APIKeySettings } from './APIKeySettings'
 import type { AgentInfo } from '../../types/agent'
 import { cn } from '../../lib/cn'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 interface AgentSelectorProps {
   compact?: boolean
@@ -125,6 +126,21 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
     setIsOpen(false)
   }
 
+  // Get available agents for keyboard navigation
+  const availableAgents = sortedAgents.filter(a => a.available)
+
+  // Arrow key navigation for agent selection
+  useArrowKeyNavigation({
+    isOpen,
+    itemCount: availableAgents.length,
+    onSelect: (index) => {
+      if (availableAgents[index]) {
+        handleSelect(availableAgents[index].name)
+      }
+    },
+    containerRef: dropdownRef,
+  })
+
   // Always show the dropdown trigger — never a standalone gear.
   // When no agents are available, show a generic agent icon; settings gear
   // lives only inside the dropdown as a footer item.
@@ -162,14 +178,22 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
               {sortedAgents.map((agent: AgentInfo) => (
                 <div
                   key={agent.name}
+                  role="menuitem"
+                  tabIndex={agent.available ? 0 : -1}
                   className={cn(
                     'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors',
                     agent.available
-                      ? 'hover:bg-secondary cursor-pointer'
+                      ? 'hover:bg-secondary cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset'
                       : 'cursor-default',
                     agent.name === selectedAgent && 'bg-primary/10'
                   )}
                   onClick={() => agent.available && handleSelect(agent.name)}
+                  onKeyDown={(e) => {
+                    if (agent.available && (e.key === 'Enter' || e.key === ' ')) {
+                      e.preventDefault()
+                      handleSelect(agent.name)
+                    }
+                  }}
                 >
                   <AgentIcon provider={agent.provider} className={cn('w-5 h-5 mt-0.5 flex-shrink-0', !agent.available && 'opacity-40')} />
                   <div className="flex-1 min-w-0">

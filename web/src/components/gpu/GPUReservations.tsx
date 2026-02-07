@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Zap,
@@ -25,6 +25,7 @@ import { ClusterBadge } from '../ui/ClusterBadge'
 import { cn } from '../../lib/cn'
 import { TechnicalAcronym } from '../shared/TechnicalAcronym'
 import { getChartColor, getChartColorByName } from '../../lib/chartColors'
+import { useTabKeyNavigation } from '../../hooks/useTabKeyNavigation'
 
 // GPU utilization thresholds for visual indicators
 const UTILIZATION_HIGH_THRESHOLD = 80 // Red indicator above this percentage
@@ -133,6 +134,18 @@ export function GPUReservations() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [showNewReservationForm, setShowNewReservationForm] = useState(false)
   const [selectedReservation, setSelectedReservation] = useState<GPUReservation | null>(null)
+  const tabsRef = useRef<HTMLDivElement>(null)
+
+  // Tab definitions
+  const tabs: ViewTab[] = ['overview', 'calendar', 'quotas', 'requests']
+  
+  // Tab keyboard navigation
+  useTabKeyNavigation({
+    tabCount: tabs.length,
+    activeIndex: tabs.indexOf(activeTab),
+    onTabChange: (index) => setActiveTab(tabs[index]),
+    containerRef: tabsRef,
+  })
 
   // This page uses mock data for reservations, quotas, and team usage
   // Real GPU node data comes from useGPUNodes()
@@ -259,7 +272,7 @@ export function GPUReservations() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-border">
+      <div ref={tabsRef} className="flex gap-1 mb-6 border-b border-border" role="tablist">
         {[
           { id: 'overview', label: 'Overview', icon: TrendingUp },
           { id: 'calendar', label: 'Calendar', icon: Calendar },
@@ -270,9 +283,12 @@ export function GPUReservations() {
           return (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              tabIndex={activeTab === tab.id ? 0 : -1}
               onClick={() => setActiveTab(tab.id as ViewTab)}
               className={cn(
-                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[2px] transition-colors',
+                'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[2px] transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                 activeTab === tab.id
                   ? 'border-purple-500 text-purple-400'
                   : 'border-transparent text-muted-foreground hover:text-foreground'
