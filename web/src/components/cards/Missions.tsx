@@ -27,6 +27,7 @@ import {
   CardEmptyState,
 } from '../../lib/cards'
 import { useCardLoadingState } from './CardDataContext'
+import { useMissions } from '../../hooks/useMissions'
 
 interface MissionsProps {
   config?: Record<string, unknown>
@@ -108,6 +109,7 @@ const CLUSTER_FILTER_KEY = 'kubestellar-card-filter:deployment-missions-clusters
 export function Missions(_props: MissionsProps) {
   const { missions, activeMissions, completedMissions } = useDeployMissions()
   const { deduplicatedClusters, isLoading } = useClusters()
+  const { startMission } = useMissions()
   const [expandedMissions, setExpandedMissions] = useState<Set<string>>(new Set())
   const [hideCompleted, setHideCompleted] = useState(false)
 
@@ -304,6 +306,7 @@ export function Missions(_props: MissionsProps) {
                 isExpanded={expandedMissions.has(mission.id)}
                 onToggle={() => toggleMission(mission.id)}
                 isActive={isActive}
+                startMission={startMission}
               />
             )
           })}
@@ -350,9 +353,17 @@ interface MissionRowProps {
   isExpanded: boolean
   onToggle: () => void
   isActive: boolean
+  startMission: (params: {
+    title: string
+    description: string
+    type: 'upgrade' | 'troubleshoot' | 'analyze' | 'deploy' | 'repair' | 'custom'
+    cluster?: string
+    initialPrompt: string
+    context?: Record<string, unknown>
+  }) => string
 }
 
-function MissionRow({ mission, isExpanded, onToggle, isActive }: MissionRowProps) {
+function MissionRow({ mission, isExpanded, onToggle, isActive, startMission }: MissionRowProps) {
   const config = STATUS_CONFIG[mission.status]
   const StatusIcon = config.icon
   const elapsed = getElapsed(mission.startedAt, mission.completedAt)
@@ -371,6 +382,39 @@ function MissionRow({ mission, isExpanded, onToggle, isActive }: MissionRowProps
   const readyClusters = mission.clusterStatuses.filter(s => s.status === 'running').length
   const failedClusters = mission.clusterStatuses.filter(s => s.status === 'failed').length
   const progressPct = totalClusters > 0 ? ((readyClusters + failedClusters) / totalClusters) * 100 : 0
+
+  // Handlers for AI actions
+  const handleDiagnose = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    startMission({
+      title: `Diagnose: ${mission.workload}`,
+      description: `Diagnose deployment failure for ${mission.workload}`,
+      type: 'troubleshoot',
+      initialPrompt: `Analyze the deployment failure for ${mission.workload}. Check pod events, logs, and resource limits to diagnose the issue.`,
+      context: {
+        workload: mission.workload,
+        namespace: mission.namespace,
+        clusters: mission.clusterStatuses.filter(cs => cs.status === 'failed').map(cs => cs.cluster),
+        status: mission.status,
+      },
+    })
+  }, [mission, startMission])
+
+  const handleRepair = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
+    startMission({
+      title: `Repair: ${mission.workload}`,
+      description: `Auto-repair deployment failure for ${mission.workload}`,
+      type: 'repair',
+      initialPrompt: `Automatically fix the deployment failure for ${mission.workload}. Apply safe remediation steps such as restarting pods, adjusting resources, or fixing configuration issues.`,
+      context: {
+        workload: mission.workload,
+        namespace: mission.namespace,
+        clusters: mission.clusterStatuses.filter(cs => cs.status === 'failed').map(cs => cs.cluster),
+        status: mission.status,
+      },
+    })
+  }, [mission, startMission])
 
   return (
     <div className={cn(
@@ -471,7 +515,7 @@ function MissionRow({ mission, isExpanded, onToggle, isActive }: MissionRowProps
       {(mission.status === 'abort' || mission.status === 'partial') && (
         <div className="px-3 pb-2 flex items-center gap-2">
           <button
-            onClick={() => {}}
+            onClick={handleDiagnose}
             className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded bg-purple-500/15 text-purple-400 hover:bg-purple-500/25 border border-purple-500/20 transition-colors"
             title="AI will analyze pod events, logs, and resource limits to diagnose the failure"
           >
@@ -479,7 +523,7 @@ function MissionRow({ mission, isExpanded, onToggle, isActive }: MissionRowProps
             Diagnose
           </button>
           <button
-            onClick={() => {}}
+            onClick={handleRepair}
             className="flex items-center gap-1.5 text-[10px] px-2 py-1 rounded bg-blue-500/15 text-blue-400 hover:bg-blue-500/25 border border-blue-500/20 transition-colors"
             title="AI will attempt to fix the issue (restart pods, adjust resources, etc.)"
           >
