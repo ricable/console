@@ -1,20 +1,16 @@
-import { useState } from 'react'
 import { Bug } from 'lucide-react'
 import { FeatureRequestModal } from './FeatureRequestModal'
 import { useNotifications } from '../../hooks/useFeatureRequests'
+import { useModal } from '../../hooks/useModal'
 
 export function FeatureRequestButton() {
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const modal = useModal()
   const { unreadCount } = useNotifications()
-
-  const handleClick = () => {
-    setIsModalOpen(true)
-  }
 
   return (
     <>
       <button
-        onClick={handleClick}
+        onClick={modal.open}
         data-tour="feedback"
         className={`relative p-2 rounded-lg hover:bg-secondary/50 transition-colors ${
           unreadCount > 0 ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
@@ -30,8 +26,8 @@ export function FeatureRequestButton() {
       </button>
 
       <FeatureRequestModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        isOpen={modal.isOpen}
+        onClose={modal.close}
       />
     </>
   )

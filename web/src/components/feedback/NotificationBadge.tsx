@@ -1,6 +1,6 @@
-import { useState } from 'react'
 import { Bell, X, Check, Clock, Bug, Sparkles, GitPullRequest, Eye } from 'lucide-react'
 import { useNotifications, type Notification, type NotificationType } from '../../hooks/useFeatureRequests'
+import { useModal } from '../../hooks/useModal'
 
 // Format relative time
 function formatRelativeTime(dateString: string): string {
@@ -46,7 +46,7 @@ export function NotificationBadge() {
     markAllAsRead,
     isLoading,
   } = useNotifications()
-  const [isOpen, setIsOpen] = useState(false)
+  const modal = useModal()
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
@@ -73,7 +73,7 @@ export function NotificationBadge() {
     <div className="relative">
       {/* Badge Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={modal.toggle}
         className={`relative p-2 rounded-lg hover:bg-secondary/50 transition-colors ${
           unreadCount > 0 ? 'text-foreground' : 'text-muted-foreground'
         }`}
@@ -88,12 +88,12 @@ export function NotificationBadge() {
       </button>
 
       {/* Dropdown Panel */}
-      {isOpen && (
+      {modal.isOpen && (
         <>
           {/* Backdrop */}
           <div
             className="fixed inset-0 z-40"
-            onClick={() => setIsOpen(false)}
+            onClick={modal.close}
           />
 
           {/* Panel */}
@@ -120,7 +120,7 @@ export function NotificationBadge() {
                   </button>
                 )}
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={modal.close}
                   className="p-1 rounded hover:bg-secondary/50 text-muted-foreground"
                 >
                   <X className="w-4 h-4" />
@@ -178,7 +178,7 @@ export function NotificationBadge() {
               <div className="p-2 border-t border-border text-center">
                 <button
                   onClick={() => {
-                    setIsOpen(false)
+                    modal.close()
                     // Could navigate to full notifications page
                   }}
                   className="text-xs text-purple-400 hover:text-purple-300 transition-colors"

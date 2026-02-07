@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, Check, Loader2, Settings } from 'lucide-react'
 import { useMissions } from '../../hooks/useMissions'
@@ -7,6 +7,7 @@ import { AgentIcon } from './AgentIcon'
 import { APIKeySettings } from './APIKeySettings'
 import type { AgentInfo } from '../../types/agent'
 import { cn } from '../../lib/cn'
+import { useModals } from '../../hooks/useModal'
 
 interface AgentSelectorProps {
   compact?: boolean
@@ -19,8 +20,7 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
   const { isDemoMode: isDemoModeHook } = useDemoMode()
   // Synchronous fallback prevents flash during React transitions
   const isDemoMode = isDemoModeHook || getDemoMode()
-  const [isOpen, setIsOpen] = useState(false)
-  const [showSettingsModal, setShowSettingsModal] = useState(false)
+  const modals = useModals(['dropdown', 'settings'])
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   // CLI-based agents (bob, claude-code) should be hidden when not available
@@ -56,42 +56,42 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
 
   // Retry connection when dropdown is opened and agents are empty
   useEffect(() => {
-    if (isOpen && agents.length === 0 && !agentsLoading && !isDemoMode) {
+    if (modals.isModalOpen('dropdown') && agents.length === 0 && !agentsLoading && !isDemoMode) {
       console.log('[AgentSelector] Dropdown opened with no agents, attempting reconnect...')
       connectToAgent()
     }
-  }, [isOpen, agents.length, agentsLoading, isDemoMode, connectToAgent])
+  }, [modals, agents.length, agentsLoading, isDemoMode, connectToAgent])
 
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        modals.closeModal('dropdown')
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+  }, [modals])
 
   // Close on escape
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        setIsOpen(false)
+        modals.closeModal('dropdown')
       }
     }
-    if (isOpen) {
+    if (modals.isModalOpen('dropdown')) {
       document.addEventListener('keydown', handleEscape)
       return () => document.removeEventListener('keydown', handleEscape)
     }
-  }, [isOpen])
+  }, [modals])
 
   // Close dropdown when entering demo mode
   useEffect(() => {
     if (isDemoMode) {
-      setIsOpen(false)
+      modals.closeModal('dropdown')
     }
-  }, [isDemoMode])
+  }, [isDemoMode, modals])
 
   // Loading state (only when NOT in demo mode)
   if (agentsLoading && !isDemoMode) {
@@ -122,7 +122,7 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
 
   const handleSelect = (agentName: string) => {
     selectAgent(agentName)
-    setIsOpen(false)
+    modals.closeModal('dropdown')
   }
 
   // Always show the dropdown trigger — never a standalone gear.
@@ -132,11 +132,11 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
     <>
     <div ref={dropdownRef} className={cn('relative flex items-center gap-1', className, isGreyedOut && 'opacity-40 pointer-events-none')}>
       <button
-        onClick={() => !isDemoMode && setIsOpen(!isOpen)}
+        onClick={() => !isDemoMode && modals.toggleModal('dropdown')}
         className={cn(
           'flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors',
           'bg-secondary/50 border-border hover:bg-secondary',
-          isOpen && 'ring-1 ring-primary'
+          modals.isModalOpen('dropdown') && 'ring-1 ring-primary'
         )}
       >
         {hasAvailableAgents && currentAgent ? (
@@ -151,11 +151,11 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
         )}
         <ChevronDown className={cn(
           'w-4 h-4 text-muted-foreground transition-transform',
-          isOpen && 'rotate-180'
+          modals.isModalOpen('dropdown') && 'rotate-180'
         )} />
       </button>
 
-      {isOpen && (
+      {modals.isModalOpen('dropdown') && (
         <div className="absolute z-50 top-full mt-1 right-0 w-72 rounded-lg bg-card border border-border shadow-lg overflow-hidden">
           {sortedAgents.length > 0 && (
             <div className="py-1">
@@ -217,8 +217,8 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
           <div className="border-t border-border">
             <button
               onClick={() => {
-                setShowSettingsModal(true)
-                setIsOpen(false)
+                modals.openModal('settings')
+                modals.closeModal('dropdown')
               }}
               className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
             >
@@ -229,7 +229,7 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
         </div>
       )}
     </div>
-    {!isDemoMode && <APIKeySettings isOpen={showSettingsModal} onClose={() => setShowSettingsModal(false)} />}
+    {!isDemoMode && <APIKeySettings isOpen={modals.isModalOpen('settings')} onClose={() => modals.closeModal('settings')} />}
     </>
   )
 }
