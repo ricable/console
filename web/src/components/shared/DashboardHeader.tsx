@@ -153,7 +153,7 @@ export function DashboardHeader({
           >
             <AlertTriangle className="w-3 h-3" aria-hidden="true" />
             <span>{error}</span>
-            <RefreshCw className="w-3 h-3" />
+            <RefreshCw className={`w-3 h-3 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
         ) : displayTimestamp ? (
           <span className="text-xs text-muted-foreground">
