@@ -20,6 +20,7 @@ import { InlineAIAssist } from './InlineAIAssist'
 import { CARD_T1_SYSTEM_PROMPT, CARD_T2_SYSTEM_PROMPT, CARD_INLINE_ASSIST_PROMPT, CODE_INLINE_ASSIST_PROMPT } from '../../lib/ai/prompts'
 import { generateSampleData, detectFieldFormat } from '../../lib/ai/sampleData'
 import { useAIMode } from '../../hooks/useAIMode'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 interface CardFactoryModalProps {
   isOpen: boolean
@@ -1108,9 +1109,21 @@ function TemplateDropdown<T extends { name: string }>({
   label: string
 }) {
   const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Arrow key navigation
+  useArrowKeyNavigation({
+    isOpen: open,
+    itemCount: templates.length,
+    onSelect: (index) => {
+      onSelect(templates[index])
+      setOpen(false)
+    },
+    containerRef,
+  })
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-secondary/50 border border-border text-muted-foreground hover:text-foreground transition-colors"
@@ -1124,7 +1137,9 @@ function TemplateDropdown<T extends { name: string }>({
             <button
               key={tpl.name}
               onClick={() => { onSelect(tpl); setOpen(false) }}
-              className="w-full text-left px-3 py-1.5 rounded-md text-xs text-foreground hover:bg-secondary transition-colors"
+              role="menuitem"
+              tabIndex={0}
+              className="w-full text-left px-3 py-1.5 rounded-md text-xs text-foreground hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
             >
               {tpl.name}
             </button>

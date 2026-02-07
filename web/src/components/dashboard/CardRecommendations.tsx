@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Clock, ChevronDown, X, Plus, AlertTriangle, Info, Lightbulb } from 'lucide-react'
 import { useCardRecommendations, CardRecommendation } from '../../hooks/useCardRecommendations'
 import { useSnoozedRecommendations } from '../../hooks/useSnoozedRecommendations'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 interface Props {
   currentCardTypes: string[]
@@ -68,28 +69,51 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
     }
   }, [expandedRec])
 
-  const handleAddCard = async (rec: CardRecommendation) => {
+  const handleAddCard = useCallback(async (rec: CardRecommendation) => {
     setAddingCard(rec.id)
     await new Promise(resolve => setTimeout(resolve, 300))
     onAddCard(rec.cardType, rec.config)
     setAddingCard(null)
     setExpandedRec(null)
     dismissRecommendation(rec.id) // Permanently hide tile after adding card
-  }
+  }, [onAddCard, dismissRecommendation])
 
-  const handleSnooze = (e: React.MouseEvent, rec: CardRecommendation) => {
+  const handleSnooze = useCallback((e: React.MouseEvent, rec: CardRecommendation) => {
     e.stopPropagation()
     snoozeRecommendation(rec)
     setExpandedRec(null)
-  }
+  }, [snoozeRecommendation])
 
-  const handleDismiss = (e: React.MouseEvent) => {
+  const handleDismiss = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     setExpandedRec(null)
-  }
+  }, [])
 
   // Filter out snoozed and dismissed recommendations
   const visibleRecommendations = recommendations.filter(rec => !isSnoozed(rec.id) && !isDismissed(rec.id))
+
+  // Menu items for keyboard navigation
+  const dropdownItems = useMemo(() => {
+    const currentRec = recommendations.find(r => r.id === expandedRec)
+    if (!currentRec) return []
+    return [
+      { action: () => handleAddCard(currentRec), label: 'Add Card' },
+      { action: (e: React.MouseEvent) => handleSnooze(e, currentRec), label: 'Snooze' },
+      { action: handleDismiss, label: 'Dismiss' },
+    ]
+  }, [expandedRec, recommendations, handleAddCard, handleSnooze, handleDismiss])
+
+  // Arrow key navigation for dropdown
+  useArrowKeyNavigation({
+    isOpen: expandedRec !== null,
+    itemCount: dropdownItems.length,
+    onSelect: (index) => {
+      const item = dropdownItems[index]
+      const syntheticEvent = { stopPropagation: () => {}, preventDefault: () => {} } as React.MouseEvent
+      item.action(syntheticEvent)
+    },
+    containerRef: dropdownRef,
+  })
 
   if (!hasRecommendations || visibleRecommendations.length === 0) return null
 
@@ -156,7 +180,9 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
                       <button
                         onClick={() => handleAddCard(rec)}
                         disabled={isAdding}
-                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                        role="menuitem"
+                        tabIndex={0}
+                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary ${
                           rec.priority === 'high'
                             ? 'bg-red-500 hover:bg-red-600 text-white'
                             : rec.priority === 'medium'
@@ -169,14 +195,18 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
                       </button>
                       <button
                         onClick={(e) => handleSnooze(e, rec)}
-                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                         title="Snooze"
                       >
                         <Clock className="w-3 h-3" />
                       </button>
                       <button
                         onClick={handleDismiss}
-                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                         title="Dismiss"
                       >
                         <X className="w-3 h-3" />

@@ -1,6 +1,7 @@
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { Filter, ChevronDown, Server } from 'lucide-react'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 interface ClusterFilterDropdownProps {
   localClusterFilter: string[]
@@ -29,7 +30,28 @@ export function ClusterFilterDropdown({
   minClusters = 1,
 }: ClusterFilterDropdownProps) {
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const [dropdownStyle, setDropdownStyle] = useState<{ top: number; left?: number; right?: number } | null>(null)
+
+  // All cluster options including "All clusters"
+  const allOptions = useMemo(() => {
+    return ['all', ...availableClusters.map(c => c.name)]
+  }, [availableClusters])
+
+  // Arrow key navigation
+  useArrowKeyNavigation({
+    isOpen: showClusterFilter,
+    itemCount: allOptions.length,
+    onSelect: (index) => {
+      if (index === 0) {
+        clearClusterFilter()
+      } else {
+        toggleClusterFilter(availableClusters[index - 1].name)
+      }
+      setShowClusterFilter(false)
+    },
+    containerRef,
+  })
 
   // Calculate dropdown position when opening (using fixed positioning for portal)
   const calculatePosition = useCallback(() => {
@@ -99,6 +121,7 @@ export function ClusterFilterDropdown({
         {/* Portal dropdown to escape overflow-hidden containers */}
         {showClusterFilter && dropdownStyle && createPortal(
           <div
+            ref={containerRef}
             className="fixed w-40 max-h-48 overflow-y-auto rounded-lg bg-card border border-border shadow-lg z-50"
             style={{
               top: dropdownStyle.top,
@@ -109,7 +132,9 @@ export function ClusterFilterDropdown({
             <div className="p-1">
               <button
                 onClick={clearClusterFilter}
-                className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors ${
+                role="menuitem"
+                tabIndex={0}
+                className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
                   localClusterFilter.length === 0 ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-secondary text-foreground'
                 }`}
               >
@@ -119,7 +144,9 @@ export function ClusterFilterDropdown({
                 <button
                   key={cluster.name}
                   onClick={() => toggleClusterFilter(cluster.name)}
-                  className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors ${
+                  role="menuitem"
+                  tabIndex={0}
+                  className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors focus:outline-none focus:ring-2 focus:ring-primary ${
                     localClusterFilter.includes(cluster.name) ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-secondary text-foreground'
                   }`}
                 >

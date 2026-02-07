@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { Bell, X, Check, Clock, Bug, Sparkles, GitPullRequest, Eye } from 'lucide-react'
 import { useNotifications, type Notification, type NotificationType } from '../../hooks/useFeatureRequests'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 // Format relative time
 function formatRelativeTime(dateString: string): string {
@@ -47,6 +48,7 @@ export function NotificationBadge() {
     isLoading,
   } = useNotifications()
   const [isOpen, setIsOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.read) {
@@ -57,6 +59,19 @@ export function NotificationBadge() {
   const handleMarkAllRead = async () => {
     await markAllAsRead()
   }
+
+  // Get clickable notifications for keyboard navigation
+  const visibleNotifications = useMemo(() => notifications.slice(0, 10), [notifications])
+
+  // Arrow key navigation
+  useArrowKeyNavigation({
+    isOpen,
+    itemCount: visibleNotifications.length,
+    onSelect: (index) => {
+      handleNotificationClick(visibleNotifications[index])
+    },
+    containerRef,
+  })
 
   if (isLoading && notifications.length === 0) {
     return (
@@ -70,7 +85,7 @@ export function NotificationBadge() {
   }
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       {/* Badge Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
@@ -140,7 +155,9 @@ export function NotificationBadge() {
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-3 border-b border-border/50 hover:bg-secondary/30 cursor-pointer transition-colors ${
+                    role="menuitem"
+                    tabIndex={0}
+                    className={`p-3 border-b border-border/50 hover:bg-secondary/30 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset ${
                       !notification.read ? 'bg-purple-500/5' : ''
                     }`}
                   >

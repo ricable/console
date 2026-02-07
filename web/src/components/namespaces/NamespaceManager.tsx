@@ -23,6 +23,7 @@ import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { DashboardHeader } from '../shared/DashboardHeader'
 import { api } from '../../lib/api'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 const LOCAL_AGENT_URL = 'http://127.0.0.1:8585'
 
@@ -899,6 +900,8 @@ function CreateNamespaceModal({ clusters, onClose, onCreated }: CreateNamespaceM
   const [initialAccess, setInitialAccess] = useState<InitialAccessEntry[]>([])
   const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [showGroupDropdown, setShowGroupDropdown] = useState(false)
+  const userDropdownRef = useRef<HTMLDivElement>(null)
+  const groupDropdownRef = useRef<HTMLDivElement>(null)
 
   const addUserAccess = (user: string) => {
     if (!initialAccess.some(a => a.type === 'User' && a.name === user)) {
@@ -1029,12 +1032,14 @@ function CreateNamespaceModal({ clusters, onClose, onCreated }: CreateNamespaceM
                   Add User
                 </button>
                 {showUserDropdown && availableUsers.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div ref={userDropdownRef} className="absolute z-10 top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {availableUsers.map(user => (
                       <button
                         key={user}
                         onClick={() => addUserAccess(user)}
-                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         {user}
                       </button>
@@ -1051,12 +1056,14 @@ function CreateNamespaceModal({ clusters, onClose, onCreated }: CreateNamespaceM
                   Add Group
                 </button>
                 {showGroupDropdown && availableGroups.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div ref={groupDropdownRef} className="absolute z-10 top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {availableGroups.map(group => (
                       <button
                         key={group}
                         onClick={() => addGroupAccess(group)}
-                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         {group}
                       </button>
@@ -1190,6 +1197,7 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
   const [granting, setGranting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   // Filter out subjects that already have access
   const existingSubjectNames = new Set(
@@ -1229,6 +1237,21 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
     setSubjectName(name)
     setShowDropdown(false)
   }
+
+  // Filtered subjects for keyboard navigation
+  const filteredSubjects = useMemo(() => {
+    return availableSubjects.filter(name => !subjectName || name.toLowerCase().includes(subjectName.toLowerCase()))
+  }, [availableSubjects, subjectName])
+
+  // Arrow key navigation
+  useArrowKeyNavigation({
+    isOpen: showDropdown,
+    itemCount: filteredSubjects.length,
+    onSelect: (index) => {
+      selectSubject(filteredSubjects[index])
+    },
+    containerRef: dropdownRef,
+  })
 
   return (
     <BaseModal isOpen={true} onClose={onClose} size="md">
@@ -1278,14 +1301,16 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
                 className="w-full px-3 py-2 rounded-lg bg-secondary border border-border text-white placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-blue-500/50"
               />
               {showDropdown && availableSubjects.length > 0 && (
-                <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div ref={dropdownRef} className="absolute z-10 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {availableSubjects
                     .filter(name => !subjectName || name.toLowerCase().includes(subjectName.toLowerCase()))
                     .map(name => (
                       <button
                         key={name}
                         onClick={() => selectSubject(name)}
-                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="w-full px-3 py-2 text-left text-sm text-white hover:bg-secondary/50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         {name}
                       </button>
@@ -1293,7 +1318,9 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
                   {subjectName && !availableSubjects.some(n => n.toLowerCase() === subjectName.toLowerCase()) && (
                     <button
                       onClick={() => selectSubject(subjectName)}
-                      className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-secondary/50 transition-colors border-t border-border"
+                      role="menuitem"
+                      tabIndex={0}
+                      className="w-full px-3 py-2 text-left text-sm text-blue-400 hover:bg-secondary/50 transition-colors border-t border-border focus:outline-none focus:ring-2 focus:ring-primary"
                     >
                       Use "{subjectName}"
                     </button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lightbulb, Clock, X, ChevronDown, Zap, AlertTriangle, Shield, Server, Scale, Activity, Wrench, Stethoscope } from 'lucide-react'
 import { useMissionSuggestions, MissionSuggestion, MissionType } from '../../hooks/useMissionSuggestions'
@@ -7,6 +7,7 @@ import { useMissions } from '../../hooks/useMissions'
 import { useLocalAgent } from '../../hooks/useLocalAgent'
 import { useDemoMode } from '../../hooks/useDemoMode'
 import { Skeleton } from '../ui/Skeleton'
+import { useArrowKeyNavigation } from '../../hooks/useArrowKeyNavigation'
 
 const MISSION_ICONS: Record<MissionType, typeof Zap> = {
   scale: Scale,
@@ -93,7 +94,7 @@ export function MissionSuggestions() {
     }
   }, [expandedId])
 
-  const handleAction = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+  const handleAction = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
     e.stopPropagation()
     e.preventDefault()
 
@@ -116,9 +117,9 @@ export function MissionSuggestions() {
         })
       }
     }, 0)
-  }
+  }, [navigate, startMission, dismissMission])
 
-  const handleRepair = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+  const handleRepair = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
     e.stopPropagation()
     e.preventDefault()
 
@@ -137,19 +138,42 @@ export function MissionSuggestions() {
         context: suggestion.context,
       })
     }, 0)
-  }
+  }, [startMission, dismissMission])
 
-  const handleSnooze = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+  const handleSnooze = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
     e.stopPropagation()
     snoozeMission(suggestion)
     setExpandedId(null)
-  }
+  }, [snoozeMission])
 
-  const handleDismiss = (e: React.MouseEvent, suggestion: MissionSuggestion) => {
+  const handleDismiss = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
     e.stopPropagation()
     dismissMission(suggestion.id)
     setExpandedId(null)
-  }
+  }, [dismissMission])
+
+  // Menu items for keyboard navigation
+  const dropdownItems = useMemo(() => [
+    { action: handleAction, label: 'Diagnose' },
+    { action: handleRepair, label: 'Repair' },
+    { action: handleSnooze, label: 'Snooze' },
+    { action: handleDismiss, label: 'Dismiss' },
+  ], [handleAction, handleRepair, handleSnooze, handleDismiss])
+
+  // Arrow key navigation for dropdown
+  useArrowKeyNavigation({
+    isOpen: expandedId !== null,
+    itemCount: dropdownItems.length,
+    onSelect: (index) => {
+      const suggestion = suggestions.find(s => s.id === expandedId)
+      if (suggestion) {
+        const item = dropdownItems[index]
+        const syntheticEvent = { stopPropagation: () => {}, preventDefault: () => {} } as React.MouseEvent
+        item.action(syntheticEvent, suggestion)
+      }
+    },
+    containerRef: dropdownRef,
+  })
 
   // Show skeleton when agent is offline and demo mode is OFF
   if (forceSkeletonForOffline) {
@@ -239,7 +263,9 @@ export function MissionSuggestions() {
                       <button
                         onClick={(e) => handleAction(e, suggestion)}
                         disabled={isProcessing}
-                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 ${
+                        role="menuitem"
+                        tabIndex={0}
+                        className={`flex-1 px-2 py-1.5 rounded text-xs font-medium transition-colors flex items-center justify-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary ${
                           suggestion.priority === 'critical'
                             ? 'bg-red-500 hover:bg-red-600 text-white'
                             : suggestion.priority === 'high'
@@ -253,7 +279,9 @@ export function MissionSuggestions() {
                       <button
                         onClick={(e) => handleRepair(e, suggestion)}
                         disabled={isProcessing}
-                        className="px-2 py-1.5 rounded text-xs font-medium bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors flex items-center gap-1"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-green-500/20 hover:bg-green-500/30 text-green-400 transition-colors flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-primary"
                         title="AI Repair - automatically fix this issue"
                       >
                         <Wrench className="w-3 h-3" />
@@ -261,14 +289,18 @@ export function MissionSuggestions() {
                       </button>
                       <button
                         onClick={(e) => handleSnooze(e, suggestion)}
-                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                         title="Snooze for 24 hours"
                       >
                         <Clock className="w-3 h-3" />
                       </button>
                       <button
                         onClick={(e) => handleDismiss(e, suggestion)}
-                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors"
+                        role="menuitem"
+                        tabIndex={0}
+                        className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
                         title="Dismiss"
                       >
                         <X className="w-3 h-3" />
