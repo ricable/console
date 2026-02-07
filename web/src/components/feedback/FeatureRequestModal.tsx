@@ -13,6 +13,7 @@ import {
   type NotificationType,
 } from '../../hooks/useFeatureRequests'
 import { useAuth } from '../../lib/auth'
+import { Skeleton } from '../ui/Skeleton'
 
 // Time thresholds for relative time formatting
 const MINUTES_PER_HOUR = 60 // Minutes in an hour
@@ -388,9 +389,9 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
                   /* Request Queue Sub-tab */
                   <div className="flex-1 overflow-y-auto">
                     {requestsLoading && requests.length === 0 ? (
-                      <div className="p-8 text-center text-muted-foreground">
-                        <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin" />
-                        <p className="text-sm">Loading...</p>
+                      <div className="p-8 text-center text-muted-foreground space-y-3">
+                        <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+                        <Skeleton className="h-4 w-32 mx-auto" />
                       </div>
                     ) : requests.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground">
@@ -722,9 +723,9 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
                     )}
                     <div className="flex-1 overflow-y-auto">
                       {notificationsLoading && notifications.length === 0 ? (
-                        <div className="p-8 text-center text-muted-foreground">
-                          <Loader2 className="w-6 h-6 mx-auto mb-2 animate-spin" />
-                          <p className="text-sm">Loading...</p>
+                        <div className="p-8 text-center text-muted-foreground space-y-3">
+                          <Loader2 className="w-6 h-6 mx-auto animate-spin" />
+                          <Skeleton className="h-4 w-32 mx-auto" />
                         </div>
                       ) : notifications.length === 0 ? (
                         <div className="p-8 text-center text-muted-foreground">

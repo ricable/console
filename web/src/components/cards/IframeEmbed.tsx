@@ -4,6 +4,7 @@ import {
   ExternalLink, Settings, X, AlertTriangle, Loader2,
   RotateCcw, Globe, Save, Trash2
 } from 'lucide-react'
+import { Skeleton } from '../ui/Skeleton'
 
 interface IframeEmbedConfig {
   url?: string
@@ -330,7 +331,7 @@ export function IframeEmbed({ config }: { config?: IframeEmbedConfig }) {
               <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  <span className="text-sm text-muted-foreground">Loading...</span>
+                  <Skeleton className="h-4 w-24" />
                 </div>
               </div>
             )}
