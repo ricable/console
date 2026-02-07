@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useLocalAgent } from './useLocalAgent'
 import { isDemoMode } from '../lib/demoMode'
 
@@ -38,12 +38,21 @@ const DEMO_CLUSTERS: LocalCluster[] = [
 export function useLocalClusterTools() {
   const { isConnected } = useLocalAgent()
   const inDemoMode = isDemoMode()
+  const isMountedRef = useRef(true)
   const [tools, setTools] = useState<LocalClusterTool[]>([])
   const [clusters, setClusters] = useState<LocalCluster[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [isDeleting, setIsDeleting] = useState<string | null>(null) // cluster name being deleted
+
+  // Track component mount status
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
 
   // Fetch detected tools
   const fetchTools = useCallback(async () => {
@@ -79,9 +88,11 @@ export function useLocalClusterTools() {
       setIsLoading(true)
       // Simulate loading delay for realism
       setTimeout(() => {
-        setClusters(DEMO_CLUSTERS)
-        setError(null)
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setClusters(DEMO_CLUSTERS)
+          setError(null)
+          setIsLoading(false)
+        }
       }, 300)
       return
     }
@@ -96,14 +107,20 @@ export function useLocalClusterTools() {
       const response = await fetch(`${LOCAL_AGENT_URL}/local-clusters`)
       if (response.ok) {
         const data = await response.json()
-        setClusters(data.clusters || [])
-        setError(null)
+        if (isMountedRef.current) {
+          setClusters(data.clusters || [])
+          setError(null)
+        }
       }
     } catch (err) {
       console.error('Failed to fetch local clusters:', err)
-      setError('Failed to fetch clusters')
+      if (isMountedRef.current) {
+        setError('Failed to fetch clusters')
+      }
     } finally {
-      setIsLoading(false)
+      if (isMountedRef.current) {
+        setIsLoading(false)
+      }
     }
   }, [isConnected, inDemoMode])
 
@@ -113,7 +130,9 @@ export function useLocalClusterTools() {
     if (inDemoMode) {
       setIsCreating(true)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      setIsCreating(false)
+      if (isMountedRef.current) {
+        setIsCreating(false)
+      }
       return { status: 'creating', message: `Demo: Creating ${tool} cluster "${name}"` }
     }
 
@@ -140,10 +159,14 @@ export function useLocalClusterTools() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create cluster'
-      setError(message)
+      if (isMountedRef.current) {
+        setError(message)
+      }
       return { status: 'error', message }
     } finally {
-      setIsCreating(false)
+      if (isMountedRef.current) {
+        setIsCreating(false)
+      }
     }
   }, [isConnected, inDemoMode])
 
@@ -153,7 +176,9 @@ export function useLocalClusterTools() {
     if (inDemoMode) {
       setIsDeleting(name)
       await new Promise(resolve => setTimeout(resolve, 1000))
-      setIsDeleting(null)
+      if (isMountedRef.current) {
+        setIsDeleting(null)
+      }
       return true
     }
 
@@ -175,15 +200,21 @@ export function useLocalClusterTools() {
         return true
       } else {
         const text = await response.text()
-        setError(text)
+        if (isMountedRef.current) {
+          setError(text)
+        }
         return false
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete cluster'
-      setError(message)
+      if (isMountedRef.current) {
+        setError(message)
+      }
       return false
     } finally {
-      setIsDeleting(null)
+      if (isMountedRef.current) {
+        setIsDeleting(null)
+      }
     }
   }, [isConnected, inDemoMode, fetchClusters])
 
