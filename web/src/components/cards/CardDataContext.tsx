@@ -59,6 +59,8 @@ export interface CardDataState {
   hasData?: boolean
   /** Whether the card is displaying demo/mock data instead of real data */
   isDemoData?: boolean
+  /** Timestamp of last successful data refresh (for freshness indicator) */
+  lastRefresh?: number | null
 }
 
 interface CardDataReportContextValue {
@@ -75,13 +77,13 @@ export const CardDataReportContext = createContext<CardDataReportContextValue>(N
  * your cached data hook (e.g. useCachedPodIssues, useCachedDeployments).
  */
 export function useReportCardDataState(state: CardDataState) {
-  const { isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData } = state
+  const { isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData, lastRefresh } = state
   const ctx = useContext(CardDataReportContext)
   // useLayoutEffect runs synchronously before paint, ensuring cached data
   // is reported before CardWrapper decides to show skeleton
   useLayoutEffect(() => {
-    ctx.report({ isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData })
-  }, [ctx, isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData])
+    ctx.report({ isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData, lastRefresh })
+  }, [ctx, isFailed, consecutiveFailures, errorMessage, isLoading, isRefreshing, hasData, isDemoData, lastRefresh])
 }
 
 /**
@@ -100,6 +102,8 @@ export interface CardLoadingStateOptions {
   errorMessage?: string
   /** Whether the card is displaying demo/mock data. Set to false to opt-out of demo indicator. */
   isDemoData?: boolean
+  /** Timestamp of last successful data refresh (for freshness indicator) */
+  lastRefresh?: number | null
 }
 
 /**
@@ -138,6 +142,7 @@ export function useCardLoadingState(options: CardLoadingStateOptions) {
     // Default to undefined (not false) so cards don't accidentally opt-out of demo indicator.
     // Only cards that explicitly set isDemoData: false will opt-out.
     isDemoData,
+    lastRefresh,
   } = options
 
   // hasData is true once loading completes (even with empty data) OR if we have cached data
@@ -153,6 +158,7 @@ export function useCardLoadingState(options: CardLoadingStateOptions) {
     isRefreshing: isLoading && hasData,
     hasData,
     isDemoData,
+    lastRefresh,
   })
 
   return {

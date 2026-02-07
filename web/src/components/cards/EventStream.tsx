@@ -25,6 +25,7 @@ export function EventStream() {
     events: rawEvents,
     isLoading: hookLoading,
     error,
+    lastRefresh,
   } = useCachedEvents(undefined, undefined, { limit: 100, category: 'realtime' })
 
   // Report state to CardWrapper for refresh animation
@@ -33,6 +34,7 @@ export function EventStream() {
     hasAnyData: rawEvents.length > 0,
     isFailed: !!error && rawEvents.length === 0,
     consecutiveFailures: error ? 1 : 0,
+    lastRefresh,
   })
 
   // Use shared card data hook for filtering, sorting, and pagination

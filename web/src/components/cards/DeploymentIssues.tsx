@@ -39,7 +39,8 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
     isLoading: hookLoading,
     isFailed,
     consecutiveFailures,
-    error
+    error,
+    lastRefresh
   } = useCachedDeploymentIssues(clusterConfig, namespaceConfig)
 
   const { drillToDeployment } = useDrillDownActions()
@@ -50,6 +51,7 @@ export function DeploymentIssues({ config }: DeploymentIssuesProps) {
     hasAnyData: rawIssues.length > 0,
     isFailed,
     consecutiveFailures,
+    lastRefresh,
   })
 
   // Use shared card data hook for filtering, sorting, and pagination

@@ -1004,6 +1004,12 @@ export function CardWrapper({
 
   // Merge isDemoData from child-reported state with prop
   const effectiveIsDemoData = isDemoData || childDataState?.isDemoData || false
+  
+  // Merge lastUpdated from prop with child-reported lastRefresh
+  // Child's lastRefresh takes priority if provided
+  const effectiveLastUpdated = childDataState?.lastRefresh
+    ? new Date(childDataState.lastRefresh)
+    : lastUpdated
 
   // Child can explicitly opt-out of demo indicator by reporting isDemoData: false
   // This is used by stack-dependent cards that use stack data even in global demo mode
@@ -1224,9 +1230,9 @@ export function CardWrapper({
               <RefreshCw className="w-3 h-3 text-blue-400 animate-spin" />
             )}
             {/* Last updated indicator */}
-            {!isVisuallySpinning && !effectiveIsLoading && !effectiveIsFailed && lastUpdated && (
-              <span className="text-[10px] text-muted-foreground" title={lastUpdated.toLocaleString()}>
-                {formatTimeAgo(lastUpdated)}
+            {!isVisuallySpinning && !effectiveIsLoading && !effectiveIsFailed && effectiveLastUpdated && (
+              <span className="text-[10px] text-muted-foreground" title={effectiveLastUpdated.toLocaleString()}>
+                {formatTimeAgo(effectiveLastUpdated)}
               </span>
             )}
           </div>
