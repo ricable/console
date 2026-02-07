@@ -15,11 +15,110 @@ import { useGlobalFilters, type SeverityLevel } from '../../hooks/useGlobalFilte
 import { useDrillDown } from '../../hooks/useDrillDown'
 import { useMissions } from '../../hooks/useMissions'
 import { getSeverityIcon } from '../../types/alerts'
-import type { Alert, AlertSeverity } from '../../types/alerts'
+import type { Alert, AlertSeverity, AlertStats } from '../../types/alerts'
 import { CardControls } from '../ui/CardControls'
 import { Pagination } from '../ui/Pagination'
 import { useCardData, CardClusterFilter, CardSearchInput, CardAIActions } from '../../lib/cards'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
+
+// Demo data for offline/demo mode
+function getDemoAlerts(): { activeAlerts: Alert[]; acknowledgedAlerts: Alert[]; stats: AlertStats } {
+  const now = new Date()
+  const activeAlerts: Alert[] = [
+    {
+      id: 'demo-alert-1',
+      ruleId: 'rule-gpu-critical',
+      ruleName: 'GPU Usage Critical',
+      severity: 'critical',
+      status: 'firing',
+      message: 'GPU allocation has exceeded 90% on vllm-gpu-cluster for 5 minutes',
+      details: { gpuUsage: 95, threshold: 90 },
+      cluster: 'vllm-gpu-cluster',
+      namespace: 'ml-workloads',
+      resource: 'gpu-node-001',
+      resourceKind: 'Node',
+      firedAt: new Date(now.getTime() - 15 * 60000).toISOString(),
+      isDemo: true,
+    },
+    {
+      id: 'demo-alert-2',
+      ruleId: 'rule-pod-crash',
+      ruleName: 'Pod CrashLooping',
+      severity: 'warning',
+      status: 'firing',
+      message: 'Pod api-server-7d8f9c6b5-x2k4m is in CrashLoopBackOff state',
+      details: { restartCount: 5 },
+      cluster: 'eks-prod-us-east-1',
+      namespace: 'production',
+      resource: 'api-server-7d8f9c6b5-x2k4m',
+      resourceKind: 'Pod',
+      firedAt: new Date(now.getTime() - 45 * 60000).toISOString(),
+      isDemo: true,
+    },
+    {
+      id: 'demo-alert-3',
+      ruleId: 'rule-memory-pressure',
+      ruleName: 'Memory Pressure',
+      severity: 'warning',
+      status: 'firing',
+      message: 'Node memory usage is above 85% on worker-node-03',
+      details: { memoryUsage: 88, threshold: 85 },
+      cluster: 'gke-staging',
+      namespace: undefined,
+      resource: 'worker-node-03',
+      resourceKind: 'Node',
+      firedAt: new Date(now.getTime() - 120 * 60000).toISOString(),
+      isDemo: true,
+    },
+    {
+      id: 'demo-alert-4',
+      ruleId: 'rule-disk-space',
+      ruleName: 'Disk Space Low',
+      severity: 'info',
+      status: 'firing',
+      message: 'Available disk space is below 20% on storage-node-02',
+      details: { diskUsage: 82, threshold: 80 },
+      cluster: 'openshift-prod',
+      namespace: undefined,
+      resource: 'storage-node-02',
+      resourceKind: 'Node',
+      firedAt: new Date(now.getTime() - 240 * 60000).toISOString(),
+      isDemo: true,
+    },
+  ]
+
+  const acknowledgedAlerts: Alert[] = [
+    {
+      id: 'demo-alert-ack-1',
+      ruleId: 'rule-node-ready',
+      ruleName: 'Node Not Ready',
+      severity: 'critical',
+      status: 'firing',
+      message: 'Node compute-node-05 is not ready',
+      details: {},
+      cluster: 'eks-prod-us-east-1',
+      namespace: undefined,
+      resource: 'compute-node-05',
+      resourceKind: 'Node',
+      firedAt: new Date(now.getTime() - 360 * 60000).toISOString(),
+      acknowledgedAt: new Date(now.getTime() - 300 * 60000).toISOString(),
+      acknowledgedBy: 'demo-user',
+      isDemo: true,
+    },
+  ]
+
+  const stats: AlertStats = {
+    total: activeAlerts.length + acknowledgedAlerts.length,
+    firing: activeAlerts.length,
+    resolved: 0,
+    critical: activeAlerts.filter(a => a.severity === 'critical').length,
+    warning: activeAlerts.filter(a => a.severity === 'warning').length,
+    info: activeAlerts.filter(a => a.severity === 'info').length,
+    acknowledged: acknowledgedAlerts.length,
+  }
+
+  return { activeAlerts, acknowledgedAlerts, stats }
+}
 
 // Format relative time
 function formatRelativeTime(dateString: string): string {
@@ -39,7 +138,16 @@ function formatRelativeTime(dateString: string): string {
 type SortField = 'severity' | 'time'
 
 export function ActiveAlerts() {
-  const { activeAlerts, acknowledgedAlerts, stats, acknowledgeAlert, runAIDiagnosis } = useAlerts()
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
+  // Get alerts from hook or demo data
+  const { activeAlerts: liveActiveAlerts, acknowledgedAlerts: liveAcknowledgedAlerts, stats: liveStats, acknowledgeAlert, runAIDiagnosis } = useAlerts()
+  const demoData = useMemo(() => getDemoAlerts(), [])
+  
+  const activeAlerts = shouldUseDemoData ? demoData.activeAlerts : liveActiveAlerts
+  const acknowledgedAlerts = shouldUseDemoData ? demoData.acknowledgedAlerts : liveAcknowledgedAlerts
+  const stats = shouldUseDemoData ? demoData.stats : liveStats
+  
   const { selectedSeverities, isAllSeveritiesSelected, customFilter } = useGlobalFilters()
 
   // Report state to CardWrapper for refresh animation
