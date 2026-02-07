@@ -70,7 +70,7 @@ export function ProwCIMonitor({ config: _config }: ProwCIMonitorProps) {
   // Check if we should use demo data
   const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
 
-  const { jobs, status: prowStatus, isLoading, isRefreshing, isFailed, consecutiveFailures, refetch, formatTimeAgo } = useCachedProwJobs()
+  const { jobs, status: prowStatus, isLoading, isRefreshing, isFailed, consecutiveFailures, refetch, formatTimeAgo, lastRefresh } = useCachedProwJobs()
 
   // Report loading state to CardWrapper
   useCardLoadingState({
@@ -79,6 +79,7 @@ export function ProwCIMonitor({ config: _config }: ProwCIMonitorProps) {
     isFailed,
     consecutiveFailures: consecutiveFailures ?? 0,
     isDemoData: shouldUseDemoData,
+    lastRefresh,
   })
 
   // Stats

@@ -45,8 +45,8 @@ export function NamespaceOverview({ config }: NamespaceOverviewProps) {
     return result
   }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
-  const { issues: allPodIssues } = useCachedPodIssues(selectedCluster)
-  const { issues: allDeploymentIssues } = useCachedDeploymentIssues(selectedCluster)
+  const { issues: allPodIssues, lastRefresh: podIssuesLastRefresh } = useCachedPodIssues(selectedCluster)
+  const { issues: allDeploymentIssues, lastRefresh: deploymentIssuesLastRefresh } = useCachedDeploymentIssues(selectedCluster)
 
   // Fetch namespaces for the selected cluster
   const { namespaces } = useNamespaces(selectedCluster || undefined)
@@ -64,10 +64,17 @@ export function NamespaceOverview({ config }: NamespaceOverviewProps) {
 
   const cluster = clusters.find(c => c.name === selectedCluster)
 
+  // Use the most recent lastRefresh from either data source
+  const lastRefresh = Math.max(
+    podIssuesLastRefresh || 0,
+    deploymentIssuesLastRefresh || 0
+  ) || null
+
   // Report state to CardWrapper for refresh animation
   const { showSkeleton, showEmptyState } = useCardLoadingState({
     isLoading: clustersLoading,
     hasAnyData: allClusters.length > 0,
+    lastRefresh,
   })
 
   if (showSkeleton) {

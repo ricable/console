@@ -43,18 +43,25 @@ const STATUS_DOT: Record<string, string> = {
 
 export function ClusterHealthMonitor({ config: _config }: ClusterHealthMonitorProps) {
   const { deduplicatedClusters: allClusters, isLoading: clustersLoading, refetch: refetchClusters } = useClusters()
-  const { issues: allPodIssues, isLoading: podsLoading, refetch: refetchPods } = useCachedPodIssues()
-  const { issues: allDeployIssues, isLoading: deploysLoading, refetch: refetchDeploys } = useCachedDeploymentIssues()
+  const { issues: allPodIssues, isLoading: podsLoading, refetch: refetchPods, lastRefresh: podsLastRefresh } = useCachedPodIssues()
+  const { issues: allDeployIssues, isLoading: deploysLoading, refetch: refetchDeploys, lastRefresh: deploysLastRefresh } = useCachedDeploymentIssues()
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
   const [expandedClusters, setExpandedClusters] = useState<Set<string>>(new Set())
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const isLoading = clustersLoading || podsLoading || deploysLoading
 
+  // Use the most recent lastRefresh from either data source
+  const lastRefresh = Math.max(
+    podsLastRefresh || 0,
+    deploysLastRefresh || 0
+  ) || null
+
   // Report loading state to CardWrapper for skeleton/refresh behavior
   useCardLoadingState({
     isLoading,
     hasAnyData: allClusters.length > 0,
+    lastRefresh,
   })
 
   // Filter clusters by global filter
