@@ -87,10 +87,11 @@ export function YAMLDrillDown({ data }: Props) {
         <div className="flex items-center gap-2">
           <button
             onClick={fetchYAML}
-            className="p-2 rounded-lg bg-card/50 border border-border hover:bg-card transition-colors"
+            disabled={isLoading}
+            className="p-2 rounded-lg bg-card/50 border border-border hover:bg-card transition-colors disabled:opacity-50"
             title="Refresh"
           >
-            <RefreshCw className="w-4 h-4 text-muted-foreground" />
+            <RefreshCw className={`w-4 h-4 text-muted-foreground ${isLoading ? 'animate-spin' : ''}`} />
           </button>
           <button
             onClick={copyToClipboard}
