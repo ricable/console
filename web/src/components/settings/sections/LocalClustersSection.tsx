@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { Container, RefreshCw, Plus, Trash2, Check, AlertCircle, Loader2 } from 'lucide-react'
+import { Container, RefreshCw, Plus, Trash2, Check, AlertCircle, Loader2, Circle } from 'lucide-react'
 import { useLocalClusterTools } from '../../../hooks/useLocalClusterTools'
+import { useDemoMode } from '../../../hooks/useDemoMode'
 
 export function LocalClustersSection() {
+  const { isDemoMode } = useDemoMode()
   const {
     installedTools,
     clusters,
@@ -41,6 +43,36 @@ export function LocalClustersSection() {
     await deleteCluster(tool, name)
   }
 
+  // Get color and icon for cluster status
+  const getStatusDisplay = (status: string) => {
+    switch (status) {
+      case 'running':
+        return {
+          color: 'text-green-400',
+          bgColor: 'bg-green-500/10',
+          borderColor: 'border-green-500/20',
+          icon: <Circle className="w-2 h-2 fill-current" />,
+          label: 'Running'
+        }
+      case 'stopped':
+        return {
+          color: 'text-yellow-400',
+          bgColor: 'bg-yellow-500/10',
+          borderColor: 'border-yellow-500/20',
+          icon: <Circle className="w-2 h-2 fill-current" />,
+          label: 'Stopped'
+        }
+      default:
+        return {
+          color: 'text-muted-foreground',
+          bgColor: 'bg-secondary/30',
+          borderColor: 'border-border',
+          icon: <Circle className="w-2 h-2 fill-current" />,
+          label: 'Unknown'
+        }
+    }
+  }
+
   // Get icon for tool
   const getToolIcon = (tool: string) => {
     switch (tool) {
@@ -69,19 +101,29 @@ export function LocalClustersSection() {
     }
   }
 
+  // Show demo mode badge when in demo mode
+  const showDemoModeBadge = isDemoMode && (isConnected || installedTools.length > 0)
+
   return (
     <div id="local-clusters-settings" className="glass rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <div className={`p-2 rounded-lg ${isConnected && installedTools.length > 0 ? 'bg-purple-500/20' : 'bg-secondary'}`}>
-            <Container className={`w-5 h-5 ${isConnected && installedTools.length > 0 ? 'text-purple-400' : 'text-muted-foreground'}`} />
+          <div className={`p-2 rounded-lg ${(isConnected || isDemoMode) && installedTools.length > 0 ? 'bg-purple-500/20' : 'bg-secondary'}`}>
+            <Container className={`w-5 h-5 ${(isConnected || isDemoMode) && installedTools.length > 0 ? 'text-purple-400' : 'text-muted-foreground'}`} />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-foreground">Local Clusters</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium text-foreground">Local Clusters</h2>
+              {showDemoModeBadge && (
+                <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                  Demo
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">Create and manage local Kubernetes clusters</p>
           </div>
         </div>
-        {isConnected && (
+        {(isConnected || isDemoMode) && (
           <button
             onClick={refresh}
             disabled={isLoading}
@@ -93,8 +135,8 @@ export function LocalClustersSection() {
         )}
       </div>
 
-      {/* Not Connected State */}
-      {!isConnected && (
+      {/* Not Connected and Not Demo Mode State */}
+      {!isConnected && !isDemoMode && (
         <div className="p-4 rounded-lg bg-secondary/50 border border-border">
           <div className="flex items-center gap-2 text-muted-foreground">
             <AlertCircle className="w-5 h-5" />
@@ -106,8 +148,8 @@ export function LocalClustersSection() {
         </div>
       )}
 
-      {/* Connected - No Tools Found */}
-      {isConnected && installedTools.length === 0 && (
+      {/* Connected or Demo Mode - No Tools Found */}
+      {(isConnected || isDemoMode) && installedTools.length === 0 && (
         <div className="p-4 rounded-lg bg-orange-500/10 border border-orange-500/20">
           <div className="flex items-center gap-2 text-orange-400">
             <AlertCircle className="w-5 h-5" />
@@ -124,8 +166,8 @@ export function LocalClustersSection() {
         </div>
       )}
 
-      {/* Connected - Tools Available */}
-      {isConnected && installedTools.length > 0 && (
+      {/* Connected or Demo Mode - Tools Available */}
+      {(isConnected || isDemoMode) && installedTools.length > 0 && (
         <>
           {/* Detected Tools */}
           <div className="mb-6">
@@ -219,34 +261,42 @@ export function LocalClustersSection() {
               </p>
             ) : (
               <div className="space-y-2">
-                {clusters.map((cluster) => (
-                  <div
-                    key={`${cluster.tool}-${cluster.name}`}
-                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg">{getToolIcon(cluster.tool)}</span>
-                      <div>
-                        <p className="font-medium text-foreground">{cluster.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {cluster.tool} • {cluster.status}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleDelete(cluster.tool, cluster.name)}
-                      disabled={isDeleting === cluster.name}
-                      className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                      title="Delete cluster"
+                {clusters.map((cluster) => {
+                  const statusDisplay = getStatusDisplay(cluster.status)
+                  return (
+                    <div
+                      key={`${cluster.tool}-${cluster.name}`}
+                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/30 border border-border"
                     >
-                      {isDeleting === cluster.name ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Trash2 className="w-4 h-4" />
-                      )}
-                    </button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg">{getToolIcon(cluster.tool)}</span>
+                        <div>
+                          <p className="font-medium text-foreground">{cluster.name}</p>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-muted-foreground">{cluster.tool}</span>
+                            <span className="text-muted-foreground">•</span>
+                            <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded ${statusDisplay.bgColor} ${statusDisplay.borderColor} ${statusDisplay.color} border`}>
+                              {statusDisplay.icon}
+                              {statusDisplay.label}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDelete(cluster.tool, cluster.name)}
+                        disabled={isDeleting === cluster.name}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
+                        title="Delete cluster"
+                      >
+                        {isDeleting === cluster.name ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>
