@@ -78,14 +78,12 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
     dismissRecommendation(rec.id) // Permanently hide tile after adding card
   }, [onAddCard, dismissRecommendation])
 
-  const handleSnooze = useCallback((e: React.MouseEvent, rec: CardRecommendation) => {
-    e.stopPropagation()
+  const handleSnooze = useCallback((rec: CardRecommendation) => {
     snoozeRecommendation(rec)
     setExpandedRec(null)
   }, [snoozeRecommendation])
 
-  const handleDismiss = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleDismiss = useCallback(() => {
     setExpandedRec(null)
   }, [])
 
@@ -98,7 +96,7 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
     if (!currentRec) return []
     return [
       { action: () => handleAddCard(currentRec), label: 'Add Card' },
-      { action: (e: React.MouseEvent) => handleSnooze(e, currentRec), label: 'Snooze' },
+      { action: () => handleSnooze(currentRec), label: 'Snooze' },
       { action: handleDismiss, label: 'Dismiss' },
     ]
   }, [expandedRec, recommendations, handleAddCard, handleSnooze, handleDismiss])
@@ -109,8 +107,7 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
     itemCount: dropdownItems.length,
     onSelect: (index) => {
       const item = dropdownItems[index]
-      const syntheticEvent = { stopPropagation: () => {}, preventDefault: () => {} } as React.MouseEvent
-      item.action(syntheticEvent)
+      item.action()
     },
     containerRef: dropdownRef,
   })
@@ -194,7 +191,7 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
                         {isAdding ? 'Adding...' : 'Add Card'}
                       </button>
                       <button
-                        onClick={(e) => handleSnooze(e, rec)}
+                        onClick={(e) => { e.stopPropagation(); handleSnooze(rec) }}
                         role="menuitem"
                         tabIndex={0}
                         className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
@@ -203,7 +200,7 @@ export function CardRecommendations({ currentCardTypes, onAddCard }: Props) {
                         <Clock className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={handleDismiss}
+                        onClick={(e) => { e.stopPropagation(); handleDismiss() }}
                         role="menuitem"
                         tabIndex={0}
                         className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"

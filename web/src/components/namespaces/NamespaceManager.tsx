@@ -1322,8 +1322,7 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
               />
               {showDropdown && availableSubjects.length > 0 && (
                 <div ref={dropdownRef} className="absolute z-10 top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {availableSubjects
-                    .filter(name => !subjectName || name.toLowerCase().includes(subjectName.toLowerCase()))
+                  {filteredSubjects
                     .map(name => (
                       <button
                         key={name}

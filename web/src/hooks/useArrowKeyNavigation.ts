@@ -50,18 +50,20 @@ export function useArrowKeyNavigation({
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault()
-          currentIndexRef.current = Math.min(currentIndexRef.current + 1, itemCount - 1)
-          if (loop && currentIndexRef.current === itemCount - 1) {
-            currentIndexRef.current = 0
+          if (currentIndexRef.current === itemCount - 1) {
+            currentIndexRef.current = loop ? 0 : itemCount - 1
+          } else {
+            currentIndexRef.current = currentIndexRef.current + 1
           }
           handled = true
           break
 
         case 'ArrowUp':
           e.preventDefault()
-          currentIndexRef.current = Math.max(currentIndexRef.current - 1, 0)
-          if (loop && currentIndexRef.current === 0) {
-            currentIndexRef.current = itemCount - 1
+          if (currentIndexRef.current === 0) {
+            currentIndexRef.current = loop ? itemCount - 1 : 0
+          } else {
+            currentIndexRef.current = currentIndexRef.current - 1
           }
           handled = true
           break

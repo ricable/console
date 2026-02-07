@@ -94,10 +94,7 @@ export function MissionSuggestions() {
     }
   }, [expandedId])
 
-  const handleAction = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
-    e.stopPropagation()
-    e.preventDefault()
-
+  const handleAction = useCallback((suggestion: MissionSuggestion) => {
     // Close dropdown and dismiss the suggestion permanently
     setExpandedId(null)
     setProcessingId(null)
@@ -119,10 +116,7 @@ export function MissionSuggestions() {
     }, 0)
   }, [navigate, startMission, dismissMission])
 
-  const handleRepair = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
-    e.stopPropagation()
-    e.preventDefault()
-
+  const handleRepair = useCallback((suggestion: MissionSuggestion) => {
     // Close dropdown and dismiss the suggestion permanently
     setExpandedId(null)
     setProcessingId(null)
@@ -140,24 +134,23 @@ export function MissionSuggestions() {
     }, 0)
   }, [startMission, dismissMission])
 
-  const handleSnooze = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
-    e.stopPropagation()
+  const handleSnooze = useCallback((suggestion: MissionSuggestion) => {
     snoozeMission(suggestion)
     setExpandedId(null)
   }, [snoozeMission])
 
-  const handleDismiss = useCallback((e: React.MouseEvent, suggestion: MissionSuggestion) => {
-    e.stopPropagation()
+  const handleDismiss = useCallback((suggestion: MissionSuggestion) => {
     dismissMission(suggestion.id)
     setExpandedId(null)
   }, [dismissMission])
 
   // Menu items for keyboard navigation
+  // Menu items for keyboard navigation
   const dropdownItems = useMemo(() => [
-    { action: handleAction, label: 'Diagnose' },
-    { action: handleRepair, label: 'Repair' },
-    { action: handleSnooze, label: 'Snooze' },
-    { action: handleDismiss, label: 'Dismiss' },
+    { action: (suggestion: MissionSuggestion) => handleAction(suggestion), label: 'Diagnose' },
+    { action: (suggestion: MissionSuggestion) => handleRepair(suggestion), label: 'Repair' },
+    { action: (suggestion: MissionSuggestion) => handleSnooze(suggestion), label: 'Snooze' },
+    { action: (suggestion: MissionSuggestion) => handleDismiss(suggestion), label: 'Dismiss' },
   ], [handleAction, handleRepair, handleSnooze, handleDismiss])
 
   // Arrow key navigation for dropdown
@@ -168,8 +161,7 @@ export function MissionSuggestions() {
       const suggestion = suggestions.find(s => s.id === expandedId)
       if (suggestion) {
         const item = dropdownItems[index]
-        const syntheticEvent = { stopPropagation: () => {}, preventDefault: () => {} } as React.MouseEvent
-        item.action(syntheticEvent, suggestion)
+        item.action(suggestion)
       }
     },
     containerRef: dropdownRef,
@@ -261,7 +253,7 @@ export function MissionSuggestions() {
                     {/* Action buttons */}
                     <div className="flex flex-wrap gap-1.5">
                       <button
-                        onClick={(e) => handleAction(e, suggestion)}
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleAction(suggestion) }}
                         disabled={isProcessing}
                         role="menuitem"
                         tabIndex={0}
@@ -277,7 +269,7 @@ export function MissionSuggestions() {
                         {suggestion.action.label}
                       </button>
                       <button
-                        onClick={(e) => handleRepair(e, suggestion)}
+                        onClick={(e) => { e.stopPropagation(); handleRepair(suggestion) }}
                         disabled={isProcessing}
                         role="menuitem"
                         tabIndex={0}
@@ -288,7 +280,7 @@ export function MissionSuggestions() {
                         Repair
                       </button>
                       <button
-                        onClick={(e) => handleSnooze(e, suggestion)}
+                        onClick={(e) => { e.stopPropagation(); handleSnooze(suggestion) }}
                         role="menuitem"
                         tabIndex={0}
                         className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
@@ -297,7 +289,7 @@ export function MissionSuggestions() {
                         <Clock className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={(e) => handleDismiss(e, suggestion)}
+                        onClick={(e) => { e.stopPropagation(); handleDismiss(suggestion) }}
                         role="menuitem"
                         tabIndex={0}
                         className="px-2 py-1.5 rounded text-xs font-medium bg-secondary/50 hover:bg-secondary transition-colors focus:outline-none focus:ring-2 focus:ring-primary"
