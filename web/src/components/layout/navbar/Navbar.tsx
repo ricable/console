@@ -144,6 +144,9 @@ export function Navbar() {
 
                   {/* Simplified mobile menu - only essential items */}
                   <div className="px-3 py-2">
+                    <ActiveUserCount />
+                  </div>
+                  <div className="px-3 py-2">
                     <AgentStatusIndicator />
                   </div>
                   <div className="px-3 py-2">
