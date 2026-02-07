@@ -2734,8 +2734,13 @@ jobs:
           fi
 
           # Find buttons that should have loading state
+          # Improved pattern to reduce false positives:
+          # - Look for actual button text/children with action words
+          # - Exclude UI toggles (expand/collapse patterns)
+          # - Exclude JavaScript method names (Set.delete, Map.set, etc.)
           BUTTONS_NO_LOADING=$(grep -rn "<button.*onClick" src/ --include="*.tsx" 2>/dev/null | \
-            grep -iE "submit|save|deploy|create|delete|update|send" | \
+            grep -iE ">.*\s*(Submit|Save|Create|Update|Send|Apply|Confirm)" | \
+            grep -v "toggleType\|toggleItem\|expand\|collapse\|\.delete\|\.set\|\.add" | \
             while read line; do
               FILE=$(echo "$line" | cut -d: -f1)
               LINE_NO=$(echo "$line" | cut -d: -f2)
