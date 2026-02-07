@@ -960,6 +960,26 @@ function CreateNamespaceModal({ clusters, onClose, onCreated }: CreateNamespaceM
     g => !initialAccess.some(a => a.type === 'Group' && a.name === g)
   )
 
+  // Arrow key navigation for user dropdown
+  useArrowKeyNavigation({
+    isOpen: showUserDropdown,
+    itemCount: availableUsers.length,
+    onSelect: (index) => {
+      addUserAccess(availableUsers[index])
+    },
+    containerRef: userDropdownRef,
+  })
+
+  // Arrow key navigation for group dropdown
+  useArrowKeyNavigation({
+    isOpen: showGroupDropdown,
+    itemCount: availableGroups.length,
+    onSelect: (index) => {
+      addGroupAccess(availableGroups[index])
+    },
+    containerRef: groupDropdownRef,
+  })
+
   return (
     <BaseModal isOpen={true} onClose={onClose} size="lg">
       <BaseModal.Header
