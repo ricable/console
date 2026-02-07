@@ -98,7 +98,7 @@ export interface CardLoadingStateOptions {
   consecutiveFailures?: number
   /** Error message from the last failed fetch (optional) */
   errorMessage?: string
-  /** Whether the card is displaying demo/mock data instead of real data (default: false) */
+  /** Whether the card is displaying demo/mock data. Set to false to opt-out of demo indicator. */
   isDemoData?: boolean
 }
 
@@ -135,7 +135,9 @@ export function useCardLoadingState(options: CardLoadingStateOptions) {
     isFailed = false,
     consecutiveFailures = 0,
     errorMessage,
-    isDemoData = false,
+    // Default to undefined (not false) so cards don't accidentally opt-out of demo indicator.
+    // Only cards that explicitly set isDemoData: false will opt-out.
+    isDemoData,
   } = options
 
   // hasData is true once loading completes (even with empty data) OR if we have cached data
