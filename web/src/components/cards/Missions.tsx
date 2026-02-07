@@ -348,19 +348,22 @@ export function Missions(_props: MissionsProps) {
 // Mission Row
 // ============================================================================
 
+// Type for startMission function signature
+type StartMissionFn = (params: {
+  title: string
+  description: string
+  type: 'upgrade' | 'troubleshoot' | 'analyze' | 'deploy' | 'repair' | 'custom'
+  cluster?: string
+  initialPrompt: string
+  context?: Record<string, unknown>
+}) => string
+
 interface MissionRowProps {
   mission: DeployMission
   isExpanded: boolean
   onToggle: () => void
   isActive: boolean
-  startMission: (params: {
-    title: string
-    description: string
-    type: 'upgrade' | 'troubleshoot' | 'analyze' | 'deploy' | 'repair' | 'custom'
-    cluster?: string
-    initialPrompt: string
-    context?: Record<string, unknown>
-  }) => string
+  startMission: StartMissionFn
 }
 
 function MissionRow({ mission, isExpanded, onToggle, isActive, startMission }: MissionRowProps) {
@@ -383,6 +386,12 @@ function MissionRow({ mission, isExpanded, onToggle, isActive, startMission }: M
   const failedClusters = mission.clusterStatuses.filter(s => s.status === 'failed').length
   const progressPct = totalClusters > 0 ? ((readyClusters + failedClusters) / totalClusters) * 100 : 0
 
+  // Extract failed cluster names for AI actions
+  const failedClusterNames = useMemo(
+    () => mission.clusterStatuses.filter(cs => cs.status === 'failed').map(cs => cs.cluster),
+    [mission.clusterStatuses]
+  )
+
   // Handlers for AI actions
   const handleDiagnose = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -394,11 +403,11 @@ function MissionRow({ mission, isExpanded, onToggle, isActive, startMission }: M
       context: {
         workload: mission.workload,
         namespace: mission.namespace,
-        clusters: mission.clusterStatuses.filter(cs => cs.status === 'failed').map(cs => cs.cluster),
+        clusters: failedClusterNames,
         status: mission.status,
       },
     })
-  }, [mission, startMission])
+  }, [mission, startMission, failedClusterNames])
 
   const handleRepair = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
@@ -410,11 +419,11 @@ function MissionRow({ mission, isExpanded, onToggle, isActive, startMission }: M
       context: {
         workload: mission.workload,
         namespace: mission.namespace,
-        clusters: mission.clusterStatuses.filter(cs => cs.status === 'failed').map(cs => cs.cluster),
+        clusters: failedClusterNames,
         status: mission.status,
       },
     })
-  }, [mission, startMission])
+  }, [mission, startMission, failedClusterNames])
 
   return (
     <div className={cn(
