@@ -5,6 +5,10 @@
  * This prevents using stale cached data that may be outdated.
  */
 
+// Maximum age for cleanup (7 days in milliseconds)
+const CLEANUP_MAX_AGE_DAYS = 7
+const CLEANUP_MAX_AGE_MS = CLEANUP_MAX_AGE_DAYS * 24 * 60 * 60 * 1000
+
 export interface StorageWithTTL<T> {
   data: T
   timestamp: number
@@ -64,19 +68,21 @@ export function setWithTTL<T>(key: string, data: T): void {
           timestamp: Date.now(),
         }
         localStorage.setItem(key, JSON.stringify(item))
-      } catch {
-        console.error('[Storage] Failed to save even after cleanup')
+      } catch (retryError) {
+        console.error('[Storage] Failed to save even after cleanup:', retryError)
       }
+    } else {
+      // Log other storage errors (e.g., SecurityError when cookies disabled)
+      console.error('[Storage] Failed to save to localStorage:', e)
     }
   }
 }
 
 /**
  * Clean up old items from localStorage
- * Removes items older than 7 days
+ * Removes items older than CLEANUP_MAX_AGE_DAYS
  */
 function cleanupOldItems(): void {
-  const maxAge = 7 * 24 * 60 * 60 * 1000 // 7 days
   const now = Date.now()
   
   const keysToRemove: string[] = []
@@ -92,7 +98,7 @@ function cleanupOldItems(): void {
       const parsed = JSON.parse(item)
       if (typeof parsed === 'object' && parsed !== null && 'timestamp' in parsed) {
         const age = now - parsed.timestamp
-        if (age > maxAge) {
+        if (age > CLEANUP_MAX_AGE_MS) {
           keysToRemove.push(key)
         }
       }
