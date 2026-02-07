@@ -16,6 +16,7 @@ import { TokenUsageWidget } from './TokenUsageWidget'
 import { ClusterFilterPanel } from './ClusterFilterPanel'
 import { AgentStatusIndicator } from './AgentStatusIndicator'
 import { UpdateIndicator } from './UpdateIndicator'
+import { ActiveUserCount } from './ActiveUserCount'
 import { ROUTES } from '../../../config/routes'
 
 export function Navbar() {
@@ -69,6 +70,9 @@ export function Navbar() {
       <div className="flex items-center gap-1 md:gap-3">
         {/* Desktop-only items */}
         <div className="hidden md:flex items-center gap-3">
+          {/* Active User Count */}
+          <ActiveUserCount />
+
           {/* Global Filters (includes Clear Filters button) */}
           <ClusterFilterPanel />
 
