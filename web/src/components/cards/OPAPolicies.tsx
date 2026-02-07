@@ -492,7 +492,7 @@ function ClusterOPAModal({
   const [isYamlEditorOpen, setIsYamlEditorOpen] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState<Policy | null>(null)
   const [yamlContent, setYamlContent] = useState('')
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<Policy | null>(null)
+  const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null)
   const createMenuRef = useRef<HTMLDivElement>(null)
 
   // Close create menu when clicking outside
@@ -662,7 +662,7 @@ Please proceed with applying this policy.`,
         ['delete', policy.kind.toLowerCase(), policy.name],
         { context: clusterName, timeout: 15000 }
       )
-      setIsDeleteConfirmOpen(null)
+      setPolicyToDelete(null)
       onRefresh()
     } catch (err) {
       console.error('Failed to delete policy:', err)
@@ -670,7 +670,7 @@ Please proceed with applying this policy.`,
   }
 
   // Disable parent modal's Escape handler when a child modal is open
-  const hasChildModalOpen = isTemplateModalOpen || isYamlEditorOpen || !!isDeleteConfirmOpen
+  const hasChildModalOpen = isTemplateModalOpen || isYamlEditorOpen || !!policyToDelete
 
   return (
     <>
@@ -816,7 +816,7 @@ Please proceed with applying this policy.`,
                           <Edit3 className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setIsDeleteConfirmOpen(policy) }}
+                          onClick={(e) => { e.stopPropagation(); setPolicyToDelete(policy) }}
                           className="p-1.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
                           title="Delete policy"
                         >
@@ -987,27 +987,27 @@ Please proceed with applying this policy.`,
       </BaseModal>
 
       {/* Delete Confirmation Modal */}
-      <BaseModal isOpen={!!isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(null)} size="sm">
+      <BaseModal isOpen={!!policyToDelete} onClose={() => setPolicyToDelete(null)} size="sm">
         <BaseModal.Header
           title="Delete Policy"
           description="This action cannot be undone"
           icon={Trash2}
-          onClose={() => setIsDeleteConfirmOpen(null)}
+          onClose={() => setPolicyToDelete(null)}
           showBack={false}
         />
         <BaseModal.Content>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete the policy <span className="text-foreground font-medium">{isDeleteConfirmOpen?.name}</span>?
+              Are you sure you want to delete the policy <span className="text-foreground font-medium">{policyToDelete?.name}</span>?
             </p>
-            {isDeleteConfirmOpen && isDeleteConfirmOpen.violations > 0 && (
+            {policyToDelete && policyToDelete.violations > 0 && (
               <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
                 <div className="flex items-center gap-2 text-amber-400 mb-1">
                   <AlertTriangle className="w-4 h-4" />
                   <span className="font-medium">Warning</span>
                 </div>
                 <p className="text-muted-foreground">
-                  This policy has {isDeleteConfirmOpen.violations} active violations that will be cleared.
+                  This policy has {policyToDelete.violations} active violations that will be cleared.
                 </p>
               </div>
             )}
@@ -1015,14 +1015,14 @@ Please proceed with applying this policy.`,
         </BaseModal.Content>
         <BaseModal.Footer>
           <button
-            onClick={() => setIsDeleteConfirmOpen(null)}
+            onClick={() => setPolicyToDelete(null)}
             className="px-4 py-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>
           <div className="flex-1" />
           <button
-            onClick={() => isDeleteConfirmOpen && handleDelete(isDeleteConfirmOpen)}
+            onClick={() => policyToDelete && handleDelete(policyToDelete)}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
