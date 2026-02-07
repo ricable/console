@@ -6,7 +6,28 @@ import { useGlobalFilters } from '../../hooks/useGlobalFilters'
 import { useDrillDownActions } from '../../hooks/useDrillDown'
 import { Skeleton } from '../ui/Skeleton'
 import { ClusterBadge } from '../ui/ClusterBadge'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
+
+// Demo data for offline/demo mode
+function getDemoNamespaceData() {
+  return {
+    clusters: [
+      { name: 'eks-prod-us-east-1', namespaces: ['production', 'staging', 'monitoring', 'ingress'] },
+      { name: 'vllm-gpu-cluster', namespaces: ['ml-workloads', 'batch', 'data'] },
+      { name: 'gke-staging', namespaces: ['default', 'kube-system', 'staging', 'testing'] },
+      { name: 'openshift-prod', namespaces: ['production', 'legacy', 'monitoring'] },
+    ],
+    podIssues: [
+      { name: 'api-server-7d8f9c6b5-x2k4m', namespace: 'production', cluster: 'eks-prod-us-east-1', status: 'CrashLoopBackOff', restarts: 5 },
+      { name: 'worker-deployment-8f9d6c7b5-p3k2n', namespace: 'batch', cluster: 'vllm-gpu-cluster', status: 'OOMKilled', restarts: 3 },
+      { name: 'redis-cache-6c7b5d8f9-m4n1k', namespace: 'data', cluster: 'vllm-gpu-cluster', status: 'ImagePullBackOff', restarts: 0 },
+    ],
+    deploymentIssues: [
+      { name: 'frontend-app', namespace: 'production', cluster: 'eks-prod-us-east-1', replicas: 5, readyReplicas: 3 },
+      { name: 'data-processor', namespace: 'batch', cluster: 'vllm-gpu-cluster', replicas: 3, readyReplicas: 1 },
+    ],
+  }
+}
 
 interface NamespaceOverviewProps {
   config?: {
@@ -16,6 +37,8 @@ interface NamespaceOverviewProps {
 }
 
 export function NamespaceOverview({ config }: NamespaceOverviewProps) {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { deduplicatedClusters: allClusters, isLoading: clustersLoading } = useClusters()
   const [selectedCluster, setSelectedCluster] = useState<string>(config?.cluster || '')
   const [selectedNamespace, setSelectedNamespace] = useState<string>(config?.namespace || '')
@@ -28,6 +51,10 @@ export function NamespaceOverview({ config }: NamespaceOverviewProps) {
 
   // Apply global filters
   const clusters = useMemo(() => {
+    if (shouldUseDemoData) {
+      return getDemoNamespaceData().clusters.map(c => ({ name: c.name, context: c.name })) as typeof allClusters
+    }
+    
     let result = allClusters
 
     if (!isAllClustersSelected) {
@@ -43,31 +70,53 @@ export function NamespaceOverview({ config }: NamespaceOverviewProps) {
     }
 
     return result
-  }, [allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
+  }, [shouldUseDemoData, allClusters, globalSelectedClusters, isAllClustersSelected, customFilter])
 
   const { issues: allPodIssues } = useCachedPodIssues(selectedCluster)
   const { issues: allDeploymentIssues } = useCachedDeploymentIssues(selectedCluster)
 
   // Fetch namespaces for the selected cluster
-  const { namespaces } = useNamespaces(selectedCluster || undefined)
+  const { namespaces: liveNamespaces } = useNamespaces(selectedCluster || undefined)
+  
+  const namespaces = useMemo(() => {
+    if (shouldUseDemoData && selectedCluster) {
+      const demoCluster = getDemoNamespaceData().clusters.find(c => c.name === selectedCluster)
+      return demoCluster?.namespaces || []
+    }
+    return liveNamespaces
+  }, [shouldUseDemoData, selectedCluster, liveNamespaces])
 
   // Filter by namespace
   const podIssues = useMemo(() => {
+    if (shouldUseDemoData) {
+      const demoIssues = getDemoNamespaceData().podIssues
+        .filter(p => p.cluster === selectedCluster)
+        .filter(p => !selectedNamespace || p.namespace === selectedNamespace)
+      return demoIssues as typeof allPodIssues
+    }
+    
     if (!selectedNamespace) return allPodIssues
     return allPodIssues.filter(p => p.namespace === selectedNamespace)
-  }, [allPodIssues, selectedNamespace])
+  }, [shouldUseDemoData, selectedCluster, selectedNamespace, allPodIssues])
 
   const deploymentIssues = useMemo(() => {
+    if (shouldUseDemoData) {
+      const demoIssues = getDemoNamespaceData().deploymentIssues
+        .filter(d => d.cluster === selectedCluster)
+        .filter(d => !selectedNamespace || d.namespace === selectedNamespace)
+      return demoIssues as typeof allDeploymentIssues
+    }
+    
     if (!selectedNamespace) return allDeploymentIssues
     return allDeploymentIssues.filter(d => d.namespace === selectedNamespace)
-  }, [allDeploymentIssues, selectedNamespace])
+  }, [shouldUseDemoData, selectedCluster, selectedNamespace, allDeploymentIssues])
 
   const cluster = clusters.find(c => c.name === selectedCluster)
 
   // Report state to CardWrapper for refresh animation
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: clustersLoading,
-    hasAnyData: allClusters.length > 0,
+    isLoading: shouldUseDemoData ? false : clustersLoading,
+    hasAnyData: shouldUseDemoData ? true : allClusters.length > 0,
   })
 
   if (showSkeleton) {

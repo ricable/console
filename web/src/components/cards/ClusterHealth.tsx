@@ -9,7 +9,64 @@ import { CardSearchInput, CardControlsRow, CardPaginationFooter, CardAIActions }
 import { ClusterDetailModal } from '../clusters/ClusterDetailModal'
 import { CloudProviderIcon, detectCloudProvider, getProviderLabel, CloudProvider } from '../ui/CloudProviderIcon'
 import { isClusterUnreachable, isClusterTokenExpired } from '../clusters/utils'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
+
+// Demo data for offline/demo mode
+function getDemoClusters(): ClusterInfo[] {
+  return [
+    {
+      name: 'eks-prod-us-east-1',
+      context: 'eks-prod',
+      server: 'https://A1B2C3.gr7.us-east-1.eks.amazonaws.com',
+      healthy: true,
+      nodeCount: 12,
+      podCount: 156,
+      cpuCores: 48,
+      memoryGB: 192,
+    },
+    {
+      name: 'vllm-gpu-cluster',
+      context: 'vllm-gpu',
+      server: 'https://10.0.0.5:6443',
+      healthy: true,
+      nodeCount: 8,
+      podCount: 64,
+      cpuCores: 32,
+      memoryGB: 256,
+    },
+    {
+      name: 'gke-staging',
+      context: 'gke-staging',
+      server: 'https://35.123.45.67',
+      healthy: false,
+      nodeCount: 6,
+      podCount: 48,
+      cpuCores: 24,
+      memoryGB: 96,
+    },
+    {
+      name: 'openshift-prod',
+      context: 'openshift-prod',
+      server: 'https://api.openshift.example.com:6443',
+      healthy: true,
+      nodeCount: 16,
+      podCount: 224,
+      cpuCores: 64,
+      memoryGB: 384,
+    },
+    {
+      name: 'aks-dev',
+      context: 'aks-dev',
+      server: 'https://aks-dev-dns-123abc.hcp.eastus.azmk8s.io:443',
+      reachable: false,
+      healthy: false,
+      nodeCount: 0,
+      podCount: 0,
+      cpuCores: 0,
+      memoryGB: 0,
+    },
+  ]
+}
 
 // Console URL generation for cloud providers
 function getConsoleUrl(provider: CloudProvider, clusterName: string, apiServerUrl?: string): string | null {
@@ -34,7 +91,7 @@ function getConsoleUrl(provider: CloudProvider, clusterName: string, apiServerUr
     case 'aks':
       return 'https://portal.azure.com/#view/HubsExtension/BrowseResource/resourceType/Microsoft.ContainerService%2FmanagedClusters'
     case 'openshift': {
-      const apiMatch = apiServerUrl?.match(/https?:\/\/api\.([^:\/]+)/)
+      const apiMatch = apiServerUrl?.match(/https?:\/\/api\.([^:/]+)/)
       if (apiMatch) {
         return `https://console-openshift-console.apps.${apiMatch[1]}`
       }
@@ -75,6 +132,8 @@ const CLUSTER_SORT_COMPARATORS = {
 
 
 export function ClusterHealth() {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const {
     deduplicatedClusters: rawClusters,
     isLoading: isLoadingHook,
@@ -85,6 +144,9 @@ export function ClusterHealth() {
   const { selectedClusters, isAllClustersSelected } = useGlobalFilters()
   const { isMobile } = useMobile()
   const [selectedCluster, setSelectedCluster] = useState<string | null>(null)
+
+  // Use demo data if needed
+  const liveClusters = useMemo(() => shouldUseDemoData ? getDemoClusters() : rawClusters, [shouldUseDemoData, rawClusters])
 
   // Use shared card data hook for filtering, sorting, and pagination
   const {
@@ -113,7 +175,7 @@ export function ClusterHealth() {
       sortDirection,
       setSortDirection,
     },
-  } = useCardData<ClusterInfo, SortByOption>(rawClusters, {
+  } = useCardData<ClusterInfo, SortByOption>(liveClusters, {
     filter: {
       searchFields: ['name', 'context', 'server'],
       clusterField: 'name',
@@ -130,13 +192,13 @@ export function ClusterHealth() {
   // Report state to CardWrapper for refresh animation
   // Show skeleton if loading OR if we haven't completed the initial fetch yet
   // This prevents the empty card flash while waiting for initial data
-  const hasCompletedInitialFetch = lastRefresh !== null
-  const hasData = rawClusters.length > 0
+  const hasCompletedInitialFetch = shouldUseDemoData || lastRefresh !== null
+  const hasData = liveClusters.length > 0
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading: isLoadingHook || !hasCompletedInitialFetch,
+    isLoading: shouldUseDemoData ? false : (isLoadingHook || !hasCompletedInitialFetch),
     hasAnyData: hasData,
-    isFailed: !!error && !hasData,
-    consecutiveFailures: error ? 1 : 0,
+    isFailed: shouldUseDemoData ? false : (!!error && !hasData),
+    consecutiveFailures: shouldUseDemoData ? 0 : (error ? 1 : 0),
   })
   const isLoading = showSkeleton
 
@@ -152,8 +214,8 @@ export function ClusterHealth() {
 
   // Stats based on globally filtered clusters (not affected by local search/cluster filter)
   const filteredForStats = isAllClustersSelected
-    ? rawClusters
-    : rawClusters.filter(c => selectedClusters.includes(c.name))
+    ? liveClusters
+    : liveClusters.filter(c => selectedClusters.includes(c.name))
 
   // Use shared utilities for consistent status determination across all cards
   // Match EXACTLY the logic from Clusters.tsx to ensure stats are in sync
@@ -234,8 +296,8 @@ export function ClusterHealth() {
       {/* Header with controls */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400" title={`${rawClusters.length} total clusters configured`}>
-            {rawClusters.length} clusters
+          <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400" title={`${liveClusters.length} total clusters configured`}>
+            {liveClusters.length} clusters
           </span>
         </div>
         <CardControlsRow
@@ -460,7 +522,7 @@ export function ClusterHealth() {
       {selectedCluster && (
         <ClusterDetailModal
           clusterName={selectedCluster}
-          clusterUser={rawClusters.find(c => c.name === selectedCluster)?.user}
+          clusterUser={liveClusters.find(c => c.name === selectedCluster)?.user}
           onClose={() => setSelectedCluster(null)}
         />
       )}

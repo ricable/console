@@ -8,7 +8,23 @@ import { CardControls, SortDirection } from '../ui/CardControls'
 import { Pagination, usePagination } from '../ui/Pagination'
 import { ClusterFilterDropdown } from '../ui/ClusterFilterDropdown'
 import { useChartFilters } from '../../lib/cards'
-import { useCardLoadingState } from './CardDataContext'
+import { useCardLoadingState, useCardDemoState } from './CardDataContext'
+
+// Demo data for offline/demo mode
+function getDemoResourceCapacity() {
+  return {
+    totals: {
+      cpuCores: 256,
+      cpuRequestsCores: 198,
+      memoryGB: 1024,
+      memoryRequestsGB: 768,
+      totalGPUs: 32,
+      allocatedGPUs: 24,
+      nodes: 48,
+      pods: 432,
+    },
+  }
+}
 
 interface ResourceCapacityProps {
   config?: Record<string, unknown>
@@ -34,6 +50,8 @@ const SORT_OPTIONS = [
 ]
 
 export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
+  const { shouldUseDemoData } = useCardDemoState({ requires: 'agent' })
+  
   const { deduplicatedClusters: allClusters, isLoading, isRefreshing } = useClusters()
   const { nodes: gpuNodes } = useGPUNodes()
   const { drillToResources } = useDrillDownActions()
@@ -48,8 +66,8 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
 
   // Report loading state to CardWrapper for skeleton/refresh behavior
   const { showSkeleton, showEmptyState } = useCardLoadingState({
-    isLoading,
-    hasAnyData: allClusters.length > 0,
+    isLoading: shouldUseDemoData ? false : isLoading,
+    hasAnyData: shouldUseDemoData ? true : allClusters.length > 0,
   })
 
   // Local cluster filter
@@ -89,8 +107,12 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
     return result
   }, [gpuNodes, globalSelectedClusters, isAllClustersSelected, localClusterFilter])
 
-  // Calculate real totals from cluster data
+  // Calculate real totals from cluster data or use demo data
   const totals = useMemo(() => {
+    if (shouldUseDemoData) {
+      return getDemoResourceCapacity().totals
+    }
+    
     const clusterTotals = clusters.reduce(
       (acc, c) => ({
         nodes: acc.nodes + (c.nodeCount || 0),
@@ -116,10 +138,7 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
     )
 
     return { ...clusterTotals, ...gpuTotals }
-  }, [clusters, filteredGPUNodes])
-
-  // Estimate pod capacity (110 pods per node is the default Kubernetes limit)
-  const podCapacity = totals.nodes * 110
+  }, [shouldUseDemoData, clusters, filteredGPUNodes])
 
   // Build resource items list
   const resourceItems = useMemo(() => {
@@ -178,17 +197,18 @@ export function ResourceCapacity({ config: _config }: ResourceCapacityProps) {
         case 'requested':
           compare = a.requested - b.requested
           break
-        case 'percent':
+        case 'percent': {
           const pctA = a.capacity > 0 ? (a.requested / a.capacity) * 100 : 0
           const pctB = b.capacity > 0 ? (b.requested / b.capacity) * 100 : 0
           compare = pctA - pctB
           break
+        }
       }
       return sortDirection === 'asc' ? compare : -compare
     })
 
     return sorted
-  }, [totals, podCapacity, sortBy, sortDirection])
+  }, [totals, sortBy, sortDirection])
 
   // Pagination
   const effectivePerPage = limit === 'unlimited' ? 100 : limit
