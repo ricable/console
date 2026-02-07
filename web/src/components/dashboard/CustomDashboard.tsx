@@ -43,6 +43,7 @@ import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
 import { useRefreshIndicator } from '../../hooks/useRefreshIndicator'
 import { DashboardHeader } from '../shared/DashboardHeader'
+import { useModals } from '../../hooks/useModal'
 
 interface Card {
   id: string
@@ -199,10 +200,7 @@ export function CustomDashboard() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   // Modal states
-  const [isAddCardOpen, setIsAddCardOpen] = useState(false)
-  const [isConfigureCardOpen, setIsConfigureCardOpen] = useState(false)
-  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const modals = useModals(['addCard', 'configure', 'templates', 'deleteConfirm'])
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
   // Drag state
@@ -313,7 +311,7 @@ export function CustomDashboard() {
       }
     }
 
-    setIsAddCardOpen(false)
+    modals.closeModal('addCard')
     showToast(`Added ${newCards.length} card${newCards.length > 1 ? 's' : ''}`, 'success')
   }, [id, showToast])
 
@@ -331,16 +329,16 @@ export function CustomDashboard() {
 
   const handleConfigureCard = useCallback((card: Card) => {
     setSelectedCard(card)
-    setIsConfigureCardOpen(true)
-  }, [])
+    modals.openModal('configure')
+  }, [modals])
 
   const handleCardConfigured = useCallback(async (cardId: string, config: Record<string, unknown>) => {
     setCards(prev => prev.map(c =>
       c.id === cardId ? { ...c, config } : c
     ))
-    setIsConfigureCardOpen(false)
+    modals.closeModal('configure')
     setSelectedCard(null)
-  }, [])
+  }, [modals])
 
   const handleWidthChange = useCallback((cardId: string, newWidth: number) => {
     setCards(prev => prev.map(c =>
@@ -358,7 +356,7 @@ export function CustomDashboard() {
     }))
 
     setCards(templateCards)
-    setIsTemplatesOpen(false)
+    modals.closeModal('templates')
 
     // Persist to backend
     if (id) {
@@ -372,7 +370,7 @@ export function CustomDashboard() {
     }
 
     showToast(`Applied template "${template.name}" with ${templateCards.length} cards`, 'success')
-  }, [id, showToast])
+  }, [id, showToast, modals])
 
   const handleAddRecommendedCard = useCallback((cardType: string, config?: Record<string, unknown>) => {
     handleAddCards([{ type: cardType, title: formatCardTitle(cardType), config: config || {} }])
@@ -464,7 +462,7 @@ export function CustomDashboard() {
         lastUpdated={lastUpdated}
         rightExtra={
           <button
-            onClick={() => setIsDeleteConfirmOpen(true)}
+            onClick={() => modals.openModal('deleteConfirm')}
             className="p-2 rounded-lg hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors"
             title="Delete dashboard"
           >
@@ -506,13 +504,13 @@ export function CustomDashboard() {
           </p>
           <div className="flex gap-3">
             <button
-              onClick={() => setIsAddCardOpen(true)}
+              onClick={() => modals.openModal('addCard')}
               className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-lg hover:bg-purple-500/30 transition-colors"
             >
               Add Cards
             </button>
             <button
-              onClick={() => setIsTemplatesOpen(true)}
+              onClick={() => modals.openModal('templates')}
               className="px-4 py-2 bg-secondary text-foreground rounded-lg hover:bg-secondary/80 transition-colors"
             >
               Start with Template
@@ -557,26 +555,26 @@ export function CustomDashboard() {
 
       {/* Floating action buttons */}
       <FloatingDashboardActions
-        onAddCard={() => setIsAddCardOpen(true)}
-        onOpenTemplates={() => setIsTemplatesOpen(true)}
+        onAddCard={() => modals.openModal('addCard')}
+        onOpenTemplates={() => modals.openModal('templates')}
         onResetToDefaults={handleReset}
         isCustomized={cards.length > 0}
       />
 
       {/* Add Card Modal */}
       <AddCardModal
-        isOpen={isAddCardOpen}
-        onClose={() => setIsAddCardOpen(false)}
+        isOpen={modals.isModalOpen('addCard')}
+        onClose={() => modals.closeModal('addCard')}
         onAddCards={handleAddCards}
         existingCardTypes={currentCardTypes}
       />
 
       {/* Configure Card Modal */}
       <ConfigureCardModal
-        isOpen={isConfigureCardOpen}
+        isOpen={modals.isModalOpen('configure')}
         card={selectedCard}
         onClose={() => {
-          setIsConfigureCardOpen(false)
+          modals.closeModal('configure')
           setSelectedCard(null)
         }}
         onSave={handleCardConfigured}
@@ -584,18 +582,18 @@ export function CustomDashboard() {
 
       {/* Templates Modal */}
       <TemplatesModal
-        isOpen={isTemplatesOpen}
-        onClose={() => setIsTemplatesOpen(false)}
+        isOpen={modals.isModalOpen('templates')}
+        onClose={() => modals.closeModal('templates')}
         onApplyTemplate={handleApplyTemplate}
       />
 
       {/* Delete Confirmation Modal */}
-      <BaseModal isOpen={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)} size="md">
+      <BaseModal isOpen={modals.isModalOpen('deleteConfirm')} onClose={() => modals.closeModal('deleteConfirm')} size="md">
         <BaseModal.Header
           title="Delete Dashboard"
           description={`Are you sure you want to delete "${sidebarItem?.name || dashboard?.name || 'this dashboard'}"?`}
           icon={Trash2}
-          onClose={() => setIsDeleteConfirmOpen(false)}
+          onClose={() => modals.closeModal('deleteConfirm')}
           showBack={false}
         />
         <BaseModal.Content>
@@ -611,14 +609,14 @@ export function CustomDashboard() {
         </BaseModal.Content>
         <BaseModal.Footer>
           <button
-            onClick={() => setIsDeleteConfirmOpen(false)}
+            onClick={() => modals.closeModal('deleteConfirm')}
             className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={() => {
-              setIsDeleteConfirmOpen(false)
+              modals.closeModal('deleteConfirm')
               handleDeleteDashboard()
             }}
             className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"

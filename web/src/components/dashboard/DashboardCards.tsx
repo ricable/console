@@ -9,6 +9,7 @@ import { DashboardTemplate } from './templates'
 import { DashboardCard } from '../../hooks/useDashboardCards'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { DashboardHealthIndicator } from './DashboardHealthIndicator'
+import { useModals } from '../../hooks/useModal'
 
 interface CardSuggestion {
   type: string
@@ -45,26 +46,24 @@ export function DashboardCards({
   defaultCollapsed = false,
 }: DashboardCardsProps) {
   const [showCards, setShowCards] = useState(!defaultCollapsed)
-  const [isAddCardOpen, setIsAddCardOpen] = useState(false)
-  const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
-  const [isConfigureOpen, setIsConfigureOpen] = useState(false)
+  const modals = useModals(['addCard', 'templates', 'configure'])
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
 
   const handleAddCards = (suggestions: CardSuggestion[]) => {
     suggestions.forEach(card => {
       onAddCard(card.type, card.config, card.title)
     })
-    setIsAddCardOpen(false)
+    modals.closeModal('addCard')
   }
 
   const handleConfigureCard = (cardId: string) => {
     setSelectedCardId(cardId)
-    setIsConfigureOpen(true)
+    modals.openModal('configure')
   }
 
   const handleSaveConfig = (cardId: string, config: Record<string, unknown>, _title?: string) => {
     onUpdateCardConfig(cardId, config)
-    setIsConfigureOpen(false)
+    modals.closeModal('configure')
     setSelectedCardId(null)
   }
 
@@ -76,7 +75,7 @@ export function DashboardCards({
       title: card.title,
     }))
     onReplaceCards(newCards)
-    setIsTemplatesOpen(false)
+    modals.closeModal('templates')
   }
 
   const selectedCard = cards.find(c => c.id === selectedCardId)
@@ -108,14 +107,14 @@ export function DashboardCards({
         {showCards && (
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsTemplatesOpen(true)}
+              onClick={() => modals.openModal('templates')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-colors"
             >
               <Layout className="w-3.5 h-3.5" />
               Templates
             </button>
             <button
-              onClick={() => setIsAddCardOpen(true)}
+              onClick={() => modals.openModal('addCard')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-colors"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -136,7 +135,7 @@ export function DashboardCards({
                 {emptyDescription}
               </p>
               <button
-                onClick={() => setIsAddCardOpen(true)}
+                onClick={() => modals.openModal('addCard')}
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded-lg transition-colors"
               >
                 <Plus className="w-4 h-4" />
@@ -172,21 +171,21 @@ export function DashboardCards({
 
       {/* Modals */}
       <AddCardModal
-        isOpen={isAddCardOpen}
-        onClose={() => setIsAddCardOpen(false)}
+        isOpen={modals.isModalOpen('addCard')}
+        onClose={() => modals.closeModal('addCard')}
         onAddCards={handleAddCards}
       />
 
       <TemplatesModal
-        isOpen={isTemplatesOpen}
-        onClose={() => setIsTemplatesOpen(false)}
+        isOpen={modals.isModalOpen('templates')}
+        onClose={() => modals.closeModal('templates')}
         onApplyTemplate={handleApplyTemplate}
       />
 
       <ConfigureCardModal
-        isOpen={isConfigureOpen}
+        isOpen={modals.isModalOpen('configure')}
         onClose={() => {
-          setIsConfigureOpen(false)
+          modals.closeModal('configure')
           setSelectedCardId(null)
         }}
         card={configureCard}

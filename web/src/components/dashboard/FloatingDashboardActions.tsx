@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect } from 'react'
 import { Plus, Layout, RotateCcw } from 'lucide-react'
 import { useMissions } from '../../hooks/useMissions'
 import { useMobile } from '../../hooks/useMobile'
+import { useModal } from '../../hooks/useModal'
 import { ResetMode } from '../../hooks/useDashboardReset'
 import { ResetDialog } from './ResetDialog'
 
@@ -29,21 +30,21 @@ export function FloatingDashboardActions({
 }: FloatingDashboardActionsProps) {
   const { isSidebarOpen, isSidebarMinimized } = useMissions()
   const { isMobile } = useMobile()
-  const [isOpen, setIsOpen] = useState(false)
-  const [showResetDialog, setShowResetDialog] = useState(false)
+  const menu = useModal()
+  const resetDialog = useModal()
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close menu when clicking outside
   useEffect(() => {
-    if (!isOpen) return
+    if (!menu.isOpen) return
     const handleClickOutside = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setIsOpen(false)
+        menu.close()
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isOpen])
+  }, [menu])
 
   // Desktop: shift button left based on mission sidebar state
   // Mobile: always bottom left
@@ -57,7 +58,7 @@ export function FloatingDashboardActions({
   const positionClasses = getPositionClasses()
 
   const handleReset = (mode: ResetMode) => {
-    setShowResetDialog(false)
+    resetDialog.close()
     if (onReset) {
       onReset(mode)
     } else if (onResetToDefaults && mode === 'replace') {
@@ -71,11 +72,11 @@ export function FloatingDashboardActions({
     <>
       <div ref={menuRef} className={`fixed ${positionClasses} z-40 flex flex-col ${isMobile ? 'items-start' : 'items-end'} gap-1.5 transition-all duration-300`}>
         {/* Expanded menu items */}
-        {isOpen && (
+        {menu.isOpen && (
           <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
             {showResetOption && (
               <button
-                onClick={() => { setIsOpen(false); setShowResetDialog(true) }}
+                onClick={() => { menu.close(); resetDialog.open() }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
                 title="Reset dashboard cards"
               >
@@ -84,7 +85,7 @@ export function FloatingDashboardActions({
               </button>
             )}
             <button
-              onClick={() => { setIsOpen(false); onOpenTemplates() }}
+              onClick={() => { menu.close(); onOpenTemplates() }}
               data-tour="templates"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
               title="Browse dashboard templates"
@@ -93,7 +94,7 @@ export function FloatingDashboardActions({
               Templates
             </button>
             <button
-              onClick={() => { setIsOpen(false); onAddCard() }}
+              onClick={() => { menu.close(); onAddCard() }}
               data-tour="add-card"
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
               title="Add a new card"
@@ -106,23 +107,23 @@ export function FloatingDashboardActions({
 
         {/* FAB toggle - smaller on mobile */}
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onClick={menu.toggle}
           className={`flex items-center justify-center rounded-full shadow-lg transition-all duration-200 ${
             isMobile ? 'w-8 h-8' : 'w-10 h-10'
           } ${
-            isOpen
+            menu.isOpen
               ? 'bg-card border border-border rotate-45'
               : 'bg-gradient-ks hover:scale-110 hover:shadow-xl'
           }`}
-          title={isOpen ? 'Close menu' : 'Dashboard actions'}
+          title={menu.isOpen ? 'Close menu' : 'Dashboard actions'}
         >
           <Plus className={`${isMobile ? 'w-4 h-4' : 'w-5 h-5'} text-foreground`} />
         </button>
       </div>
 
       <ResetDialog
-        isOpen={showResetDialog}
-        onClose={() => setShowResetDialog(false)}
+        isOpen={resetDialog.isOpen}
+        onClose={resetDialog.close}
         onReset={handleReset}
       />
     </>
