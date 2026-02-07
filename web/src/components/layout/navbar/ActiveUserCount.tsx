@@ -47,7 +47,9 @@ export function ActiveUserCount() {
         {viewerCount}
       </span>
       <span className="text-xs text-muted-foreground hidden lg:inline">
-        {viewerCount === 1 ? 'viewer' : 'viewers'}
+        {isDemoMode
+          ? (viewerCount === 1 ? 'viewer' : 'viewers')
+          : (viewerCount === 1 ? 'user' : 'users')}
       </span>
     </div>
   )
