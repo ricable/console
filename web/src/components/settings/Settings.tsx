@@ -151,9 +151,9 @@ export function Settings() {
           </div>
           {SETTINGS_NAV.map((group) => (
             <div key={group.group}>
-              <h3 className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 px-2">
+              <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-1 px-2">
                 {group.group}
-              </h3>
+              </div>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const Icon = item.icon

@@ -255,7 +255,7 @@ export function GPUReservations() {
             </span>
           )}
         </div>
-        <p className="text-muted-foreground">Schedule and manage GPU resources across your clusters</p>
+        <div className="text-muted-foreground">Schedule and manage GPU resources across your clusters</div>
       </div>
 
       {/* Tabs */}
@@ -741,7 +741,7 @@ export function GPUReservations() {
               {reservations.filter(r => r.status === 'pending').length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
                   <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-green-400 opacity-50" />
-                  <p>{t('gpu.noPendingRequests')}</p>
+                  <div>{t('gpu.noPendingRequests')}</div>
                 </div>
               )}
             </div>

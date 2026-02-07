@@ -303,8 +303,8 @@ export function GitOps() {
       {filteredApps.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🔄</div>
-          <p className="text-lg text-foreground">No GitOps applications found</p>
-          <p className="text-sm text-muted-foreground">Configure ArgoCD or Flux to see sync status</p>
+          <div className="text-lg text-foreground">No GitOps applications found</div>
+          <div className="text-sm text-muted-foreground">Configure ArgoCD or Flux to see sync status</div>
         </div>
       ) : (
         <div className="space-y-4 mb-6 border-2 border-yellow-500/30 rounded-lg p-4">
@@ -413,10 +413,10 @@ export function GitOps() {
         {/* Info */}
         <div className="mt-8 p-4 rounded-lg bg-card/30 border border-border">
           <h3 className="text-lg font-semibold text-foreground mb-3">GitOps Integration</h3>
-          <p className="text-sm text-muted-foreground mb-3">
+          <div className="text-sm text-muted-foreground mb-3">
             GitOps integration detects drift between your Git repository and live cluster state
             using kubectl diff. Connect ArgoCD or Flux for enhanced sync capabilities.
-          </p>
+          </div>
           <div className="flex gap-2">
             <button className="px-4 py-2 rounded-lg bg-card/50 border border-border text-sm text-foreground hover:bg-card transition-colors">
               Configure ArgoCD

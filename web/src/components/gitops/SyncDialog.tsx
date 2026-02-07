@@ -343,7 +343,7 @@ export function SyncDialog({
           {isInitializing && phase === 'detection' && syncLogs.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 space-y-3">
               <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
-              <p className="text-sm text-muted-foreground">Initializing drift detection...</p>
+              <div className="text-sm text-muted-foreground">Initializing drift detection...</div>
             </div>
           )}
 
