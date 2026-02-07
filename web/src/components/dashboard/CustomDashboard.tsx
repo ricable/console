@@ -37,7 +37,7 @@ import { MissionSuggestions } from './MissionSuggestions'
 import { TemplatesModal } from './TemplatesModal'
 import { FloatingDashboardActions } from './FloatingDashboardActions'
 import { DashboardTemplate } from './templates'
-import { BaseModal } from '../../lib/modals'
+import { BaseModal, ConfirmDialog } from '../../lib/modals'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
@@ -203,6 +203,8 @@ export function CustomDashboard() {
   const [isConfigureCardOpen, setIsConfigureCardOpen] = useState(false)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isDeleteCardConfirmOpen, setIsDeleteCardConfirmOpen] = useState(false)
+  const [cardToDelete, setCardToDelete] = useState<{ id: string; title: string } | null>(null)
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
   // Drag state
@@ -318,16 +320,30 @@ export function CustomDashboard() {
   }, [id, showToast])
 
   const handleRemoveCard = useCallback(async (cardId: string) => {
-    setCards(prev => prev.filter(c => c.id !== cardId))
+    const card = cards.find(c => c.id === cardId)
+    if (card) {
+      setCardToDelete({ id: cardId, title: formatCardTitle(card.card_type) })
+      setIsDeleteCardConfirmOpen(true)
+    }
+  }, [cards])
+
+  const confirmRemoveCard = useCallback(async () => {
+    if (!cardToDelete) return
+
+    setCards(prev => prev.filter(c => c.id !== cardToDelete.id))
 
     if (id) {
       try {
-        await api.delete(`/api/dashboards/${id}/cards/${cardId}`)
+        await api.delete(`/api/dashboards/${id}/cards/${cardToDelete.id}`)
       } catch (error) {
         console.error('Failed to delete card:', error)
       }
     }
-  }, [id])
+
+    showToast(`Removed "${cardToDelete.title}"`, 'success')
+    setIsDeleteCardConfirmOpen(false)
+    setCardToDelete(null)
+  }, [cardToDelete, id, showToast])
 
   const handleConfigureCard = useCallback((card: Card) => {
     setSelectedCard(card)
@@ -628,6 +644,20 @@ export function CustomDashboard() {
           </button>
         </BaseModal.Footer>
       </BaseModal>
+
+      {/* Card Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteCardConfirmOpen}
+        onClose={() => {
+          setIsDeleteCardConfirmOpen(false)
+          setCardToDelete(null)
+        }}
+        onConfirm={confirmRemoveCard}
+        title="Remove Card"
+        message={`Are you sure you want to remove "${cardToDelete?.title || 'this card'}" from the dashboard?`}
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </div>
   )
 }

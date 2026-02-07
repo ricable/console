@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { Key, Check, AlertCircle, Loader2, Trash2, Eye, EyeOff, ExternalLink, Copy, Plug } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { AgentIcon } from './AgentIcon'
-import { BaseModal } from '../../lib/modals'
+import { BaseModal, ConfirmDialog } from '../../lib/modals'
 import { KC_AGENT, AI_PROVIDER_DOCS } from '../../config/externalApis'
+import { useToast } from '../ui/Toast'
 
 const INSTALL_COMMAND = KC_AGENT.installCommand
 
@@ -53,7 +54,10 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [keyToDelete, setKeyToDelete] = useState<{ provider: string; displayName: string } | null>(null)
   const timeoutRef = useRef<number>()
+  const { showToast } = useToast()
 
   const copyInstallCommand = async () => {
     await navigator.clipboard.writeText(INSTALL_COMMAND)
@@ -115,17 +119,29 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
       setNewKeyValue('')
       setShowKey(false)
       await fetchKeysStatus()
+      showToast('API key saved successfully', 'success')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save key')
+      showToast(err instanceof Error ? err.message : 'Failed to save key', 'error')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleDeleteKey = async (provider: string) => {
+  const handleDeleteKey = (provider: string) => {
+    const key = keysStatus.find(k => k.provider === provider)
+    if (key) {
+      setKeyToDelete({ provider, displayName: key.displayName })
+      setDeleteConfirmOpen(true)
+    }
+  }
+
+  const confirmDeleteKey = async () => {
+    if (!keyToDelete) return
+
     try {
       setSaving(true)
-      const response = await fetch(`${KC_AGENT_URL}/settings/keys/${provider}`, {
+      const response = await fetch(`${KC_AGENT_URL}/settings/keys/${keyToDelete.provider}`, {
         method: 'DELETE',
       })
 
@@ -135,8 +151,12 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
       }
 
       await fetchKeysStatus()
+      showToast(`Deleted ${keyToDelete.displayName} key`, 'success')
+      setDeleteConfirmOpen(false)
+      setKeyToDelete(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete key')
+      showToast(err instanceof Error ? err.message : 'Failed to delete key', 'error')
     } finally {
       setSaving(false)
     }
@@ -156,6 +176,7 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
   }
 
   return (
+    <>
     <BaseModal isOpen={isOpen} onClose={onClose} size="md">
       <BaseModal.Header
         title="API Key Settings"
@@ -364,5 +385,21 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
         </p>
       </BaseModal.Footer>
     </BaseModal>
+
+    {/* Delete Key Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteConfirmOpen}
+      onClose={() => {
+        setDeleteConfirmOpen(false)
+        setKeyToDelete(null)
+      }}
+      onConfirm={confirmDeleteKey}
+      title="Delete API Key"
+      message={`Are you sure you want to delete the ${keyToDelete?.displayName || 'API'} key? You will need to re-enter it to use AI features.`}
+      confirmLabel="Delete"
+      variant="danger"
+      isLoading={saving}
+    />
+    </>
   )
 }

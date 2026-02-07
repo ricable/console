@@ -4,7 +4,7 @@ import {
   X, Plus, Code, Layers, Wand2, Eye, Save, Sparkles,
   AlertTriangle, CheckCircle, Loader2, Trash2, LayoutTemplate,
 } from 'lucide-react'
-import { BaseModal } from '../../lib/modals'
+import { BaseModal, ConfirmDialog } from '../../lib/modals'
 import { cn } from '../../lib/cn'
 import { saveDynamicCard, deleteDynamicCard, getAllDynamicCards } from '../../lib/dynamic-cards'
 import { compileCardCode, createCardComponent } from '../../lib/dynamic-cards/compiler'
@@ -20,6 +20,7 @@ import { InlineAIAssist } from './InlineAIAssist'
 import { CARD_T1_SYSTEM_PROMPT, CARD_T2_SYSTEM_PROMPT, CARD_INLINE_ASSIST_PROMPT, CODE_INLINE_ASSIST_PROMPT } from '../../lib/ai/prompts'
 import { generateSampleData, detectFieldFormat } from '../../lib/ai/sampleData'
 import { useAIMode } from '../../hooks/useAIMode'
+import { useToast } from '../ui/Toast'
 
 interface CardFactoryModalProps {
   isOpen: boolean
@@ -452,6 +453,7 @@ function validateT2AssistResult(data: unknown): { valid: true; result: T2AssistR
 export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactoryModalProps) {
   const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('declarative')
+  const { showToast } = useToast()
 
   // Declarative (Tier 1) state
   const [t1Title, setT1Title] = useState('')
@@ -476,6 +478,10 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
   const [existingCards, setExistingCards] = useState<DynamicCardDefinition[]>([])
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [cardToDelete, setCardToDelete] = useState<{ id: string; title: string } | null>(null)
 
   // Track timeouts for cleanup
   const timeoutsRef = useRef<number[]>([])
@@ -605,9 +611,22 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
 
   // Delete a card
   const handleDelete = useCallback((id: string) => {
-    deleteDynamicCard(id)
-    setExistingCards(getAllDynamicCards())
-  }, [])
+    const cardToDelete = existingCards.find(c => c.id === id)
+    if (cardToDelete) {
+      setCardToDelete({ id, title: cardToDelete.title })
+      setDeleteConfirmOpen(true)
+    }
+  }, [existingCards])
+
+  const confirmDelete = useCallback(() => {
+    if (cardToDelete) {
+      deleteDynamicCard(cardToDelete.id)
+      setExistingCards(getAllDynamicCards())
+      showToast(`Deleted "${cardToDelete.title}"`, 'success')
+      setDeleteConfirmOpen(false)
+      setCardToDelete(null)
+    }
+  }, [cardToDelete, showToast])
 
   // Add column (Tier 1)
   const addColumn = useCallback(() => {
@@ -679,6 +698,7 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
   )
 
   return (
+    <>
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
@@ -1091,6 +1111,21 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
       </div>
       </BaseModal.Content>
     </BaseModal>
+
+    {/* Delete Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteConfirmOpen}
+      onClose={() => {
+        setDeleteConfirmOpen(false)
+        setCardToDelete(null)
+      }}
+      onConfirm={confirmDelete}
+      title="Delete Card"
+      message={`Are you sure you want to delete "${cardToDelete?.title || 'this card'}"? This action cannot be undone.`}
+      confirmLabel="Delete"
+      variant="danger"
+    />
+    </>
   )
 }
 

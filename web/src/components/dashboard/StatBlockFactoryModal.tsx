@@ -9,7 +9,7 @@ import {
 // which resolves icon names at runtime using Icons[name]
 import * as Icons from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
-import { BaseModal } from '../../lib/modals'
+import { BaseModal, ConfirmDialog } from '../../lib/modals'
 import { cn } from '../../lib/cn'
 import {
   saveDynamicStatsDefinition,
@@ -22,6 +22,7 @@ import { AiGenerationPanel } from './AiGenerationPanel'
 import { InlineAIAssist } from './InlineAIAssist'
 import { STAT_BLOCK_SYSTEM_PROMPT, STAT_INLINE_ASSIST_PROMPT } from '../../lib/ai/prompts'
 import { useAIMode } from '../../hooks/useAIMode'
+import { useToast } from '../ui/Toast'
 
 // Demo/preview constants
 const DEMO_STAT_VALUE = 42 // Placeholder value shown in stat block previews
@@ -232,6 +233,7 @@ function validateStatBlockResult(
 export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatBlockFactoryModalProps) {
   const [tab, setTab] = useState<Tab>('builder')
   const { isFeatureEnabled } = useAIMode()
+  const { showToast } = useToast()
 
   // Builder state
   const [title, setTitle] = useState('')
@@ -246,6 +248,10 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
   // Manage state
   const [existingStats, setExistingStats] = useState<StatsDefinition[]>([])
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+
+  // Delete confirmation state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [statToDelete, setStatToDelete] = useState<{ type: string; title: string } | null>(null)
 
   // Preview state
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
@@ -344,9 +350,22 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
   }, [statsType, blocks, title, gridCols, onStatsCreated])
 
   const handleDelete = useCallback((type: string) => {
-    deleteDynamicStatsDefinition(type)
-    setExistingStats(getAllDynamicStats())
-  }, [])
+    const statsToDelete = existingStats.find(s => s.type === type)
+    if (statsToDelete) {
+      setStatToDelete({ type, title: statsToDelete.title || type })
+      setDeleteConfirmOpen(true)
+    }
+  }, [existingStats])
+
+  const confirmDelete = useCallback(() => {
+    if (statToDelete) {
+      deleteDynamicStatsDefinition(statToDelete.type)
+      setExistingStats(getAllDynamicStats())
+      showToast(`Deleted "${statToDelete.title}"`, 'success')
+      setDeleteConfirmOpen(false)
+      setStatToDelete(null)
+    }
+  }, [statToDelete, showToast])
 
   // Handle inline AI assist result
   const handleAssistResult = useCallback((result: StatAssistResult) => {
@@ -381,6 +400,7 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
   ]
 
   return (
+    <>
     <BaseModal isOpen={isOpen} onClose={onClose} size="xl">
       <BaseModal.Header title="Stat Block Factory" icon={Activity} onClose={onClose} showBack={false} />
 
@@ -787,5 +807,20 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
         )}
       </BaseModal.Content>
     </BaseModal>
+
+    {/* Delete Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteConfirmOpen}
+      onClose={() => {
+        setDeleteConfirmOpen(false)
+        setStatToDelete(null)
+      }}
+      onConfirm={confirmDelete}
+      title="Delete Stat Block"
+      message={`Are you sure you want to delete "${statToDelete?.title || 'this stat block'}"? This action cannot be undone.`}
+      confirmLabel="Delete"
+      variant="danger"
+    />
+    </>
   )
 }
