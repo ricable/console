@@ -1,26 +1,26 @@
-import { useEffect, lazy, Suspense } from 'react'
+import React, { useEffect, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Box, Server, Layers, Rocket, FileText, Zap, Cpu, Lock, User, Bell, Ship, GitBranch, Settings, Shield, Package } from 'lucide-react'
 import { useDrillDown } from '../../hooks/useDrillDown'
 import { useMobile } from '../../hooks/useMobile'
 // Lazy load large components (>350 lines) for better performance
-const ClusterDrillDown = lazy(() => import('./views/ClusterDrillDown').then(m => ({ default: m.ClusterDrillDown })))
-const OperatorDrillDown = lazy(() => import('./views/OperatorDrillDown').then(m => ({ default: m.OperatorDrillDown })))
-const PolicyDrillDown = lazy(() => import('./views/PolicyDrillDown').then(m => ({ default: m.PolicyDrillDown })))
-const PodDrillDown = lazy(() => import('./views/PodDrillDown').then(m => ({ default: m.PodDrillDown })))
-const DeploymentDrillDown = lazy(() => import('./views/DeploymentDrillDown').then(m => ({ default: m.DeploymentDrillDown })))
-const MultiClusterSummaryDrillDown = lazy(() => import('./views/MultiClusterSummaryDrillDown').then(m => ({ default: m.MultiClusterSummaryDrillDown })))
-const ReplicaSetDrillDown = lazy(() => import('./views/ReplicaSetDrillDown').then(m => ({ default: m.ReplicaSetDrillDown })))
-const SecretDrillDown = lazy(() => import('./views/SecretDrillDown').then(m => ({ default: m.SecretDrillDown })))
-const KustomizationDrillDown = lazy(() => import('./views/KustomizationDrillDown').then(m => ({ default: m.KustomizationDrillDown })))
-const AlertDrillDown = lazy(() => import('./views/AlertDrillDown').then(m => ({ default: m.AlertDrillDown })))
-const DriftDrillDown = lazy(() => import('./views/DriftDrillDown').then(m => ({ default: m.DriftDrillDown })))
-const CRDDrillDown = lazy(() => import('./views/CRDDrillDown').then(m => ({ default: m.CRDDrillDown })))
-const ResourcesDrillDown = lazy(() => import('./views/ResourcesDrillDown').then(m => ({ default: m.ResourcesDrillDown })))
-const ServiceAccountDrillDown = lazy(() => import('./views/ServiceAccountDrillDown').then(m => ({ default: m.ServiceAccountDrillDown })))
-const ArgoAppDrillDown = lazy(() => import('./views/ArgoAppDrillDown').then(m => ({ default: m.ArgoAppDrillDown })))
-const HelmReleaseDrillDown = lazy(() => import('./views/HelmReleaseDrillDown').then(m => ({ default: m.HelmReleaseDrillDown })))
-const ConfigMapDrillDown = lazy(() => import('./views/ConfigMapDrillDown').then(m => ({ default: m.ConfigMapDrillDown })))
+const ClusterDrillDown = React.lazy(() => import('./views/ClusterDrillDown').then(m => ({ default: m.ClusterDrillDown })))
+const OperatorDrillDown = React.lazy(() => import('./views/OperatorDrillDown').then(m => ({ default: m.OperatorDrillDown })))
+const PolicyDrillDown = React.lazy(() => import('./views/PolicyDrillDown').then(m => ({ default: m.PolicyDrillDown })))
+const PodDrillDown = React.lazy(() => import('./views/PodDrillDown').then(m => ({ default: m.PodDrillDown })))
+const DeploymentDrillDown = React.lazy(() => import('./views/DeploymentDrillDown').then(m => ({ default: m.DeploymentDrillDown })))
+const MultiClusterSummaryDrillDown = React.lazy(() => import('./views/MultiClusterSummaryDrillDown').then(m => ({ default: m.MultiClusterSummaryDrillDown })))
+const ReplicaSetDrillDown = React.lazy(() => import('./views/ReplicaSetDrillDown').then(m => ({ default: m.ReplicaSetDrillDown })))
+const SecretDrillDown = React.lazy(() => import('./views/SecretDrillDown').then(m => ({ default: m.SecretDrillDown })))
+const KustomizationDrillDown = React.lazy(() => import('./views/KustomizationDrillDown').then(m => ({ default: m.KustomizationDrillDown })))
+const AlertDrillDown = React.lazy(() => import('./views/AlertDrillDown').then(m => ({ default: m.AlertDrillDown })))
+const DriftDrillDown = React.lazy(() => import('./views/DriftDrillDown').then(m => ({ default: m.DriftDrillDown })))
+const CRDDrillDown = React.lazy(() => import('./views/CRDDrillDown').then(m => ({ default: m.CRDDrillDown })))
+const ResourcesDrillDown = React.lazy(() => import('./views/ResourcesDrillDown').then(m => ({ default: m.ResourcesDrillDown })))
+const ServiceAccountDrillDown = React.lazy(() => import('./views/ServiceAccountDrillDown').then(m => ({ default: m.ServiceAccountDrillDown })))
+const ArgoAppDrillDown = React.lazy(() => import('./views/ArgoAppDrillDown').then(m => ({ default: m.ArgoAppDrillDown })))
+const HelmReleaseDrillDown = React.lazy(() => import('./views/HelmReleaseDrillDown').then(m => ({ default: m.HelmReleaseDrillDown })))
+const ConfigMapDrillDown = React.lazy(() => import('./views/ConfigMapDrillDown').then(m => ({ default: m.ConfigMapDrillDown })))
 // Keep smaller components as direct imports for immediate loading
 import { NamespaceDrillDown } from './views/NamespaceDrillDown'
 import { LogsDrillDown } from './views/LogsDrillDown'
