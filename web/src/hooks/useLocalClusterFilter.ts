@@ -33,7 +33,7 @@ interface UseLocalClusterFilterReturn<T extends Cluster> {
   /** Set dropdown visibility */
   setShowClusterFilter: (show: boolean) => void
   /** Ref for the filter dropdown container (for click-outside handling) */
-  clusterFilterRef: React.RefObject<HTMLDivElement>
+  clusterFilterRef: React.RefObject<HTMLDivElement | null>
   /** Whether any local filter is applied */
   hasLocalFilter: boolean
   /** Active local filter clusters (ones that are also in available clusters) */
@@ -156,5 +156,5 @@ export interface ClusterFilterDropdownProps {
   clearLocalFilter: () => void
   showClusterFilter: boolean
   setShowClusterFilter: (show: boolean) => void
-  clusterFilterRef: React.RefObject<HTMLDivElement>
+  clusterFilterRef: React.RefObject<HTMLDivElement | null>
 }

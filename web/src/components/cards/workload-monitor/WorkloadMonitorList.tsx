@@ -1,4 +1,5 @@
 import { CheckCircle, XCircle, AlertTriangle, HelpCircle, MinusCircle } from 'lucide-react'
+import type * as React from 'react'
 import { getIconForKind } from '../../../lib/resourceCategories'
 import type { MonitoredResource, ResourceHealthStatus } from '../../../types/workloadMonitor'
 
@@ -7,7 +8,7 @@ interface ListProps {
   onResourceClick?: (resource: MonitoredResource) => void
 }
 
-const STATUS_ICON: Record<ResourceHealthStatus, JSX.Element> = {
+const STATUS_ICON: Record<ResourceHealthStatus, React.JSX.Element> = {
   healthy: <CheckCircle className="w-3.5 h-3.5 text-green-400" />,
   degraded: <AlertTriangle className="w-3.5 h-3.5 text-yellow-400" />,
   unhealthy: <XCircle className="w-3.5 h-3.5 text-red-400" />,
