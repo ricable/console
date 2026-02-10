@@ -145,10 +145,12 @@
       "id": "cluster-health-false-positive",
       "subject": "Clusters briefly show healthy on page load before going offline",
       "description": "When navigating to the clusters dashboard, some offline clusters initially show as healthy (green checkmark) before transitioning to offline. This resets on every page refresh. The problem is that clusters are marked healthy before their metrics (CPU, memory, nodes, pods) are populated. Fix: don't mark a cluster as healthy until its capacity/metric data has been fetched. It's fine to show a loading/checking state while polling, but don't show green healthy status until real data confirms it.",
-      "status": "pending",
+      "status": "completed",
       "priority": "high",
       "created": "2026-02-09",
-      "tags": ["bug", "cluster-health", "false-positive", "ux"]
+      "completedAt": "2026-02-10",
+      "tags": ["bug", "cluster-health", "false-positive", "ux"],
+      "resolution": "Made healthy field optional (undefined=not yet checked). Removed forced healthy:true in fetchClusterListFromAgent(). Added cache merge for healthy/reachable in mergeWithStoredClusters() to preserve last-known state. Updated isInitialLoading() to show spinner until health check sets definitive healthy value. PR #785."
     },
     {
       "id": "ai-ml-cards-skeleton-loading",
