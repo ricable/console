@@ -271,7 +271,7 @@ export function GPUReservations() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as ViewTab)}
-              aria-label={`Switch to ${tab.label} tab`}
+              aria-label={`Switch to ${tab.label}`}
               className={cn(
                 'flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 -mb-[2px] transition-colors',
                 activeTab === tab.id
@@ -548,7 +548,7 @@ export function GPUReservations() {
                         <button
                           key={res.id}
                           onClick={() => setSelectedReservation(res)}
-                          aria-label={`View details for reservation ${res.name}`}
+                          aria-label={`View ${res.name} reservation: ${res.gpuCount} GPUs from ${res.startDate.toLocaleDateString()} to ${res.endDate.toLocaleDateString()}`}
                           className={cn(
                             'w-full text-left px-1.5 py-0.5 rounded text-xs truncate',
                             res.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
