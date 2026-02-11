@@ -1,10 +1,44 @@
-import { memo } from 'react'
+import { memo, useState, useEffect, useRef } from 'react'
 import { Pencil, Globe, User, ShieldAlert, ChevronRight, Star, WifiOff, RefreshCw, ExternalLink, AlertCircle, Cpu, Box, Server, KeyRound } from 'lucide-react'
 import { FlashingValue } from '../../ui/FlashingValue'
 import { ClusterInfo } from '../../../hooks/useMCP'
 import { StatusIndicator } from '../../charts/StatusIndicator'
 import { isClusterUnreachable, isClusterLoading } from '../utils'
 import { CloudProviderIcon, detectCloudProvider, getProviderLabel, getProviderColor, getConsoleUrl } from '../../ui/CloudProviderIcon'
+
+// Guarantees spinner runs for at least 1 full rotation (1s) even if data returns faster.
+// Uses refs for condition checks to avoid stale closure issues when refreshing
+// transitions true→false faster than React can commit the spinning state update.
+function useMinSpin(refreshing: boolean, minDurationMs = 1000): boolean {
+  const [spinning, setSpinning] = useState(false)
+  const spinningRef = useRef(false)
+  const spinStartRef = useRef(0)
+  const timerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => {
+    if (refreshing) {
+      clearTimeout(timerRef.current)
+      if (!spinningRef.current) {
+        spinStartRef.current = Date.now()
+        spinningRef.current = true
+        setSpinning(true)
+      }
+    } else if (spinningRef.current) {
+      const elapsed = Date.now() - spinStartRef.current
+      const remaining = Math.max(0, minDurationMs - elapsed)
+      timerRef.current = setTimeout(() => {
+        spinningRef.current = false
+        setSpinning(false)
+      }, remaining)
+    }
+  }, [refreshing, minDurationMs])
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current)
+  }, [])
+
+  return spinning
+}
 
 // Helper to derive health status from cluster data
 // If we have node data and the cluster is reachable, consider it healthy
@@ -76,6 +110,7 @@ const FullClusterCard = memo(function FullClusterCard({
   const hasCachedData = cluster.nodeCount !== undefined && cluster.nodeCount > 0
   const initialLoading = loading && !hasCachedData
   const refreshing = cluster.refreshing === true
+  const spinning = useMinSpin(refreshing)
 
   const provider = (cluster.distribution as ReturnType<typeof detectCloudProvider>) ||
     detectCloudProvider(cluster.name, cluster.server, cluster.namespaces, cluster.user)
@@ -128,15 +163,15 @@ const FullClusterCard = memo(function FullClusterCard({
               {onRefreshCluster && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onRefreshCluster() }}
-                  disabled={refreshing}
+                  disabled={spinning}
                   className={`flex items-center p-1 rounded transition-colors ${
-                    refreshing ? 'bg-blue-500/20 text-blue-400' :
+                    spinning ? 'bg-blue-500/20 text-blue-400' :
                     unreachable ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' :
                     'bg-secondary/50 text-muted-foreground hover:bg-secondary hover:text-foreground'
                   }`}
-                  title={refreshing ? 'Refreshing...' : unreachable ? 'Retry connection' : 'Refresh cluster data'}
+                  title={spinning ? 'Refreshing...' : unreachable ? 'Retry connection' : 'Refresh cluster data'}
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} />
                 </button>
               )}
             </div>
@@ -275,6 +310,7 @@ const ListClusterCard = memo(function ListClusterCard({
   const hasCachedData = cluster.nodeCount !== undefined && cluster.nodeCount > 0
   const initialLoading = loading && !hasCachedData
   const refreshing = cluster.refreshing === true
+  const spinning = useMinSpin(refreshing)
 
   const provider = (cluster.distribution as ReturnType<typeof detectCloudProvider>) ||
     detectCloudProvider(cluster.name, cluster.server, cluster.namespaces, cluster.user)
@@ -393,15 +429,15 @@ const ListClusterCard = memo(function ListClusterCard({
             {onRefreshCluster && (
               <button
                 onClick={(e) => { e.stopPropagation(); onRefreshCluster() }}
-                disabled={refreshing}
+                disabled={spinning}
                 className={`p-1.5 rounded transition-colors ${
-                  refreshing ? 'text-blue-400' :
+                  spinning ? 'text-blue-400' :
                   unreachable ? 'text-yellow-400 hover:bg-yellow-500/20' :
                   'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
-                title={refreshing ? 'Refreshing...' : 'Refresh'}
+                title={spinning ? 'Refreshing...' : 'Refresh'}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 ${spinning ? 'animate-spin' : ''}`} />
               </button>
             )}
             {!permissionsLoading && !isClusterAdmin && !unreachable && (

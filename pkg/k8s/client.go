@@ -771,7 +771,7 @@ func (m *MultiClusterClient) GetClient(contextName string) (*kubernetes.Clientse
 
 	// Set reasonable timeouts — large OpenShift clusters (18+ nodes) can return
 	// 800KB+ node payloads that take >10s over higher-latency links
-	config.Timeout = 30 * time.Second
+	config.Timeout = 45 * time.Second
 
 	client, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -815,7 +815,7 @@ func (m *MultiClusterClient) GetDynamicClient(contextName string) (dynamic.Inter
 				return nil, fmt.Errorf("failed to get config for context %s: %w", contextName, err)
 			}
 		}
-		config.Timeout = 30 * time.Second
+		config.Timeout = 45 * time.Second
 		m.configs[contextName] = config
 	}
 
@@ -874,13 +874,15 @@ func classifyError(errMsg string) string {
 
 // GetClusterHealth returns health status for a cluster
 func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName string) (*ClusterHealth, error) {
-	// Check cache
+	// Check cache — also save previous cached data for fallback on partial failures
+	var prevCached *ClusterHealth
 	m.mu.RLock()
 	if health, ok := m.healthCache[contextName]; ok {
 		if time.Since(m.cacheTime[contextName]) < m.cacheTTL {
 			m.mu.RUnlock()
 			return health, nil
 		}
+		prevCached = health
 	}
 	m.mu.RUnlock()
 
@@ -908,15 +910,42 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 		CheckedAt: now,
 	}
 
-	// Get nodes
-	nodes, err := client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		errMsg := err.Error()
+	// Fetch nodes, pods, and PVCs in parallel to avoid sequential timeout accumulation.
+	// Large clusters (e.g. 18 nodes, 972 pods) can take 10-20s per call sequentially,
+	// exceeding the context deadline. Parallel fetches reduce wall-clock time to max(individual).
+	var (
+		nodes    *corev1.NodeList
+		pods     *corev1.PodList
+		pvcs     *corev1.PersistentVolumeClaimList
+		nodesErr error
+		podsErr  error
+		pvcsErr  error
+		wg       sync.WaitGroup
+	)
+
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		nodes, nodesErr = client.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	}()
+	go func() {
+		defer wg.Done()
+		pods, podsErr = client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
+	}()
+	go func() {
+		defer wg.Done()
+		pvcs, pvcsErr = client.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
+	}()
+	wg.Wait()
+
+	// Process nodes - determines reachability
+	if nodesErr != nil {
+		errMsg := nodesErr.Error()
 		health.Healthy = false
 		health.Reachable = false
 		health.ErrorType = classifyError(errMsg)
 		health.ErrorMessage = errMsg
-		health.Issues = append(health.Issues, fmt.Sprintf("Failed to list nodes: %v", err))
+		health.Issues = append(health.Issues, fmt.Sprintf("Failed to list nodes: %v", nodesErr))
 	} else {
 		health.NodeCount = len(nodes.Items)
 		var totalCPU int64
@@ -930,15 +959,12 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 					break
 				}
 			}
-			// Sum CPU cores from allocatable resources
 			if cpu := node.Status.Allocatable.Cpu(); cpu != nil {
 				totalCPU += cpu.Value()
 			}
-			// Sum memory from allocatable resources
 			if mem := node.Status.Allocatable.Memory(); mem != nil {
 				totalMemory += mem.Value()
 			}
-			// Sum ephemeral storage from allocatable resources
 			if storage, ok := node.Status.Allocatable["ephemeral-storage"]; ok {
 				totalStorage += storage.Value()
 			}
@@ -953,16 +979,12 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 		}
 	}
 
-	// Get pod count and resource requests
-	pods, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
-	if err == nil {
+	// Process pods - non-fatal, fall back to cached values on timeout
+	if podsErr == nil {
 		health.PodCount = len(pods.Items)
-
-		// Sum resource requests from all running pods
 		var totalCPURequests int64
 		var totalMemoryRequests int64
 		for _, pod := range pods.Items {
-			// Only count running pods
 			if pod.Status.Phase != corev1.PodRunning {
 				continue
 			}
@@ -981,24 +1003,36 @@ func (m *MultiClusterClient) GetClusterHealth(ctx context.Context, contextName s
 		health.CpuRequestsCores = float64(totalCPURequests) / 1000.0
 		health.MemoryRequestsBytes = totalMemoryRequests
 		health.MemoryRequestsGB = float64(totalMemoryRequests) / (1024 * 1024 * 1024)
+	} else if prevCached != nil {
+		// Pod listing timed out — preserve previous cached pod data instead of showing 0
+		health.PodCount = prevCached.PodCount
+		health.CpuRequestsMillicores = prevCached.CpuRequestsMillicores
+		health.CpuRequestsCores = prevCached.CpuRequestsCores
+		health.MemoryRequestsBytes = prevCached.MemoryRequestsBytes
+		health.MemoryRequestsGB = prevCached.MemoryRequestsGB
 	}
 
-	// Get PVC count
-	pvcs, err := client.CoreV1().PersistentVolumeClaims("").List(ctx, metav1.ListOptions{})
-	if err == nil {
+	// Process PVCs - non-fatal, fall back to cached values on timeout
+	if pvcsErr == nil {
 		health.PVCCount = len(pvcs.Items)
 		for _, pvc := range pvcs.Items {
 			if pvc.Status.Phase == corev1.ClaimBound {
 				health.PVCBoundCount++
 			}
 		}
+	} else if prevCached != nil {
+		health.PVCCount = prevCached.PVCCount
+		health.PVCBoundCount = prevCached.PVCBoundCount
 	}
 
-	// Cache the result
-	m.mu.Lock()
-	m.healthCache[contextName] = health
-	m.cacheTime[contextName] = time.Now()
-	m.mu.Unlock()
+	// Only cache successful results — don't cache failures (timeout, context canceled)
+	// so the next request retries immediately instead of serving stale errors
+	if health.Reachable {
+		m.mu.Lock()
+		m.healthCache[contextName] = health
+		m.cacheTime[contextName] = time.Now()
+		m.mu.Unlock()
+	}
 
 	return health, nil
 }
