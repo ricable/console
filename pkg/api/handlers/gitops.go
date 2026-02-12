@@ -416,6 +416,10 @@ func (h *GitOpsHandlers) StreamOperators(c *fiber.Ctx) error {
 	c.Set("X-Accel-Buffering", "no")
 
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		// Send immediate "connected" event so the client knows the stream is alive.
+		// Without this, the client sees nothing for 20-50s until the first cluster completes.
+		writeSSEEvent(w, "connected", fiber.Map{"status": "streaming"})
+
 		if cluster != "" {
 			ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
 			defer cancel()

@@ -77,14 +77,15 @@ function parseSSEEvents(text: string): Array<{ event: string; data: string }> {
 // Hook to get operators for a cluster (or all clusters if undefined)
 // Uses SSE streaming to receive per-cluster batches as they arrive,
 // avoiding the abort cascade that occurs with per-cluster parallel REST calls.
+//
+// NOTE: The backend handles discovering and querying all clusters, so the
+// frontend does NOT depend on clusterCount. This prevents the effect from
+// re-firing (and aborting in-flight streams) every time a new cluster appears.
 export function useOperators(cluster?: string) {
   const cacheKey = `operators:${cluster || 'all'}`
   const cached = loadOperatorsCacheFromStorage(cacheKey)
   const { isDemoMode: demoMode } = useDemoMode()
   const initialMountRef = useRef(true)
-  const hasCompletedFetchRef = useRef(!!cached)
-  const abortRef = useRef<AbortController | null>(null)
-  const fetchInProgressRef = useRef(false)
 
   const [operators, setOperators] = useState<Operator[]>(cached?.data || [])
   const [isLoading, setIsLoading] = useState(!cached)
@@ -92,21 +93,10 @@ export function useOperators(cluster?: string) {
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<number | null>(cached?.timestamp || null)
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
-  const [clusterCount, setClusterCount] = useState(clusterCacheRef.clusters.length)
   const [fetchVersion, setFetchVersion] = useState(0)
 
   useEffect(() => {
-    return subscribeClusterCache((cache) => {
-      setClusterCount(cache.clusters.length)
-    })
-  }, [])
-
-  useEffect(() => {
-    if (fetchInProgressRef.current) return
-
-    abortRef.current?.abort()
     const controller = new AbortController()
-    abortRef.current = controller
 
     const doFetch = async () => {
       if (isDemoMode()) {
@@ -120,22 +110,6 @@ export function useOperators(cluster?: string) {
         return
       }
 
-      // Wait for clusters to be available before fetching
-      const hasTargets = cluster
-        ? true
-        : clusterCacheRef.clusters.filter(c => c.reachable !== false).length > 0
-
-      if (!hasTargets) {
-        if (hasCompletedFetchRef.current) {
-          setOperators([])
-          setIsLoading(false)
-        }
-        setIsRefreshing(false)
-        fetchInProgressRef.current = false
-        return
-      }
-
-      fetchInProgressRef.current = true
       setIsRefreshing(true)
 
       try {
@@ -193,12 +167,11 @@ export function useOperators(cluster?: string) {
                 console.warn('[Operators SSE] server error:', errData.error)
               } catch { /* skip */ }
             }
-            // 'done' event — stream will end naturally
+            // 'connected' and 'done' events — no action needed
           }
         }
 
         if (!controller.signal.aborted) {
-          hasCompletedFetchRef.current = true
           setOperators([...accumulated])
           saveOperatorsCacheToStorage(accumulated, cacheKey)
           setError(null)
@@ -206,18 +179,16 @@ export function useOperators(cluster?: string) {
           setLastRefresh(Date.now())
         }
       } catch (err) {
-        if (controller.signal.aborted) {
-          // Normal cleanup abort — not an error
-        } else {
+        if (!controller.signal.aborted) {
           console.warn('[Operators SSE] fetch error:', err)
           setConsecutiveFailures(prev => prev + 1)
-          setError('Unable to fetch operators')
         }
       }
 
-      setIsLoading(false)
-      setIsRefreshing(false)
-      fetchInProgressRef.current = false
+      if (!controller.signal.aborted) {
+        setIsLoading(false)
+        setIsRefreshing(false)
+      }
     }
 
     doFetch()
@@ -228,17 +199,15 @@ export function useOperators(cluster?: string) {
 
     return () => {
       controller.abort()
-      fetchInProgressRef.current = false
       unregisterRefetch()
     }
-  }, [cluster, clusterCount, fetchVersion, cacheKey])
+  }, [cluster, fetchVersion, cacheKey])
 
   const refetch = useCallback(() => {
-    abortRef.current?.abort()
-    fetchInProgressRef.current = false
     setFetchVersion(v => v + 1)
   }, [])
 
+  // Re-fetch when demo mode changes (not on initial mount)
   useEffect(() => {
     if (initialMountRef.current) {
       initialMountRef.current = false
