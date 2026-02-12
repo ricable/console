@@ -481,7 +481,7 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 // results as they arrive so the frontend can display partial results immediately.
 func (h *GitOpsHandlers) StreamOperators(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
-	const perClusterTimeout = 180 * time.Second
+	const perClusterTimeout = 20 * time.Second
 
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")
