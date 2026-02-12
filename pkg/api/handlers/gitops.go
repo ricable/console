@@ -358,10 +358,13 @@ func (h *GitOpsHandlers) getKustomizationsForCluster(ctx context.Context, cluste
 // ListOperators returns OLM-managed operators (ClusterServiceVersions)
 func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
+	const perClusterTimeout = 15 * time.Second
 
 	// If specific cluster requested, query only that cluster
 	if cluster != "" {
-		operators := h.getOperatorsForCluster(c.Context(), cluster)
+		ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
+		defer cancel()
+		operators := h.getOperatorsForCluster(ctx, cluster)
 		return c.JSON(fiber.Map{"operators": operators})
 	}
 
@@ -374,12 +377,11 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 
 		var mu sync.Mutex
 		allOperators := make([]Operator, 0)
-		clusterTimeout := 45 * time.Second
 		done := make(chan struct{})
 
 		for _, cl := range clusters {
 			go func(clusterName string) {
-				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 				defer cancel()
 
 				operators := h.getOperatorsForCluster(ctx, clusterName)
@@ -395,8 +397,8 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 			}(cl.Name)
 		}
 
-		// Progressive: wait up to 45s total, but return as soon as all clusters respond
-		deadline := time.After(45 * time.Second)
+		// Wait up to perClusterTimeout for all clusters to respond
+		deadline := time.After(perClusterTimeout)
 		remaining := len(clusters)
 		for remaining > 0 {
 			select {
@@ -411,7 +413,9 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 	}
 
 	// Fallback to default context
-	operators := h.getOperatorsForCluster(c.Context(), "")
+	ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
+	defer cancel()
+	operators := h.getOperatorsForCluster(ctx, "")
 	return c.JSON(fiber.Map{"operators": operators})
 }
 
@@ -487,9 +491,12 @@ type OperatorSubscription struct {
 // ListOperatorSubscriptions returns OLM Subscriptions
 func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
+	const perClusterTimeout = 15 * time.Second
 
 	if cluster != "" {
-		subs := h.getSubscriptionsForCluster(c.Context(), cluster)
+		ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
+		defer cancel()
+		subs := h.getSubscriptionsForCluster(ctx, cluster)
 		return c.JSON(fiber.Map{"subscriptions": subs})
 	}
 
@@ -501,12 +508,11 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 
 		var mu sync.Mutex
 		allSubs := make([]OperatorSubscription, 0)
-		clusterTimeout := 45 * time.Second
 		done := make(chan struct{})
 
 		for _, cl := range clusters {
 			go func(clusterName string) {
-				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 				defer cancel()
 
 				subs := h.getSubscriptionsForCluster(ctx, clusterName)
@@ -522,7 +528,7 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 			}(cl.Name)
 		}
 
-		deadline := time.After(45 * time.Second)
+		deadline := time.After(perClusterTimeout)
 		remaining := len(clusters)
 		for remaining > 0 {
 			select {
@@ -536,7 +542,9 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"subscriptions": allSubs})
 	}
 
-	subs := h.getSubscriptionsForCluster(c.Context(), "")
+	ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
+	defer cancel()
+	subs := h.getSubscriptionsForCluster(ctx, "")
 	return c.JSON(fiber.Map{"subscriptions": subs})
 }
 
