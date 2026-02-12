@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -358,9 +359,8 @@ func (h *GitOpsHandlers) getKustomizationsForCluster(ctx context.Context, cluste
 // ListOperators returns OLM-managed operators (ClusterServiceVersions)
 func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 	cluster := c.Query("cluster")
-	const perClusterTimeout = 15 * time.Second
+	const perClusterTimeout = 180 * time.Second
 
-	// If specific cluster requested, query only that cluster
 	if cluster != "" {
 		ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 		defer cancel()
@@ -368,19 +368,20 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"operators": operators})
 	}
 
-	// Query all clusters in parallel with timeout
 	if h.k8sClient != nil {
 		clusters, err := h.k8sClient.DeduplicatedClusters(c.Context())
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "operators": []Operator{}})
 		}
 
+		var wg sync.WaitGroup
 		var mu sync.Mutex
-		allOperators := make([]Operator, 0)
-		done := make(chan struct{})
+		var allOperators []Operator
 
 		for _, cl := range clusters {
+			wg.Add(1)
 			go func(clusterName string) {
+				defer wg.Done()
 				ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 				defer cancel()
 
@@ -390,38 +391,95 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 					allOperators = append(allOperators, operators...)
 					mu.Unlock()
 				}
-				select {
-				case done <- struct{}{}:
-				default:
-				}
 			}(cl.Name)
 		}
 
-		// Wait up to perClusterTimeout for all clusters to respond
-		deadline := time.After(perClusterTimeout)
-		remaining := len(clusters)
-		for remaining > 0 {
-			select {
-			case <-done:
-				remaining--
-			case <-deadline:
-				remaining = 0
-			}
-		}
-
+		wg.Wait()
 		return c.JSON(fiber.Map{"operators": allOperators})
 	}
 
-	// Fallback to default context
 	ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 	defer cancel()
 	operators := h.getOperatorsForCluster(ctx, "")
 	return c.JSON(fiber.Map{"operators": operators})
 }
 
-// getOperatorsForCluster gets operators for a specific cluster
+// StreamOperators returns operators as SSE events, streaming per-cluster
+// results as they arrive so the frontend can display partial results immediately.
+func (h *GitOpsHandlers) StreamOperators(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	const perClusterTimeout = 180 * time.Second
+
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		if cluster != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+			defer cancel()
+			operators := h.getOperatorsForCluster(ctx, cluster)
+			writeSSEEvent(w, "batch", fiber.Map{
+				"operators": operators,
+				"cluster":   cluster,
+				"total":     len(operators),
+			})
+			writeSSEEvent(w, "done", fiber.Map{"totalClusters": 1, "completedClusters": 1})
+			return
+		}
+
+		if h.k8sClient == nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": "no k8s client"})
+			return
+		}
+
+		clusters, err := h.k8sClient.DeduplicatedClusters(context.Background())
+		if err != nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": err.Error()})
+			return
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		completed := 0
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+				defer cancel()
+
+				operators := h.getOperatorsForCluster(ctx, clusterName)
+				mu.Lock()
+				completed++
+				if len(operators) > 0 {
+					writeSSEEvent(w, "batch", fiber.Map{
+						"operators": operators,
+						"cluster":   clusterName,
+						"total":     len(operators),
+					})
+				}
+				mu.Unlock()
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		writeSSEEvent(w, "done", fiber.Map{
+			"totalClusters":     len(clusters),
+			"completedClusters": completed,
+		})
+	})
+
+	return nil
+}
+
+// getOperatorsForCluster gets operators for a specific cluster using jsonpath
+// to extract only the fields we need, avoiding 100+ MB of full JSON output.
 func (h *GitOpsHandlers) getOperatorsForCluster(ctx context.Context, cluster string) []Operator {
-	args := []string{"get", "csv", "-A", "-o", "json"}
+	jsonpathExpr := `{range .items[*]}{.metadata.name}{"\t"}{.metadata.namespace}{"\t"}{.spec.displayName}{"\t"}{.spec.version}{"\t"}{.status.phase}{"\n"}{end}`
+	args := []string{"get", "csv", "-A", "--chunk-size=500", "-o", "jsonpath=" + jsonpathExpr}
 	if cluster != "" {
 		args = append([]string{"--context", cluster}, args...)
 	}
@@ -436,41 +494,28 @@ func (h *GitOpsHandlers) getOperatorsForCluster(ctx context.Context, cluster str
 		return []Operator{}
 	}
 
-	var result struct {
-		Items []struct {
-			Metadata struct {
-				Name      string `json:"name"`
-				Namespace string `json:"namespace"`
-			} `json:"metadata"`
-			Spec struct {
-				DisplayName string `json:"displayName"`
-				Version     string `json:"version"`
-			} `json:"spec"`
-			Status struct {
-				Phase string `json:"phase"`
-			} `json:"status"`
-		} `json:"items"`
-	}
-
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		log.Printf("failed to parse operators for cluster %s: %v", cluster, err)
-		return []Operator{}
-	}
-
-	operators := make([]Operator, 0, len(result.Items))
-	for _, item := range result.Items {
-		op := Operator{
-			Name:        item.Metadata.Name,
-			DisplayName: item.Spec.DisplayName,
-			Namespace:   item.Metadata.Namespace,
-			Version:     item.Spec.Version,
-			Phase:       item.Status.Phase,
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	operators := make([]Operator, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		fields := strings.SplitN(line, "\t", 5)
+		if len(fields) < 5 {
+			continue
+		}
+		displayName := fields[2]
+		if displayName == "" {
+			displayName = fields[0]
+		}
+		operators = append(operators, Operator{
+			Name:        fields[0],
+			Namespace:   fields[1],
+			DisplayName: displayName,
+			Version:     fields[3],
+			Phase:       fields[4],
 			Cluster:     cluster,
-		}
-		if op.DisplayName == "" {
-			op.DisplayName = item.Metadata.Name
-		}
-		operators = append(operators, op)
+		})
 	}
 
 	return operators
@@ -506,12 +551,14 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "subscriptions": []OperatorSubscription{}})
 		}
 
+		var wg sync.WaitGroup
 		var mu sync.Mutex
-		allSubs := make([]OperatorSubscription, 0)
-		done := make(chan struct{})
+		var allSubs []OperatorSubscription
 
 		for _, cl := range clusters {
+			wg.Add(1)
 			go func(clusterName string) {
+				defer wg.Done()
 				ctx, cancel := context.WithTimeout(c.Context(), perClusterTimeout)
 				defer cancel()
 
@@ -521,24 +568,10 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 					allSubs = append(allSubs, subs...)
 					mu.Unlock()
 				}
-				select {
-				case done <- struct{}{}:
-				default:
-				}
 			}(cl.Name)
 		}
 
-		deadline := time.After(perClusterTimeout)
-		remaining := len(clusters)
-		for remaining > 0 {
-			select {
-			case <-done:
-				remaining--
-			case <-deadline:
-				remaining = 0
-			}
-		}
-
+		wg.Wait()
 		return c.JSON(fiber.Map{"subscriptions": allSubs})
 	}
 
@@ -548,9 +581,10 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"subscriptions": subs})
 }
 
-// getSubscriptionsForCluster gets OLM subscriptions for a specific cluster
+// getSubscriptionsForCluster gets OLM subscriptions for a specific cluster using jsonpath
 func (h *GitOpsHandlers) getSubscriptionsForCluster(ctx context.Context, cluster string) []OperatorSubscription {
-	args := []string{"get", "subscriptions.operators.coreos.com", "-A", "-o", "json"}
+	jsonpathExpr := `{range .items[*]}{.metadata.name}{"\t"}{.metadata.namespace}{"\t"}{.spec.channel}{"\t"}{.spec.source}{"\t"}{.spec.installPlanApproval}{"\t"}{.status.currentCSV}{"\t"}{.status.installedCSV}{"\n"}{end}`
+	args := []string{"get", "subscriptions.operators.coreos.com", "-A", "-o", "jsonpath=" + jsonpathExpr}
 	if cluster != "" {
 		args = append([]string{"--context", cluster}, args...)
 	}
@@ -565,44 +599,27 @@ func (h *GitOpsHandlers) getSubscriptionsForCluster(ctx context.Context, cluster
 		return []OperatorSubscription{}
 	}
 
-	var result struct {
-		Items []struct {
-			Metadata struct {
-				Name      string `json:"name"`
-				Namespace string `json:"namespace"`
-			} `json:"metadata"`
-			Spec struct {
-				Channel            string `json:"channel"`
-				Source             string `json:"source"`
-				InstallPlanApproval string `json:"installPlanApproval"`
-			} `json:"spec"`
-			Status struct {
-				CurrentCSV   string `json:"currentCSV"`
-				InstalledCSV string `json:"installedCSV"`
-				State        string `json:"state"`
-			} `json:"status"`
-		} `json:"items"`
-	}
-
-	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
-		log.Printf("failed to parse subscriptions for cluster %s: %v", cluster, err)
-		return []OperatorSubscription{}
-	}
-
-	subs := make([]OperatorSubscription, 0, len(result.Items))
-	for _, item := range result.Items {
+	lines := strings.Split(strings.TrimSpace(stdout.String()), "\n")
+	subs := make([]OperatorSubscription, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		fields := strings.SplitN(line, "\t", 7)
+		if len(fields) < 6 {
+			continue
+		}
 		sub := OperatorSubscription{
-			Name:               item.Metadata.Name,
-			Namespace:          item.Metadata.Namespace,
-			Channel:            item.Spec.Channel,
-			Source:             item.Spec.Source,
-			InstallPlanApproval: item.Spec.InstallPlanApproval,
-			CurrentCSV:         item.Status.CurrentCSV,
+			Name:               fields[0],
+			Namespace:          fields[1],
+			Channel:            fields[2],
+			Source:             fields[3],
+			InstallPlanApproval: fields[4],
+			CurrentCSV:         fields[5],
 			Cluster:            cluster,
 		}
-		// Detect pending upgrade: currentCSV differs from installedCSV
-		if item.Status.CurrentCSV != "" && item.Status.InstalledCSV != "" && item.Status.CurrentCSV != item.Status.InstalledCSV {
-			sub.PendingUpgrade = item.Status.CurrentCSV
+		if len(fields) >= 7 && fields[5] != "" && fields[6] != "" && fields[5] != fields[6] {
+			sub.PendingUpgrade = fields[5]
 		}
 		subs = append(subs, sub)
 	}
