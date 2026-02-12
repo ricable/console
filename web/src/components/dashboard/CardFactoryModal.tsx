@@ -179,17 +179,25 @@ const T2_TEMPLATES: T2Template[] = [
     width: 4,
     source: `export default function GaugeCard({ config }) {
   const [value, setValue] = useState(67)
-  const radius = 45
-  const circumference = 2 * Math.PI * radius
+  
+  // Gauge dimensions
+  const GAUGE_RADIUS = 45
+  const GAUGE_CENTER_X = 60
+  const GAUGE_CENTER_Y = 60
+  const circumference = 2 * Math.PI * GAUGE_RADIUS
   const offset = circumference - (value / 100) * circumference
-  const color = value > 80 ? 'text-red-400' : value > 60 ? 'text-yellow-400' : 'text-green-400'
+  
+  // Utilization thresholds for color coding
+  const HIGH_THRESHOLD = 80  // Red: high utilization
+  const MED_THRESHOLD = 60   // Yellow: medium utilization
+  const color = value > HIGH_THRESHOLD ? 'text-red-400' : value > MED_THRESHOLD ? 'text-yellow-400' : 'text-green-400'
 
   return (
     <div className="h-full flex flex-col items-center justify-center gap-3">
       <svg width="120" height="120" className="-rotate-90">
-        <circle cx="60" cy="60" r={radius} fill="none" strokeWidth="8"
+        <circle cx={GAUGE_CENTER_X} cy={GAUGE_CENTER_Y} r={GAUGE_RADIUS} fill="none" strokeWidth="8"
           className="stroke-secondary" />
-        <circle cx="60" cy="60" r={radius} fill="none" strokeWidth="8"
+        <circle cx={GAUGE_CENTER_X} cy={GAUGE_CENTER_Y} r={GAUGE_RADIUS} fill="none" strokeWidth="8"
           strokeLinecap="round"
           className={\`\${color.replace('text-', 'stroke-')} transition-all duration-700\`}
           style={{ strokeDasharray: circumference, strokeDashoffset: offset }} />
@@ -213,8 +221,12 @@ const T2_TEMPLATES: T2Template[] = [
     { name: 'ap-south-1', health: 45 }, { name: 'us-west-2', health: 100 },
     { name: 'eu-central-1', health: 72 }, { name: 'ap-east-1', health: 91 },
   ]
-  const getColor = (h) => h >= 90 ? 'bg-green-500/30' : h >= 70 ? 'bg-yellow-500/30' : 'bg-red-500/30'
-  const getTextColor = (h) => h >= 90 ? 'text-green-400' : h >= 70 ? 'text-yellow-400' : 'text-red-400'
+  
+  // Health thresholds for color coding
+  const HEALTHY_THRESHOLD = 90  // Green: healthy
+  const WARNING_THRESHOLD = 70  // Yellow: warning, Red: critical
+  const getColor = (h) => h >= HEALTHY_THRESHOLD ? 'bg-green-500/30' : h >= WARNING_THRESHOLD ? 'bg-yellow-500/30' : 'bg-red-500/30'
+  const getTextColor = (h) => h >= HEALTHY_THRESHOLD ? 'text-green-400' : h >= WARNING_THRESHOLD ? 'text-yellow-400' : 'text-red-400'
 
   return (
     <div className="h-full flex flex-col p-1">
@@ -274,7 +286,11 @@ const T2_TEMPLATES: T2Template[] = [
     { label: 'Unknown', value: 5, color: '#6b7280' },
   ]
   const total = data.reduce((s, d) => s + d.value, 0)
-  const r = 40, cx = 60, cy = 60
+  
+  // Donut chart dimensions
+  const DONUT_RADIUS = 40
+  const DONUT_CENTER_X = 60
+  const DONUT_CENTER_Y = 60
   let cumulative = 0
 
   return (
@@ -282,17 +298,17 @@ const T2_TEMPLATES: T2Template[] = [
       <svg width="120" height="120" viewBox="0 0 120 120">
         {data.map((d, i) => {
           const pct = d.value / total
-          const dashArray = 2 * Math.PI * r
+          const dashArray = 2 * Math.PI * DONUT_RADIUS
           const dashOffset = dashArray * (1 - pct)
           const rotation = cumulative * 360 - 90
           cumulative += pct
           return (
-            <circle key={i} cx={cx} cy={cy} r={r} fill="none" strokeWidth="16"
+            <circle key={i} cx={DONUT_CENTER_X} cy={DONUT_CENTER_Y} r={DONUT_RADIUS} fill="none" strokeWidth="16"
               stroke={d.color} strokeDasharray={dashArray} strokeDashoffset={dashOffset}
-              transform={\`rotate(\${rotation} \${cx} \${cy})\`} />
+              transform={\`rotate(\${rotation} \${DONUT_CENTER_X} \${DONUT_CENTER_Y})\`} />
           )
         })}
-        <text x={cx} y={cy} textAnchor="middle" dy="0.35em" className="fill-foreground text-lg font-bold">{total}</text>
+        <text x={DONUT_CENTER_X} y={DONUT_CENTER_Y} textAnchor="middle" dy="0.35em" className="fill-foreground text-lg font-bold">{total}</text>
       </svg>
       <div className="flex gap-3">
         {data.map(d => (
