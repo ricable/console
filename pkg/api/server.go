@@ -501,6 +501,8 @@ func (s *Server) setupRoutes() {
 	api.Get("/gitops/operators", gitopsHandlers.ListOperators)
 	api.Get("/gitops/operators/stream", gitopsHandlers.StreamOperators)
 	api.Get("/gitops/operator-subscriptions", gitopsHandlers.ListOperatorSubscriptions)
+	api.Get("/gitops/operator-subscriptions/stream", gitopsHandlers.StreamOperatorSubscriptions)
+	api.Get("/gitops/helm-releases/stream", gitopsHandlers.StreamHelmReleases)
 	api.Post("/gitops/detect-drift", gitopsHandlers.DetectDrift)
 	api.Post("/gitops/sync", gitopsHandlers.Sync)
 

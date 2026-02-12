@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { isNetlifyDeployment, isDemoMode } from '../../lib/demoMode'
 import { useDemoMode } from '../useDemoMode'
 import { registerCacheReset, registerRefetch } from '../../lib/modeTransition'
-import { MIN_REFRESH_INDICATOR_MS, getEffectiveInterval } from './shared'
+import { MIN_REFRESH_INDICATOR_MS } from './shared'
 import type { HelmRelease, HelmHistoryEntry } from './types'
 
 // Demo Helm releases shown when in demo mode
@@ -49,7 +49,6 @@ function getDemoHelmValues(): Record<string, unknown> {
 const HELM_RELEASES_CACHE_KEY = 'kc-helm-releases-cache'
 const HELM_HISTORY_CACHE_KEY = 'kc-helm-history-cache'
 const HELM_CACHE_TTL_MS = 30000 // 30 seconds before stale
-const HELM_REFRESH_INTERVAL_MS = 120000 // 2 minutes auto-refresh
 
 interface HelmReleasesCache {
   data: HelmRelease[]
@@ -100,7 +99,24 @@ const helmReleasesCache: HelmReleasesCache = {
   listeners: new Set()
 }
 
-// Hook to get Helm releases - uses shared cache with localStorage persistence
+// Parse SSE text into events
+function parseSSEEvents(text: string): Array<{ event: string; data: string }> {
+  const events: Array<{ event: string; data: string }> = []
+  const blocks = text.split('\n\n')
+  for (const block of blocks) {
+    if (!block.trim()) continue
+    let event = ''
+    let data = ''
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event: ')) event = line.slice(7)
+      else if (line.startsWith('data: ')) data = line.slice(6)
+    }
+    if (event && data) events.push({ event, data })
+  }
+  return events
+}
+
+// Hook to get Helm releases - uses SSE streaming with shared cache and localStorage persistence
 export function useHelmReleases(cluster?: string) {
   // Initialize from cache (localStorage backed)
   const [releases, setReleases] = useState<HelmRelease[]>(helmReleasesCache.data)
@@ -113,6 +129,7 @@ export function useHelmReleases(cluster?: string) {
   const [lastRefresh, setLastRefresh] = useState<number | null>(
     helmReleasesCache.timestamp > 0 ? helmReleasesCache.timestamp : null
   )
+  const [fetchVersion, setFetchVersion] = useState(0)
 
   // Register this component to receive cache updates
   useEffect(() => {
@@ -128,11 +145,11 @@ export function useHelmReleases(cluster?: string) {
     return () => { helmReleasesCache.listeners.delete(updateHandler) }
   }, [])
 
-  const notifyListeners = useCallback((isRefreshing: boolean, isLoading = false) => {
+  const notifyListeners = useCallback((isRefreshingState: boolean, isLoadingState = false) => {
     const state: HelmReleasesCacheState = {
       releases: helmReleasesCache.data,
-      isLoading,
-      isRefreshing,
+      isLoading: isLoadingState,
+      isRefreshing: isRefreshingState,
       consecutiveFailures: helmReleasesCache.consecutiveFailures,
       lastError: helmReleasesCache.lastError,
       lastRefresh: helmReleasesCache.timestamp > 0 ? helmReleasesCache.timestamp : null
@@ -140,7 +157,7 @@ export function useHelmReleases(cluster?: string) {
     helmReleasesCache.listeners.forEach(listener => listener(state))
   }, [])
 
-  const refetch = useCallback(async (silent = false) => {
+  useEffect(() => {
     // Skip fetching entirely in forced demo mode (Netlify) — no backend
     if (isNetlifyDeployment) {
       setIsLoading(false)
@@ -149,19 +166,9 @@ export function useHelmReleases(cluster?: string) {
       return
     }
 
-    if (!silent) {
-      setIsLoading(true)
-    } else {
-      setIsRefreshing(true)
-      notifyListeners(true)
-    }
-    try {
-      const params = new URLSearchParams()
-      if (cluster) params.append('cluster', cluster)
-      const url = `/api/gitops/helm-releases?${params}`
+    const controller = new AbortController()
 
-      // Skip API calls when using demo token — provide demo releases
-      const token = localStorage.getItem('token')
+    const doFetch = async () => {
       if (isDemoMode()) {
         const demoReleases = getDemoHelmReleases()
         if (!cluster) {
@@ -169,95 +176,126 @@ export function useHelmReleases(cluster?: string) {
           helmReleasesCache.timestamp = Date.now()
           helmReleasesCache.consecutiveFailures = 0
           helmReleasesCache.lastError = null
-          notifyListeners(false)
         }
         setReleases(demoReleases)
         setLastRefresh(Date.now())
+        setError(null)
+        setConsecutiveFailures(0)
         setIsLoading(false)
-        if (!silent) {
-          setIsRefreshing(true)
-          setTimeout(() => {
-            setIsRefreshing(false)
-            notifyListeners(false)
-          }, MIN_REFRESH_INDICATOR_MS)
-        } else {
-          setIsRefreshing(false)
-          notifyListeners(false)
-        }
+        setIsRefreshing(false)
+        notifyListeners(false)
         return
       }
 
-      // Use direct fetch to bypass the global circuit breaker
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      headers['Authorization'] = `Bearer ${token}`
-      const response = await fetch(url, { method: 'GET', headers })
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`)
-      }
-      const data = await response.json() as { releases: HelmRelease[] }
-      const newReleases = data.releases || []
+      setIsRefreshing(true)
+      notifyListeners(true)
 
-      // Update cache if fetching all clusters
-      if (!cluster) {
-        helmReleasesCache.data = newReleases
-        helmReleasesCache.timestamp = Date.now()
-        helmReleasesCache.consecutiveFailures = 0
-        helmReleasesCache.lastError = null
-        saveHelmReleasesToStorage(newReleases, helmReleasesCache.timestamp)
+      try {
+        const token = localStorage.getItem('token')
+        const clusterParam = cluster ? `&cluster=${encodeURIComponent(cluster)}` : ''
+        const url = `/api/gitops/helm-releases/stream?_token=${encodeURIComponent(token || '')}${clusterParam}`
+
+        const response = await fetch(url, { signal: controller.signal })
+
+        if (!response.ok) {
+          throw new Error(`Stream failed: ${response.status}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('No response body')
+
+        const decoder = new TextDecoder()
+        const accumulated: HelmRelease[] = []
+        let buffer = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+
+          const events = parseSSEEvents(buffer)
+          const lastNewlineIdx = buffer.lastIndexOf('\n\n')
+          buffer = lastNewlineIdx >= 0 ? buffer.slice(lastNewlineIdx + 2) : buffer
+
+          for (const evt of events) {
+            if (evt.event === 'batch') {
+              try {
+                const batch = JSON.parse(evt.data) as {
+                  releases: HelmRelease[]
+                  cluster: string
+                  total: number
+                }
+                const rels = (batch.releases || []).map(r => ({
+                  ...r,
+                  cluster: r.cluster || batch.cluster,
+                }))
+                accumulated.push(...rels)
+                if (!controller.signal.aborted) {
+                  setReleases([...accumulated])
+                  setIsLoading(false)
+                }
+              } catch { /* skip malformed batch */ }
+            } else if (evt.event === 'error') {
+              try {
+                const errData = JSON.parse(evt.data) as { error: string }
+                console.warn('[Helm SSE] server error:', errData.error)
+              } catch { /* skip */ }
+            }
+          }
+        }
+
+        if (!controller.signal.aborted) {
+          // Update shared cache
+          if (!cluster) {
+            helmReleasesCache.data = accumulated
+            helmReleasesCache.timestamp = Date.now()
+            helmReleasesCache.consecutiveFailures = 0
+            helmReleasesCache.lastError = null
+            saveHelmReleasesToStorage(accumulated, helmReleasesCache.timestamp)
+          }
+          setReleases([...accumulated])
+          setError(null)
+          setConsecutiveFailures(0)
+          setLastRefresh(Date.now())
+          notifyListeners(false)
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Helm releases'
+          console.warn('[Helm SSE] fetch error:', err)
+          if (!cluster) {
+            helmReleasesCache.consecutiveFailures++
+            helmReleasesCache.lastError = errorMessage
+          }
+          setConsecutiveFailures(prev => prev + 1)
+          setError(errorMessage)
+          notifyListeners(false)
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        setIsLoading(false)
+        setIsRefreshing(false)
         notifyListeners(false)
       }
-
-      setReleases(newReleases)
-      setError(null)
-      setConsecutiveFailures(0)
-      setLastRefresh(Date.now())
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch Helm releases'
-
-      // Increment failure count
-      if (!cluster) {
-        helmReleasesCache.consecutiveFailures++
-        helmReleasesCache.lastError = errorMessage
-        notifyListeners(false)
-      }
-
-      setError(errorMessage)
-      setConsecutiveFailures(prev => prev + 1)
-      // Keep existing cached data on error
-    } finally {
-      setIsLoading(false)
-      setIsRefreshing(false)
-      if (!cluster) notifyListeners(false)
-    }
-  }, [cluster, notifyListeners])
-
-  useEffect(() => {
-    // Use cached data if fresh enough and we're fetching all clusters
-    const now = Date.now()
-    const cacheAge = now - helmReleasesCache.timestamp
-    const cacheValid = !cluster && helmReleasesCache.data.length > 0 && cacheAge < HELM_CACHE_TTL_MS
-
-    if (cacheValid) {
-      setReleases(helmReleasesCache.data)
-      setIsLoading(false)
-      // Still refresh in background if somewhat stale
-      if (cacheAge > HELM_CACHE_TTL_MS / 2) {
-        refetch(true)
-      }
-    } else {
-      refetch()
     }
 
-    const interval = setInterval(() => refetch(true), getEffectiveInterval(HELM_REFRESH_INTERVAL_MS))
+    doFetch()
 
-    // Register for unified mode transition refetch
-    const unregisterRefetch = registerRefetch(`helm-releases:${cluster || 'all'}`, () => refetch(false))
+    const unregisterRefetch = registerRefetch(`helm-releases:${cluster || 'all'}`, () => {
+      setFetchVersion(v => v + 1)
+    })
 
     return () => {
-      clearInterval(interval)
+      controller.abort()
       unregisterRefetch()
     }
-  }, [refetch, cluster])
+  }, [cluster, fetchVersion, notifyListeners])
+
+  const refetch = useCallback(() => {
+    setFetchVersion(v => v + 1)
+  }, [])
 
   // Re-fetch when demo mode changes (not on initial mount)
   useEffect(() => {
@@ -265,8 +303,8 @@ export function useHelmReleases(cluster?: string) {
       initialMountRef.current = false
       return
     }
-    refetch(false)
-  }, [demoMode, refetch])
+    setFetchVersion(v => v + 1)
+  }, [demoMode])
 
   const isFailed = consecutiveFailures >= 3
 

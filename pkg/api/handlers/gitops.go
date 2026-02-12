@@ -198,6 +198,79 @@ func (h *GitOpsHandlers) ListHelmReleases(c *fiber.Ctx) error {
 	return h.listHelmReleasesForCluster(c, "")
 }
 
+// StreamHelmReleases returns Helm releases as SSE events, streaming per-cluster
+// results as they arrive.
+func (h *GitOpsHandlers) StreamHelmReleases(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	const perClusterTimeout = 30 * time.Second
+
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		writeSSEEvent(w, "connected", fiber.Map{"status": "streaming"})
+
+		if cluster != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+			defer cancel()
+			releases := h.getHelmReleasesForCluster(ctx, cluster)
+			writeSSEEvent(w, "batch", fiber.Map{
+				"releases": releases,
+				"cluster":  cluster,
+				"total":    len(releases),
+			})
+			writeSSEEvent(w, "done", fiber.Map{"totalClusters": 1, "completedClusters": 1})
+			return
+		}
+
+		if h.k8sClient == nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": "no k8s client"})
+			return
+		}
+
+		clusters, err := h.k8sClient.DeduplicatedClusters(context.Background())
+		if err != nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": err.Error()})
+			return
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		completed := 0
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+				defer cancel()
+
+				releases := h.getHelmReleasesForCluster(ctx, clusterName)
+				mu.Lock()
+				completed++
+				if len(releases) > 0 {
+					writeSSEEvent(w, "batch", fiber.Map{
+						"releases": releases,
+						"cluster":  clusterName,
+						"total":    len(releases),
+					})
+				}
+				mu.Unlock()
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		writeSSEEvent(w, "done", fiber.Map{
+			"totalClusters":     len(clusters),
+			"completedClusters": completed,
+		})
+	})
+
+	return nil
+}
+
 // listHelmReleasesForCluster lists helm releases for a specific cluster
 func (h *GitOpsHandlers) listHelmReleasesForCluster(c *fiber.Ctx, cluster string) error {
 	releases := h.getHelmReleasesForCluster(c.Context(), cluster)
@@ -583,6 +656,79 @@ func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
 	defer cancel()
 	subs := h.getSubscriptionsForCluster(ctx, "")
 	return c.JSON(fiber.Map{"subscriptions": subs})
+}
+
+// StreamOperatorSubscriptions returns OLM Subscriptions as SSE events, streaming
+// per-cluster results as they arrive.
+func (h *GitOpsHandlers) StreamOperatorSubscriptions(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+	const perClusterTimeout = 25 * time.Second
+
+	c.Set("Content-Type", "text/event-stream")
+	c.Set("Cache-Control", "no-cache")
+	c.Set("Connection", "keep-alive")
+	c.Set("X-Accel-Buffering", "no")
+
+	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
+		writeSSEEvent(w, "connected", fiber.Map{"status": "streaming"})
+
+		if cluster != "" {
+			ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+			defer cancel()
+			subs := h.getSubscriptionsForCluster(ctx, cluster)
+			writeSSEEvent(w, "batch", fiber.Map{
+				"subscriptions": subs,
+				"cluster":       cluster,
+				"total":         len(subs),
+			})
+			writeSSEEvent(w, "done", fiber.Map{"totalClusters": 1, "completedClusters": 1})
+			return
+		}
+
+		if h.k8sClient == nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": "no k8s client"})
+			return
+		}
+
+		clusters, err := h.k8sClient.DeduplicatedClusters(context.Background())
+		if err != nil {
+			writeSSEEvent(w, "error", fiber.Map{"error": err.Error()})
+			return
+		}
+
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		completed := 0
+
+		for _, cl := range clusters {
+			wg.Add(1)
+			go func(clusterName string) {
+				defer wg.Done()
+				ctx, cancel := context.WithTimeout(context.Background(), perClusterTimeout)
+				defer cancel()
+
+				subs := h.getSubscriptionsForCluster(ctx, clusterName)
+				mu.Lock()
+				completed++
+				if len(subs) > 0 {
+					writeSSEEvent(w, "batch", fiber.Map{
+						"subscriptions": subs,
+						"cluster":       clusterName,
+						"total":         len(subs),
+					})
+				}
+				mu.Unlock()
+			}(cl.Name)
+		}
+
+		wg.Wait()
+		writeSSEEvent(w, "done", fiber.Map{
+			"totalClusters":     len(clusters),
+			"completedClusters": completed,
+		})
+	})
+
+	return nil
 }
 
 // getSubscriptionsForCluster gets OLM subscriptions for a specific cluster using jsonpath

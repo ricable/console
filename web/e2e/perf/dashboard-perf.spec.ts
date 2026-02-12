@@ -196,6 +196,55 @@ async function setupLiveMocks(page: Page) {
     })
   })
 
+  // 1b. Mock GitOps SSE stream endpoints (operators, subscriptions, helm-releases)
+  await page.route('**/api/gitops/*/stream**', (route) => {
+    const url = route.request().url()
+    // Determine data key from URL
+    let dataKey = 'items'
+    let items: unknown[] = []
+    if (url.includes('/operators/stream')) {
+      dataKey = 'operators'
+      items = [{ name: 'test-operator', namespace: 'test', version: 'v1.0.0', status: 'Succeeded', cluster: MOCK_CLUSTER }]
+    } else if (url.includes('/operator-subscriptions/stream')) {
+      dataKey = 'subscriptions'
+      items = [{ name: 'test-sub', namespace: 'test', channel: 'stable', source: 'catalog', installPlanApproval: 'Automatic', currentCSV: 'test.v1.0.0', cluster: MOCK_CLUSTER }]
+    } else if (url.includes('/helm-releases/stream')) {
+      dataKey = 'releases'
+      items = [{ name: 'test-release', namespace: 'default', revision: '1', status: 'deployed', chart: 'test-1.0.0', app_version: '1.0.0', cluster: MOCK_CLUSTER }]
+    }
+    const lines = [
+      'event: connected',
+      `data: ${JSON.stringify({ status: 'streaming' })}`,
+      '',
+      'event: batch',
+      `data: ${JSON.stringify({ [dataKey]: items, cluster: MOCK_CLUSTER, total: items.length })}`,
+      '',
+      'event: done',
+      `data: ${JSON.stringify({ totalClusters: 1, completedClusters: 1 })}`,
+      '',
+    ]
+    route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      headers: { 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' },
+      body: lines.join('\n'),
+    })
+  })
+
+  // 1c. Mock GitOps REST API endpoints (helm-history, helm-values, etc.)
+  await page.route('**/api/gitops/**', async (route) => {
+    // Skip stream endpoints (already handled above)
+    if (route.request().url().includes('/stream')) {
+      await route.fallback()
+      return
+    }
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ releases: [], subscriptions: [], operators: [], history: [], kustomizations: [], drifts: [], source: 'mock-gitops' }),
+    })
+  })
+
   // 2. Mock regular MCP REST API endpoints with realistic data
   await page.route('**/api/mcp/**', async (route) => {
     // Skip stream endpoints (already handled above)
@@ -285,7 +334,7 @@ async function setupLiveMocks(page: Page) {
   await page.route('**/api/**', async (route) => {
     const url = route.request().url()
     // Skip already-handled routes
-    if (url.includes('/api/mcp/') || url.includes('/api/me') || url.includes('/api/workloads') ||
+    if (url.includes('/api/mcp/') || url.includes('/api/gitops/') || url.includes('/api/me') || url.includes('/api/workloads') ||
         url.includes('/api/kubectl/') || url.includes('/api/active-users') ||
         url.includes('/api/notifications') || url.includes('/api/user/preferences') ||
         url.includes('/api/permissions/') || url.includes('/health') ||

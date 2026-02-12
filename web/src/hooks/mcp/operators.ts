@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { api } from '../../lib/api'
 import { isDemoMode } from '../../lib/demoMode'
 import { useDemoMode } from '../useDemoMode'
 import { registerRefetch } from '../../lib/modeTransition'
-import { clusterCacheRef, subscribeClusterCache } from './shared'
+import { clusterCacheRef } from './shared'
 import type { Operator, OperatorSubscription } from './types'
 
 // localStorage cache keys
@@ -53,9 +52,6 @@ function saveSubscriptionsCacheToStorage(data: OperatorSubscription[], key: stri
     }
   } catch { /* ignore */ }
 }
-
-// Per-cluster timeout for subscription REST calls
-const OPERATOR_API_TIMEOUT = 25000
 
 // Parse SSE text into events
 function parseSSEEvents(text: string): Array<{ event: string; data: string }> {
@@ -220,14 +216,12 @@ export function useOperators(cluster?: string) {
 }
 
 // Hook to get operator subscriptions for a cluster (or all clusters if undefined)
+// Uses SSE streaming to receive per-cluster batches as they arrive.
 export function useOperatorSubscriptions(cluster?: string) {
   const cacheKey = `subscriptions:${cluster || 'all'}`
   const cached = loadSubscriptionsCacheFromStorage(cacheKey)
   const { isDemoMode: demoMode } = useDemoMode()
   const initialMountRef = useRef(true)
-  const hasCompletedFetchRef = useRef(!!cached)
-  const abortRef = useRef<AbortController | null>(null)
-  const fetchInProgressRef = useRef(false)
 
   const [subscriptions, setSubscriptions] = useState<OperatorSubscription[]>(cached?.data || [])
   const [isLoading, setIsLoading] = useState(!cached)
@@ -235,25 +229,10 @@ export function useOperatorSubscriptions(cluster?: string) {
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<number | null>(cached?.timestamp || null)
   const [consecutiveFailures, setConsecutiveFailures] = useState(0)
-  // Track cluster count to re-fetch when clusters become available
-  const [clusterCount, setClusterCount] = useState(clusterCacheRef.clusters.length)
-  // Version counter to force refetch
   const [fetchVersion, setFetchVersion] = useState(0)
 
-  // Subscribe to cluster cache updates for "all clusters" mode
   useEffect(() => {
-    return subscribeClusterCache((cache) => {
-      setClusterCount(cache.clusters.length)
-    })
-  }, [])
-
-  // Refetch when cluster, clusterCount, or fetchVersion changes
-  useEffect(() => {
-    if (fetchInProgressRef.current) return
-
-    abortRef.current?.abort()
     const controller = new AbortController()
-    abortRef.current = controller
 
     const doFetch = async () => {
       if (isDemoMode()) {
@@ -267,62 +246,81 @@ export function useOperatorSubscriptions(cluster?: string) {
         return
       }
 
-      fetchInProgressRef.current = true
       setIsRefreshing(true)
 
-      const targets = cluster
-        ? [cluster]
-        : clusterCacheRef.clusters.filter(c => c.reachable !== false).map(c => c.name)
+      try {
+        const token = localStorage.getItem('token')
+        const clusterParam = cluster ? `&cluster=${encodeURIComponent(cluster)}` : ''
+        const url = `/api/gitops/operator-subscriptions/stream?_token=${encodeURIComponent(token || '')}${clusterParam}`
 
-      if (targets.length === 0) {
-        if (hasCompletedFetchRef.current) {
-          setSubscriptions([])
-          setIsLoading(false)
+        const response = await fetch(url, { signal: controller.signal })
+
+        if (!response.ok) {
+          throw new Error(`Stream failed: ${response.status}`)
         }
-        setIsRefreshing(false)
-        fetchInProgressRef.current = false
-        return
-      }
 
-      const accumulated: OperatorSubscription[] = []
-      let anySucceeded = false
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error('No response body')
 
-      await Promise.allSettled(
-        targets.map(async (clusterName) => {
-          try {
-            const { data } = await api.get<{ subscriptions: OperatorSubscription[] }>(
-              `/api/gitops/operator-subscriptions?cluster=${encodeURIComponent(clusterName)}`,
-              { timeout: OPERATOR_API_TIMEOUT },
-            )
-            anySucceeded = true
-            const subs = (data.subscriptions || []).map(sub => ({ ...sub, cluster: clusterName }))
-            if (subs.length > 0 && !controller.signal.aborted) {
-              accumulated.push(...subs)
-              setSubscriptions([...accumulated])
-              setIsLoading(false)
+        const decoder = new TextDecoder()
+        const accumulated: OperatorSubscription[] = []
+        let buffer = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+
+          const events = parseSSEEvents(buffer)
+          const lastNewlineIdx = buffer.lastIndexOf('\n\n')
+          buffer = lastNewlineIdx >= 0 ? buffer.slice(lastNewlineIdx + 2) : buffer
+
+          for (const evt of events) {
+            if (evt.event === 'batch') {
+              try {
+                const batch = JSON.parse(evt.data) as {
+                  subscriptions: OperatorSubscription[]
+                  cluster: string
+                  total: number
+                }
+                const subs = (batch.subscriptions || []).map(sub => ({
+                  ...sub,
+                  cluster: sub.cluster || batch.cluster,
+                }))
+                accumulated.push(...subs)
+                if (!controller.signal.aborted) {
+                  setSubscriptions([...accumulated])
+                  setIsLoading(false)
+                }
+              } catch { /* skip malformed batch */ }
+            } else if (evt.event === 'error') {
+              try {
+                const errData = JSON.parse(evt.data) as { error: string }
+                console.warn('[Subscriptions SSE] server error:', errData.error)
+              } catch { /* skip */ }
             }
-          } catch {
-            // Skip clusters where operator subscription API is unavailable
           }
-        }),
-      )
+        }
 
-      if (!controller.signal.aborted) {
-        if (anySucceeded || hasCompletedFetchRef.current) {
-          hasCompletedFetchRef.current = true
+        if (!controller.signal.aborted) {
           setSubscriptions([...accumulated])
           saveSubscriptionsCacheToStorage(accumulated, cacheKey)
           setError(null)
           setConsecutiveFailures(0)
           setLastRefresh(Date.now())
-        } else {
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) {
+          console.warn('[Subscriptions SSE] fetch error:', err)
           setConsecutiveFailures(prev => prev + 1)
-          setError('Unable to fetch operator subscriptions')
         }
       }
-      setIsLoading(false)
-      setIsRefreshing(false)
-      fetchInProgressRef.current = false
+
+      if (!controller.signal.aborted) {
+        setIsLoading(false)
+        setIsRefreshing(false)
+      }
     }
 
     doFetch()
@@ -333,14 +331,11 @@ export function useOperatorSubscriptions(cluster?: string) {
 
     return () => {
       controller.abort()
-      fetchInProgressRef.current = false
       unregisterRefetch()
     }
-  }, [cluster, clusterCount, fetchVersion, cacheKey])
+  }, [cluster, fetchVersion, cacheKey])
 
   const refetch = useCallback(() => {
-    abortRef.current?.abort()
-    fetchInProgressRef.current = false
     setFetchVersion(v => v + 1)
   }, [])
 
