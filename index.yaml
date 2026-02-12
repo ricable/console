@@ -3,9 +3,9 @@ entries:
   kubestellar-console:
   - apiVersion: v2
     appVersion: v0.3.10-nightly.20260212
-    created: "2026-02-12T15:00:10.109112584Z"
+    created: "2026-02-12T15:23:57.344978808Z"
     description: KubeStellar Console - AI-powered multi-cluster Kubernetes dashboard
-    digest: ff2357a480140b089f1ffafe26a1419a47a446f3cbb1af1e1e002f854b1f920d
+    digest: 625dfa3f5544a3b35c948e593c8b31d38e7eeacf006757999175002331f281e9
     home: https://kubestellar.io/docs/console
     keywords:
     - kubernetes
@@ -24,7 +24,7 @@ entries:
     version: 0.3.10-nightly.20260212
   - apiVersion: v2
     appVersion: v0.3.9
-    created: "2026-02-12T15:00:10.109635992Z"
+    created: "2026-02-12T15:23:57.345512417Z"
     description: KubeStellar Console - AI-powered multi-cluster Kubernetes dashboard
     digest: daf71ef15ab0bc82c01772124fa4732b5ca1989982aaf9cbc83fc96b3f927545
     home: https://kubestellar.io/docs/console
@@ -43,4 +43,4 @@ entries:
     urls:
     - https://kubestellar.github.io/console/kubestellar-console-0.3.9.tgz
     version: 0.3.9
-generated: "2026-02-12T15:00:10.108266254Z"
+generated: "2026-02-12T15:23:57.344255203Z"
