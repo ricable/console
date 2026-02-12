@@ -499,6 +499,7 @@ func (s *Server) setupRoutes() {
 	api.Get("/gitops/helm-values", gitopsHandlers.GetHelmValues)
 	api.Get("/gitops/kustomizations", gitopsHandlers.ListKustomizations)
 	api.Get("/gitops/operators", gitopsHandlers.ListOperators)
+	api.Get("/gitops/operator-subscriptions", gitopsHandlers.ListOperatorSubscriptions)
 	api.Post("/gitops/detect-drift", gitopsHandlers.DetectDrift)
 	api.Post("/gitops/sync", gitopsHandlers.Sync)
 

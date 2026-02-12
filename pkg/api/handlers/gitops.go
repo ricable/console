@@ -372,15 +372,13 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "operators": []Operator{}})
 		}
 
-		var wg sync.WaitGroup
 		var mu sync.Mutex
-		var allOperators []Operator
-		clusterTimeout := 15 * time.Second
+		allOperators := make([]Operator, 0)
+		clusterTimeout := 45 * time.Second
+		done := make(chan struct{})
 
 		for _, cl := range clusters {
-			wg.Add(1)
 			go func(clusterName string) {
-				defer wg.Done()
 				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
 				defer cancel()
 
@@ -390,10 +388,25 @@ func (h *GitOpsHandlers) ListOperators(c *fiber.Ctx) error {
 					allOperators = append(allOperators, operators...)
 					mu.Unlock()
 				}
+				select {
+				case done <- struct{}{}:
+				default:
+				}
 			}(cl.Name)
 		}
 
-		wg.Wait()
+		// Progressive: wait up to 45s total, but return as soon as all clusters respond
+		deadline := time.After(45 * time.Second)
+		remaining := len(clusters)
+		for remaining > 0 {
+			select {
+			case <-done:
+				remaining--
+			case <-deadline:
+				remaining = 0
+			}
+		}
+
 		return c.JSON(fiber.Map{"operators": allOperators})
 	}
 
@@ -457,6 +470,136 @@ func (h *GitOpsHandlers) getOperatorsForCluster(ctx context.Context, cluster str
 	}
 
 	return operators
+}
+
+// OperatorSubscription represents an OLM Subscription
+type OperatorSubscription struct {
+	Name               string `json:"name"`
+	Namespace          string `json:"namespace"`
+	Channel            string `json:"channel"`
+	Source             string `json:"source"`
+	InstallPlanApproval string `json:"installPlanApproval"`
+	CurrentCSV         string `json:"currentCSV"`
+	PendingUpgrade     string `json:"pendingUpgrade,omitempty"`
+	Cluster            string `json:"cluster,omitempty"`
+}
+
+// ListOperatorSubscriptions returns OLM Subscriptions
+func (h *GitOpsHandlers) ListOperatorSubscriptions(c *fiber.Ctx) error {
+	cluster := c.Query("cluster")
+
+	if cluster != "" {
+		subs := h.getSubscriptionsForCluster(c.Context(), cluster)
+		return c.JSON(fiber.Map{"subscriptions": subs})
+	}
+
+	if h.k8sClient != nil {
+		clusters, err := h.k8sClient.DeduplicatedClusters(c.Context())
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error(), "subscriptions": []OperatorSubscription{}})
+		}
+
+		var mu sync.Mutex
+		allSubs := make([]OperatorSubscription, 0)
+		clusterTimeout := 45 * time.Second
+		done := make(chan struct{})
+
+		for _, cl := range clusters {
+			go func(clusterName string) {
+				ctx, cancel := context.WithTimeout(c.Context(), clusterTimeout)
+				defer cancel()
+
+				subs := h.getSubscriptionsForCluster(ctx, clusterName)
+				if len(subs) > 0 {
+					mu.Lock()
+					allSubs = append(allSubs, subs...)
+					mu.Unlock()
+				}
+				select {
+				case done <- struct{}{}:
+				default:
+				}
+			}(cl.Name)
+		}
+
+		deadline := time.After(45 * time.Second)
+		remaining := len(clusters)
+		for remaining > 0 {
+			select {
+			case <-done:
+				remaining--
+			case <-deadline:
+				remaining = 0
+			}
+		}
+
+		return c.JSON(fiber.Map{"subscriptions": allSubs})
+	}
+
+	subs := h.getSubscriptionsForCluster(c.Context(), "")
+	return c.JSON(fiber.Map{"subscriptions": subs})
+}
+
+// getSubscriptionsForCluster gets OLM subscriptions for a specific cluster
+func (h *GitOpsHandlers) getSubscriptionsForCluster(ctx context.Context, cluster string) []OperatorSubscription {
+	args := []string{"get", "subscriptions.operators.coreos.com", "-A", "-o", "json"}
+	if cluster != "" {
+		args = append([]string{"--context", cluster}, args...)
+	}
+
+	cmd := exec.CommandContext(ctx, "kubectl", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		log.Printf("kubectl get subscriptions failed for cluster %s: %v, stderr: %s", cluster, err, stderr.String())
+		return []OperatorSubscription{}
+	}
+
+	var result struct {
+		Items []struct {
+			Metadata struct {
+				Name      string `json:"name"`
+				Namespace string `json:"namespace"`
+			} `json:"metadata"`
+			Spec struct {
+				Channel            string `json:"channel"`
+				Source             string `json:"source"`
+				InstallPlanApproval string `json:"installPlanApproval"`
+			} `json:"spec"`
+			Status struct {
+				CurrentCSV   string `json:"currentCSV"`
+				InstalledCSV string `json:"installedCSV"`
+				State        string `json:"state"`
+			} `json:"status"`
+		} `json:"items"`
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		log.Printf("failed to parse subscriptions for cluster %s: %v", cluster, err)
+		return []OperatorSubscription{}
+	}
+
+	subs := make([]OperatorSubscription, 0, len(result.Items))
+	for _, item := range result.Items {
+		sub := OperatorSubscription{
+			Name:               item.Metadata.Name,
+			Namespace:          item.Metadata.Namespace,
+			Channel:            item.Spec.Channel,
+			Source:             item.Spec.Source,
+			InstallPlanApproval: item.Spec.InstallPlanApproval,
+			CurrentCSV:         item.Status.CurrentCSV,
+			Cluster:            cluster,
+		}
+		// Detect pending upgrade: currentCSV differs from installedCSV
+		if item.Status.CurrentCSV != "" && item.Status.InstalledCSV != "" && item.Status.CurrentCSV != item.Status.InstalledCSV {
+			sub.PendingUpgrade = item.Status.CurrentCSV
+		}
+		subs = append(subs, sub)
+	}
+
+	return subs
 }
 
 // DetectDrift detects drift between git and cluster state

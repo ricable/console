@@ -100,41 +100,60 @@ export function useOperators(cluster?: string) {
 
       setIsRefreshing(true)
 
-      // Build URL — backend handles parallel cluster queries when no cluster specified
-      const url = cluster
-        ? `/api/gitops/operators?cluster=${encodeURIComponent(cluster)}`
-        : '/api/gitops/operators'
+      // Progressive discovery: fetch per-cluster in parallel, update UI as each responds
+      const targets = cluster
+        ? [cluster]
+        : clusterCacheRef.clusters.filter(c => c.reachable !== false).map(c => c.name)
 
-      try {
-        const { data } = await api.get<{ operators: Array<Operator & { phase?: string }> }>(url)
+      if (targets.length === 0) {
         if (!cancelled) {
-          // Map backend `phase` field to frontend `status` field
-          const newOperators = (data.operators || []).map(op => ({
-            ...op,
-            status: (op.status || op.phase || 'Unknown') as Operator['status'],
-            cluster: op.cluster || cluster || '',
-          }))
-          setOperators(newOperators)
-          saveOperatorsCacheToStorage(newOperators, cacheKey)
-          setError(null)
-          setConsecutiveFailures(0)
-          setLastRefresh(Date.now())
-        }
-      } catch (err) {
-        if (!cancelled) {
-          // Don't show error - operators are optional
-          setError(null)
-          setConsecutiveFailures(prev => prev + 1)
-          // Keep cached data on error instead of clearing
-          if (operators.length === 0) {
-            setOperators([])
-          }
-        }
-      } finally {
-        if (!cancelled) {
+          setOperators([])
           setIsLoading(false)
           setIsRefreshing(false)
         }
+        return
+      }
+
+      const accumulated: Operator[] = []
+      let completed = 0
+
+      const mapOperators = (ops: Array<Operator & { phase?: string }>, clusterName: string) =>
+        ops.map(op => ({
+          ...op,
+          status: (op.status || op.phase || 'Unknown') as Operator['status'],
+          cluster: op.cluster || clusterName,
+        }))
+
+      await Promise.allSettled(
+        targets.map(async (clusterName) => {
+          try {
+            const { data } = await api.get<{ operators: Array<Operator & { phase?: string }> }>(
+              `/api/gitops/operators?cluster=${encodeURIComponent(clusterName)}`,
+              { timeout: 90000 },
+            )
+            const ops = mapOperators(data.operators || [], clusterName)
+            if (ops.length > 0 && !cancelled) {
+              accumulated.push(...ops)
+              // Progressive update — show data as each cluster responds
+              setOperators([...accumulated])
+              setIsLoading(false)
+            }
+          } catch {
+            // Skip clusters where operator API is unavailable
+          } finally {
+            completed++
+          }
+        }),
+      )
+
+      if (!cancelled) {
+        setOperators([...accumulated])
+        saveOperatorsCacheToStorage(accumulated, cacheKey)
+        setError(null)
+        setConsecutiveFailures(accumulated.length > 0 ? 0 : 1)
+        setLastRefresh(Date.now())
+        setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
 
@@ -213,64 +232,50 @@ export function useOperatorSubscriptions(cluster?: string) {
 
       setIsRefreshing(true)
 
-      // If no cluster specified, fetch from all clusters
-      if (!cluster) {
-        const allClusters = clusterCacheRef.clusters
-        if (allClusters.length === 0) {
-          if (!cancelled) {
-            setSubscriptions([])
-            setIsLoading(false)
-            setIsRefreshing(false)
-          }
-          return
-        }
+      // Progressive discovery: fetch per-cluster in parallel, update UI as each responds
+      const targets = cluster
+        ? [cluster]
+        : clusterCacheRef.clusters.filter(c => c.reachable !== false).map(c => c.name)
 
-        const allSubscriptions: OperatorSubscription[] = []
-        for (const c of allClusters) {
-          try {
-            const { data } = await api.get<{ subscriptions: OperatorSubscription[] }>(`/api/mcp/operator-subscriptions?cluster=${encodeURIComponent(c.name)}`)
-            allSubscriptions.push(...(data.subscriptions || []).map(sub => ({ ...sub, cluster: c.name })))
-          } catch {
-            // Skip clusters where operator subscription API is unavailable
-          }
-        }
+      if (targets.length === 0) {
         if (!cancelled) {
-          setSubscriptions(allSubscriptions)
-          saveSubscriptionsCacheToStorage(allSubscriptions, cacheKey)
-          setError(null)
-          setConsecutiveFailures(0)
-          setLastRefresh(Date.now())
+          setSubscriptions([])
           setIsLoading(false)
           setIsRefreshing(false)
         }
         return
       }
 
-      try {
-        const { data } = await api.get<{ subscriptions: OperatorSubscription[] }>(`/api/mcp/operator-subscriptions?cluster=${encodeURIComponent(cluster)}`)
-        if (!cancelled) {
-          const newSubscriptions = (data.subscriptions || []).map(sub => ({ ...sub, cluster }))
-          setSubscriptions(newSubscriptions)
-          saveSubscriptionsCacheToStorage(newSubscriptions, cacheKey)
-          setError(null)
-          setConsecutiveFailures(0)
-          setLastRefresh(Date.now())
-        }
-      } catch (err) {
-        if (!cancelled) {
-          // Don't show error - subscriptions are optional
-          setError(null)
-          setConsecutiveFailures(prev => prev + 1)
-          // Keep cached data on error instead of clearing
-          if (subscriptions.length === 0) {
-            setSubscriptions([])
+      const accumulated: OperatorSubscription[] = []
+
+      await Promise.allSettled(
+        targets.map(async (clusterName) => {
+          try {
+            const { data } = await api.get<{ subscriptions: OperatorSubscription[] }>(
+              `/api/gitops/operator-subscriptions?cluster=${encodeURIComponent(clusterName)}`,
+              { timeout: 90000 },
+            )
+            const subs = (data.subscriptions || []).map(sub => ({ ...sub, cluster: clusterName }))
+            if (subs.length > 0 && !cancelled) {
+              accumulated.push(...subs)
+              // Progressive update — show data as each cluster responds
+              setSubscriptions([...accumulated])
+              setIsLoading(false)
+            }
+          } catch {
+            // Skip clusters where operator subscription API is unavailable
           }
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false)
-          setIsRefreshing(false)
-        }
+        }),
+      )
+
+      if (!cancelled) {
+        setSubscriptions([...accumulated])
+        saveSubscriptionsCacheToStorage(accumulated, cacheKey)
+        setError(null)
+        setConsecutiveFailures(accumulated.length > 0 ? 0 : 1)
+        setLastRefresh(Date.now())
+        setIsLoading(false)
+        setIsRefreshing(false)
       }
     }
 
