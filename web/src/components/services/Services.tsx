@@ -82,6 +82,7 @@ export function Services() {
       isRefreshing={dataRefreshing}
       lastUpdated={lastUpdated}
       hasData={reachableClusters.length > 0}
+      error={error}
       emptyState={{
         title: 'Services Dashboard',
         description: 'Add cards to monitor Kubernetes services, endpoints, and network connectivity across your clusters.',

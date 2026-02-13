@@ -22,8 +22,8 @@ const DEFAULT_POD_CARDS = getDefaultCards('pods')
 
 export function Pods() {
   // Use cached hooks for stale-while-revalidate pattern
-  const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastRefresh: podIssuesLastRefresh, refetch: refetchPodIssues } = useCachedPodIssues()
-  const { clusters, isLoading: clustersLoading, refetch: refetchClusters } = useClusters()
+  const { issues: podIssues, isLoading: podIssuesLoading, isRefreshing: podIssuesRefreshing, lastRefresh: podIssuesLastRefresh, refetch: refetchPodIssues, error: podIssuesError } = useCachedPodIssues()
+  const { clusters, isLoading: clustersLoading, refetch: refetchClusters, error: clustersError } = useClusters()
 
   // Derive lastUpdated from cache timestamp
   const lastUpdated = podIssuesLastRefresh ? new Date(podIssuesLastRefresh) : null
@@ -41,6 +41,7 @@ export function Pods() {
   // Combined loading/refreshing states
   const isLoading = podIssuesLoading || clustersLoading
   const isRefreshing = podIssuesRefreshing
+  const error = podIssuesError || clustersError
   const isModeSwitching = useIsModeSwitching()
   // Show skeleton during mode switching for smooth transitions
   const showSkeletons = (podIssues.length === 0 && isLoading) || isModeSwitching
@@ -132,6 +133,7 @@ export function Pods() {
       isRefreshing={isRefreshing}
       lastUpdated={lastUpdated}
       hasData={stats.totalPods > 0}
+      error={error}
       emptyState={{
         title: 'Pods Dashboard',
         description: 'Add cards to monitor pod health, issues, and resource usage across your clusters.',

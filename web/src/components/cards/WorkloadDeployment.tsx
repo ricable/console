@@ -376,7 +376,7 @@ export function WorkloadDeployment(_props: WorkloadDeploymentProps) {
   const isDemo = demoMode
 
   // Fetch real workloads from cache (handles demo mode internally via useCache)
-  const { data: realWorkloads, isLoading: workloadsLoading, isFailed, consecutiveFailures } = useCachedWorkloads()
+  const { data: realWorkloads, isLoading: workloadsLoading, isFailed, consecutiveFailures, error, refetch } = useCachedWorkloads()
 
   // Report state to CardWrapper for refresh animation
   const { showSkeleton } = useCardLoadingState({
@@ -579,6 +579,28 @@ export function WorkloadDeployment(_props: WorkloadDeploymentProps) {
           <Skeleton variant="rounded" height={70} />
           <Skeleton variant="rounded" height={70} />
         </div>
+      </div>
+    )
+  }
+
+  // Show error state if failed and no data
+  if (isFailed && !isDemo && workloads.length === 0 && error) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+        <XCircle className="h-12 w-12 text-red-500 mb-4" />
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          Failed to Load Workloads
+        </h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 max-w-md">
+          {error}
+        </p>
+        <button
+          onClick={() => refetch()}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+        >
+          <ArrowUpRight className="h-4 w-4" />
+          Retry
+        </button>
       </div>
     )
   }
