@@ -14,6 +14,7 @@ import {
   Plus,
   ArrowUpRight,
   GripVertical,
+  RefreshCw,
 } from 'lucide-react'
 import { ClusterBadge } from '../ui/ClusterBadge'
 import { Skeleton } from '../ui/Skeleton'
@@ -598,7 +599,7 @@ export function WorkloadDeployment(_props: WorkloadDeploymentProps) {
           onClick={() => refetch()}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
         >
-          <ArrowUpRight className="h-4 w-4" />
+          <RefreshCw className="h-4 w-4" />
           Retry
         </button>
       </div>
