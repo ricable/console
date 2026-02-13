@@ -32,6 +32,7 @@ export function ClusterCardSkeleton() {
       </div>
 
       {/* Stats grid */}
+      {/* Multi-cluster: Renders skeleton for 4 stats (works for any cluster) */}
       <div className="grid grid-cols-4 gap-4 text-center">
         {[...Array(4)].map((_, i) => (
           <div key={i}>
@@ -55,6 +56,7 @@ export function ClusterCardSkeleton() {
 /**
  * Stats overview skeleton for the top summary section
  * Uses the shared Skeleton component for consistent styling with dashboard cards
+ * Multi-cluster: Renders 8 stat blocks for aggregate multi-cluster metrics
  */
 export function StatsOverviewSkeleton() {
   return (

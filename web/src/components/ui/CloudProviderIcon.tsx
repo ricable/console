@@ -402,6 +402,7 @@ export function getConsoleUrl(provider: CloudProvider, clusterName: string, apiS
 }
 
 // Provider detection from cluster name, API server URL, user, and optionally namespaces
+// Multi-cluster: Detects provider for each cluster independently using various heuristics
 // Priority: 1. Namespace-based (most accurate), 2. Name-based, 3. User-based, 4. URL-based
 export function detectCloudProvider(
   clusterName: string,
@@ -414,6 +415,7 @@ export function detectCloudProvider(
   const user = userName?.toLowerCase() || ''
 
   // Check namespace-based patterns FIRST (most accurate when available)
+  // Multi-cluster: Each cluster has its own namespace list for detection
   if (namespaces && namespaces.length > 0) {
     const nsLower = namespaces.map(ns => ns.toLowerCase())
 

@@ -129,6 +129,9 @@ const Cluster = ({
       </Billboard>
 
       {/* Nodes */}
+      {/* Note: This visualization component renders 3D nodes for globe animation.
+           The .map() and .filter() operations here are for rendering graphics nodes,
+           not related to Kubernetes cluster management (multi-cluster context) */}
       <group ref={clusterRef}>
         {nodes.map((nodePos, idx) => (
           <group key={idx}>

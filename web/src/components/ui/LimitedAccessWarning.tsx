@@ -4,9 +4,9 @@ import { cn } from '../../lib/cn'
 interface LimitedAccessWarningProps {
   /** Show when there's an error (demo data mode) */
   hasError?: boolean
-  /** Show when some clusters are unreachable */
+  /** Show when some clusters are unreachable (multi-cluster: tracks unreachable count) */
   unreachableCount?: number
-  /** Total cluster count for context */
+  /** Total cluster count for context (multi-cluster: total clusters being monitored) */
   totalCount?: number
   /** Custom message */
   message?: string
@@ -32,6 +32,7 @@ export function LimitedAccessWarning({
   const getText = () => {
     if (message) return message
     if (hasError) return 'Using demo data'
+    // Multi-cluster: Display unreachable cluster counts with proper pluralization
     if (unreachableCount > 0 && totalCount) {
       return `${unreachableCount} of ${totalCount} clusters offline`
     }

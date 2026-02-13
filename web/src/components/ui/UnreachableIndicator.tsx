@@ -49,9 +49,10 @@ export function UnreachableIndicator({
 /**
  * Inline value display that shows "-" for unreachable clusters
  * with the unreachable indicator on hover
+ * Multi-cluster: Used to display values per-cluster with unreachable state handling
  */
 interface UnreachableValueProps {
-  /** Whether the cluster is reachable/healthy */
+  /** Whether the cluster is reachable/healthy (multi-cluster: per-cluster state) */
   isReachable: boolean
   /** The value to display when reachable */
   value: number | string

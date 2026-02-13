@@ -117,6 +117,7 @@ export function ClusterFilterDropdown({
               >
                 All clusters
               </button>
+              {/* Multi-cluster: Render dropdown item for each available cluster */}
               {availableClusters.map(cluster => {
                 const clusterState: ClusterState = cluster.healthy !== undefined || cluster.reachable !== undefined
                   ? getClusterState(

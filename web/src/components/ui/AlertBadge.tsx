@@ -117,6 +117,7 @@ export function AlertBadge() {
       result = result.filter(a =>
         a.ruleName.toLowerCase().includes(query) ||
         a.message.toLowerCase().includes(query) ||
+        // Multi-cluster: Search by cluster name (alerts can come from any cluster)
         (a.cluster?.toLowerCase() || '').includes(query)
       )
     }
@@ -140,6 +141,7 @@ export function AlertBadge() {
 
   const handleAlertClick = (alert: Alert) => {
     setIsOpen(false)
+    // Multi-cluster: Open drilldown for the specific cluster where the alert originated
     if (alert.cluster) {
       openDrillDown({
         type: 'cluster',
@@ -427,6 +429,7 @@ export function AlertBadge() {
                         {alert.message}
                       </p>
                       <div className="flex items-center gap-3 mt-1">
+                        {/* Multi-cluster: Display cluster name for alerts (each alert has cluster field) */}
                         {alert.cluster && (
                           <span className="text-xs text-muted-foreground flex items-center gap-1">
                             <Server className="w-3 h-3" />
@@ -467,6 +470,7 @@ export function AlertBadge() {
                         )
                       } else {
                         // No mission or mission was deleted - show diagnose button
+                        // Multi-cluster: Pass cluster info to AI actions for cluster-specific diagnosis
                         return (
                           <CardAIActions
                             resource={{ kind: 'Alert', name: alert.ruleName, cluster: alert.cluster, status: alert.severity }}

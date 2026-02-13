@@ -19,7 +19,8 @@ export function AIML() {
   const { nodes: gpuNodes, isLoading: gpuLoading } = useGPUNodes()
   const { getStatValue: getUniversalStatValue } = useUniversalStats()
 
-  // Get GPU cluster names for intelligent LLM-d cluster discovery
+  // Multi-cluster: Aggregate GPU cluster names across all clusters for intelligent LLM-d discovery
+  // Each GPU node includes a 'cluster' field, allowing us to identify which clusters have GPUs
   const gpuClusterNames = useMemo(() => new Set(gpuNodes.map(n => n.cluster)), [gpuNodes])
 
   // Dynamically discover LLM-d clusters from available reachable clusters
@@ -28,7 +29,7 @@ export function AIML() {
 
   const { models: llmModels, isLoading: llmLoading } = useCachedLLMdModels(llmdClusters)
 
-  // Filter reachable clusters
+  // Multi-cluster: Filter to only include reachable clusters from the full cluster array
   const reachableClusters = clusters.filter(c => c.reachable !== false)
 
   // Calculate total GPUs

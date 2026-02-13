@@ -116,6 +116,7 @@ export function ClusterSelect({
             >
               {placeholder}
             </button>
+            {/* Multi-cluster: Render option for each cluster in the selection dropdown */}
             {clusters.map(cluster => {
               const clusterState: ClusterState = cluster.healthy !== undefined || cluster.reachable !== undefined
                 ? getClusterState(cluster.healthy ?? true, cluster.reachable, cluster.nodeCount, undefined, cluster.errorType)
