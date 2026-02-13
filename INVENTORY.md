@@ -1,16 +1,16 @@
 # KubeStellar Console - Complete Inventory
 
-Last Updated: 2026-02-05  
-Last Verified: 2026-02-05 (Auto-QA verification - all 23 drill-down views and 29+ modals confirmed present)
+Last Updated: 2026-02-13  
+Last Verified: 2026-02-13 (Auto-QA verification - all 24 drill-down views and 29+ modals confirmed present)
 
 ## Summary
 
 | Category | Count |
 |----------|-------|
 | Dashboard Pages | 22 (1 main + 21 dedicated) |
-| Card Types | 143 |
-| Cards with Drill-Down | 37 (+ 3 planned) |
-| Drill-Down Views | 23 |
+| Card Types | 144 |
+| Cards with Drill-Down | 38 (+ 3 planned) |
+| Drill-Down Views | 24 |
 | Modal Dialogs | 32 standalone + 7 inline |
 | Stats Block Types | 93 (across 14 dashboard types) |
 | Cards with Demo Data | 42 (29%) |
@@ -60,7 +60,7 @@ Last Verified: 2026-02-05 (Auto-QA verification - all 23 drill-down views and 29
 
 ---
 
-## 2. Card Types (110 Total)
+## 2. Card Types (144 Total)
 
 ### Category: Cluster Health (8 cards)
 | # | Type | Title | Visualization |
@@ -85,7 +85,7 @@ Last Verified: 2026-02-05 (Auto-QA verification - all 23 drill-down views and 29
 | 14 | `app_status` | Workload Status | donut |
 | 15 | `workload_deployment` | Workload Deployment | table |
 
-### Category: Compute (8 cards)
+### Category: Compute (9 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
 | 16 | `compute_overview` | Compute Overview | status |
@@ -94,222 +94,223 @@ Last Verified: 2026-02-05 (Auto-QA verification - all 23 drill-down views and 29
 | 19 | `gpu_overview` | GPU Overview | gauge |
 | 20 | `gpu_status` | GPU Status | donut |
 | 21 | `gpu_inventory` | GPU Inventory | table |
-| 22 | `gpu_workloads` | GPU Workloads | table |
-| 23 | `gpu_usage_trend` | GPU Usage Trend | timeseries |
+| 22 | `gpu_namespace_allocations` | GPU Namespace Allocations | table |
+| 23 | `gpu_workloads` | GPU Workloads | table |
+| 24 | `gpu_usage_trend` | GPU Usage Trend | timeseries |
 
 ### Category: Storage (2 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 24 | `storage_overview` | Storage Overview | status |
-| 25 | `pvc_status` | PVC Status | table |
+| 25 | `storage_overview` | Storage Overview | status |
+| 26 | `pvc_status` | PVC Status | table |
 
 ### Category: Network (7 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 26 | `network_overview` | Network Overview | status |
-| 27 | `service_status` | Service Status | table |
-| 28 | `cluster_network` | Cluster Network | status |
-| 29 | `service_exports` | Service Exports (MCS) | table |
-| 30 | `service_imports` | Service Imports (MCS) | table |
-| 31 | `gateway_status` | Gateway API Status | status |
-| 32 | `service_topology` | Service Topology | diagram |
+| 27 | `network_overview` | Network Overview | status |
+| 28 | `service_status` | Service Status | table |
+| 29 | `cluster_network` | Cluster Network | status |
+| 30 | `service_exports` | Service Exports (MCS) | table |
+| 31 | `service_imports` | Service Imports (MCS) | table |
+| 32 | `gateway_status` | Gateway API Status | status |
+| 33 | `service_topology` | Service Topology | diagram |
 
 ### Category: GitOps (7 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 33 | `helm_release_status` | Helm Releases | status |
-| 34 | `helm_history` | Helm History | events |
-| 35 | `helm_values_diff` | Helm Values Diff | table |
-| 36 | `chart_versions` | Helm Chart Versions | table |
-| 37 | `kustomization_status` | Kustomization Status | status |
-| 38 | `overlay_comparison` | Overlay Comparison | table |
-| 39 | `gitops_drift` | GitOps Drift | status |
+| 34 | `helm_release_status` | Helm Releases | status |
+| 35 | `helm_history` | Helm History | events |
+| 36 | `helm_values_diff` | Helm Values Diff | table |
+| 37 | `chart_versions` | Helm Chart Versions | table |
+| 38 | `kustomization_status` | Kustomization Status | status |
+| 39 | `overlay_comparison` | Overlay Comparison | table |
+| 40 | `gitops_drift` | GitOps Drift | status |
 
 ### Category: ArgoCD (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 40 | `argocd_applications` | ArgoCD Applications | status |
-| 41 | `argocd_sync_status` | ArgoCD Sync Status | donut |
-| 42 | `argocd_health` | ArgoCD Health | status |
+| 41 | `argocd_applications` | ArgoCD Applications | status |
+| 42 | `argocd_sync_status` | ArgoCD Sync Status | donut |
+| 43 | `argocd_health` | ArgoCD Health | status |
 
 ### Category: Operators (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 43 | `operator_status` | OLM Operators | status |
-| 44 | `operator_subscriptions` | Operator Subscriptions | table |
-| 45 | `crd_health` | CRD Health | status |
+| 44 | `operator_status` | OLM Operators | status |
+| 45 | `operator_subscriptions` | Operator Subscriptions | table |
+| 46 | `crd_health` | CRD Health | status |
 
 ### Category: Namespaces (5 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 46 | `namespace_overview` | Namespace Overview | status |
-| 47 | `namespace_quotas` | Namespace Quotas | gauge |
-| 48 | `namespace_rbac` | Namespace RBAC | table |
-| 49 | `namespace_events` | Namespace Events | events |
-| 50 | `namespace_monitor` | Namespace Monitor | status |
+| 47 | `namespace_overview` | Namespace Overview | status |
+| 48 | `namespace_quotas` | Namespace Quotas | gauge |
+| 49 | `namespace_rbac` | Namespace RBAC | table |
+| 50 | `namespace_events` | Namespace Events | events |
+| 51 | `namespace_monitor` | Namespace Monitor | status |
 
 ### Category: Security & Events (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 51 | `security_issues` | Security Issues | table |
-| 52 | `event_stream` | Event Stream | events |
-| 53 | `user_management` | User Management | table |
+| 52 | `security_issues` | Security Issues | table |
+| 53 | `event_stream` | Event Stream | events |
+| 54 | `user_management` | User Management | table |
 
 ### Category: Live Trends (4 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 54 | `events_timeline` | Events Timeline | timeseries |
-| 55 | `pod_health_trend` | Pod Health Trend | timeseries |
-| 56 | `resource_trend` | Resource Trend | timeseries |
-| 57 | `gpu_utilization` | GPU Utilization | timeseries |
+| 55 | `events_timeline` | Events Timeline | timeseries |
+| 56 | `pod_health_trend` | Pod Health Trend | timeseries |
+| 57 | `resource_trend` | Resource Trend | timeseries |
+| 58 | `gpu_utilization` | GPU Utilization | timeseries |
 
 ### Category: AI (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 58 | `console_ai_issues` | AI Issues | status |
-| 59 | `console_ai_kubeconfig_audit` | AI Kubeconfig Audit | status |
-| 60 | `console_ai_health_check` | AI Health Check | gauge |
+| 59 | `console_ai_issues` | AI Issues | status |
+| 60 | `console_ai_kubeconfig_audit` | AI Kubeconfig Audit | status |
+| 61 | `console_ai_health_check` | AI Health Check | gauge |
 
 ### Category: Alerting (2 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 61 | `active_alerts` | Active Alerts | status |
-| 62 | `alert_rules` | Alert Rules | table |
+| 62 | `active_alerts` | Active Alerts | status |
+| 63 | `alert_rules` | Alert Rules | table |
 
 ### Category: Cost Management (2 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 63 | `opencost_overview` | OpenCost | bar |
-| 64 | `kubecost_overview` | Kubecost | bar |
+| 64 | `opencost_overview` | OpenCost | bar |
+| 65 | `kubecost_overview` | Kubecost | bar |
 
 ### Category: Policy Management (2 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 65 | `opa_policies` | OPA Gatekeeper | status |
-| 66 | `kyverno_policies` | Kyverno Policies | status |
+| 66 | `opa_policies` | OPA Gatekeeper | status |
+| 67 | `kyverno_policies` | Kyverno Policies | status |
 
 ### Category: Compliance & Security Posture (5 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 67 | `falco_alerts` | Falco Alerts | status |
-| 68 | `trivy_scan` | Trivy Scan | status |
-| 69 | `kubescape_scan` | Kubescape Scan | status |
-| 70 | `policy_violations` | Policy Violations | table |
-| 71 | `compliance_score` | Compliance Score | gauge |
+| 68 | `falco_alerts` | Falco Alerts | status |
+| 69 | `trivy_scan` | Trivy Scan | status |
+| 70 | `kubescape_scan` | Kubescape Scan | status |
+| 71 | `policy_violations` | Policy Violations | table |
+| 72 | `compliance_score` | Compliance Score | gauge |
 
 ### Category: Data Compliance (3 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 72 | `vault_secrets` | Vault Secrets | status |
-| 73 | `external_secrets` | External Secrets | status |
-| 74 | `cert_manager` | Cert Manager | status |
+| 73 | `vault_secrets` | Vault Secrets | status |
+| 74 | `external_secrets` | External Secrets | status |
+| 75 | `cert_manager` | Cert Manager | status |
 
 ### Category: Workload Detection (7 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 75 | `prow_jobs` | Prow Jobs | table |
-| 76 | `prow_status` | Prow Status | status |
-| 77 | `prow_history` | Prow History | events |
-| 78 | `llm_inference` | LLM Inference | table |
-| 79 | `llm_models` | LLM Models | table |
-| 80 | `ml_jobs` | ML Training Jobs | table |
-| 81 | `ml_notebooks` | Jupyter Notebooks | table |
+| 76 | `prow_jobs` | Prow Jobs | table |
+| 77 | `prow_status` | Prow Status | status |
+| 78 | `prow_history` | Prow History | events |
+| 79 | `llm_inference` | LLM Inference | table |
+| 80 | `llm_models` | LLM Models | table |
+| 81 | `ml_jobs` | ML Training Jobs | table |
+| 82 | `ml_notebooks` | Jupyter Notebooks | table |
 
 ### Category: External Integrations (2 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 82 | `github_activity` | GitHub Activity | table |
-| 83 | `weather` | Weather | status |
+| 83 | `github_activity` | GitHub Activity | table |
+| 84 | `weather` | Weather | status |
 
 ### Category: Utilities (5 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 84 | `kubectl` | Kubectl Terminal | interactive |
-| 85 | `iframe_embed` | Iframe Embed | interactive |
-| 86 | `network_utils` | Network Utils | interactive |
-| 87 | `mobile_browser` | Mobile Browser | interactive |
-| 88 | `stock_market_ticker` | Stock Market Ticker | status |
+| 85 | `kubectl` | Kubectl Terminal | interactive |
+| 86 | `iframe_embed` | Iframe Embed | interactive |
+| 87 | `network_utils` | Network Utils | interactive |
+| 88 | `mobile_browser` | Mobile Browser | interactive |
+| 89 | `stock_market_ticker` | Stock Market Ticker | status |
 
 ### Category: Games (22 cards)
 | # | Type | Title | Visualization |
 |---|------|-------|---------------|
-| 89 | `sudoku_game` | Sudoku Game | interactive |
-| 90 | `match_game` | Kube Match | interactive |
-| 91 | `solitaire` | Kube Solitaire | interactive |
-| 92 | `checkers` | AI Checkers | interactive |
-| 93 | `game_2048` | Kube 2048 | interactive |
-| 94 | `kubedle` | Kubedle | interactive |
-| 95 | `pod_sweeper` | Pod Sweeper | interactive |
-| 96 | `container_tetris` | Container Tetris | interactive |
-| 97 | `flappy_pod` | Flappy Pod | interactive |
-| 98 | `kube_man` | Kube-Man | interactive |
-| 99 | `kube_kong` | Kube Kong | interactive |
-| 100 | `pod_pitfall` | Pod Pitfall | interactive |
-| 101 | `node_invaders` | Node Invaders | interactive |
-| 102 | `pod_brothers` | Pod Brothers | interactive |
-| 103 | `kube_kart` | Kube Kart | interactive |
-| 104 | `kube_pong` | Kube Pong | interactive |
-| 105 | `kube_snake` | Kube Snake | interactive |
-| 106 | `kube_galaga` | Kube Galaga | interactive |
-| 107 | `kube_craft` | KubeCraft | interactive |
-| 108 | `kube_chess` | Kube Chess | interactive |
-| 109 | `kube_craft_3d` | KubeCraft 3D | interactive |
-| 110 | `kube_doom` | Kube Doom | interactive |
+| 90 | `sudoku_game` | Sudoku Game | interactive |
+| 91 | `match_game` | Kube Match | interactive |
+| 92 | `solitaire` | Kube Solitaire | interactive |
+| 93 | `checkers` | AI Checkers | interactive |
+| 94 | `game_2048` | Kube 2048 | interactive |
+| 95 | `kubedle` | Kubedle | interactive |
+| 96 | `pod_sweeper` | Pod Sweeper | interactive |
+| 97 | `container_tetris` | Container Tetris | interactive |
+| 98 | `flappy_pod` | Flappy Pod | interactive |
+| 99 | `kube_man` | Kube-Man | interactive |
+| 100 | `kube_kong` | Kube Kong | interactive |
+| 101 | `pod_pitfall` | Pod Pitfall | interactive |
+| 102 | `node_invaders` | Node Invaders | interactive |
+| 103 | `pod_brothers` | Pod Brothers | interactive |
+| 104 | `kube_kart` | Kube Kart | interactive |
+| 105 | `kube_pong` | Kube Pong | interactive |
+| 106 | `kube_snake` | Kube Snake | interactive |
+| 107 | `kube_galaga` | Kube Galaga | interactive |
+| 108 | `kube_craft` | KubeCraft | interactive |
+| 109 | `kube_chess` | Kube Chess | interactive |
+| 110 | `kube_craft_3d` | KubeCraft 3D | interactive |
+| 111 | `kube_doom` | Kube Doom | interactive |
 
 ### Category: NEW - Kubernetes Resources (17 cards)
 | # | Type | Title | Visualization | Demo Data |
 |---|------|-------|---------------|-----------|
-| 111 | `configmap_status` | ConfigMap Status | table | ❌ Live |
-| 112 | `secret_status` | Secret Status | table | ❌ Live |
-| 113 | `node_status` | Node Status | table | ❌ Live |
-| 114 | `job_status` | Job Status | table | ❌ Live |
-| 115 | `cronjob_status` | CronJob Status | table | ❌ Live |
-| 116 | `daemonset_status` | DaemonSet Status | table | ❌ Live |
-| 117 | `statefulset_status` | StatefulSet Status | table | ❌ Live |
-| 118 | `replicaset_status` | ReplicaSet Status | table | ❌ Live |
-| 119 | `hpa_status` | HPA Status | table | ❌ Live |
-| 120 | `pv_status` | PV Status | table | ❌ Live |
-| 121 | `ingress_status` | Ingress Status | table | ❌ Live |
-| 122 | `namespace_status` | Namespace Status | table | ❌ Live |
-| 123 | `limit_range_status` | LimitRange Status | table | ❌ Live |
-| 124 | `resource_quota_status` | ResourceQuota Status | table | ❌ Live |
-| 125 | `network_policy_status` | NetworkPolicy Status | table | ❌ Live |
-| 126 | `service_account_status` | ServiceAccount Status | table | ❌ Live |
-| 127 | `role_status` | Role Status | table | ❌ Live |
-| 128 | `role_binding_status` | RoleBinding Status | table | ❌ Live |
+| 112 | `configmap_status` | ConfigMap Status | table | ❌ Live |
+| 113 | `secret_status` | Secret Status | table | ❌ Live |
+| 114 | `node_status` | Node Status | table | ❌ Live |
+| 115 | `job_status` | Job Status | table | ❌ Live |
+| 116 | `cronjob_status` | CronJob Status | table | ❌ Live |
+| 117 | `daemonset_status` | DaemonSet Status | table | ❌ Live |
+| 118 | `statefulset_status` | StatefulSet Status | table | ❌ Live |
+| 119 | `replicaset_status` | ReplicaSet Status | table | ❌ Live |
+| 120 | `hpa_status` | HPA Status | table | ❌ Live |
+| 121 | `pv_status` | PV Status | table | ❌ Live |
+| 122 | `ingress_status` | Ingress Status | table | ❌ Live |
+| 123 | `namespace_status` | Namespace Status | table | ❌ Live |
+| 124 | `limit_range_status` | LimitRange Status | table | ❌ Live |
+| 125 | `resource_quota_status` | ResourceQuota Status | table | ❌ Live |
+| 126 | `network_policy_status` | NetworkPolicy Status | table | ❌ Live |
+| 127 | `service_account_status` | ServiceAccount Status | table | ❌ Live |
+| 128 | `role_status` | Role Status | table | ❌ Live |
+| 129 | `role_binding_status` | RoleBinding Status | table | ❌ Live |
 
 ### Category: NEW - Events & Monitoring (4 cards)
 | # | Type | Title | Visualization | Demo Data |
 |---|------|-------|---------------|-----------|
-| 129 | `warning_events` | Warning Events | events | ❌ Live |
-| 130 | `recent_events` | Recent Events | events | ❌ Live |
-| 131 | `event_summary` | Event Summary | status | ✅ Demo |
-| 132 | `provider_health` | Provider Health | status | ✅ Demo |
+| 130 | `warning_events` | Warning Events | events | ❌ Live |
+| 131 | `recent_events` | Recent Events | events | ❌ Live |
+| 132 | `event_summary` | Event Summary | status | ✅ Demo |
+| 133 | `provider_health` | Provider Health | status | ✅ Demo |
 
 ### Category: NEW - Deploy & GitOps (5 cards)
 | # | Type | Title | Visualization | Demo Data |
 |---|------|-------|---------------|-----------|
-| 133 | `cluster_groups` | Cluster Groups | status | ✅ Demo |
-| 134 | `deployment_missions` | Deployment Missions | status | ✅ Demo |
-| 135 | `resource_marshall` | Resource Marshall | interactive | ❌ Live |
-| 136 | `workload_deployment` | Workload Deployment | table | ❌ Live |
-| 137 | `workload_monitor` | Workload Monitor | status | ❌ Live |
+| 134 | `cluster_groups` | Cluster Groups | status | ✅ Demo |
+| 135 | `deployment_missions` | Deployment Missions | status | ✅ Demo |
+| 136 | `resource_marshall` | Resource Marshall | interactive | ❌ Live |
+| 137 | `workload_deployment` | Workload Deployment | table | ❌ Live |
+| 138 | `workload_monitor` | Workload Monitor | status | ❌ Live |
 
 ### Category: NEW - AI & Integrations (5 cards)
 | # | Type | Title | Visualization | Demo Data |
 |---|------|-------|---------------|-----------|
-| 138 | `console_ai_offline_detection` | AI Offline Detection | status | ✅ Demo |
-| 139 | `cluster_health_monitor` | Cluster Health Monitor | status | ❌ Live |
-| 140 | `github_ci_monitor` | GitHub CI Monitor | status | ❌ Live |
-| 141 | `prow_ci_monitor` | Prow CI Monitor | status | ❌ Live |
-| 142 | `llmd_stack_monitor` | LLM-d Stack Monitor | status | ❌ Live |
+| 139 | `console_ai_offline_detection` | AI Offline Detection | status | ✅ Demo |
+| 140 | `cluster_health_monitor` | Cluster Health Monitor | status | ❌ Live |
+| 141 | `github_ci_monitor` | GitHub CI Monitor | status | ❌ Live |
+| 142 | `prow_ci_monitor` | Prow CI Monitor | status | ❌ Live |
+| 143 | `llmd_stack_monitor` | LLM-d Stack Monitor | status | ❌ Live |
 
 ### Category: NEW - Misc (3 cards)
 | # | Type | Title | Visualization | Demo Data |
 |---|------|-------|---------------|-----------|
-| 143 | `dynamic_card` | Dynamic Card | dynamic | ❌ Live |
-| 144 | `rss_feed` | RSS Feed | events | ✅ Demo |
-| 145 | `pod_crosser` | Pod Crosser | interactive | ❌ Game |
+| 144 | `dynamic_card` | Dynamic Card | dynamic | ❌ Live |
+| 145 | `rss_feed` | RSS Feed | events | ✅ Demo |
+| 146 | `pod_crosser` | Pod Crosser | interactive | ❌ Game |
 
 ---
 
@@ -634,7 +635,7 @@ These modals are defined within card/page components rather than as standalone f
 
 ---
 
-## 8. Drill-Down Views (23 Total)
+## 8. Drill-Down Views (24 Total)
 
 Drill-down views are displayed within `DrillDownModal` when clicking items in cards.
 
@@ -648,25 +649,26 @@ Drill-down views are displayed within `DrillDownModal` when clicking items in ca
 | 6 | DeploymentDrillDown | `drilldown/views/DeploymentDrillDown.tsx` | DeploymentStatus, DeploymentIssues |
 | 7 | DriftDrillDown | `drilldown/views/DriftDrillDown.tsx` | GitOpsDrift card |
 | 8 | EventsDrillDown | `drilldown/views/EventsDrillDown.tsx` | EventStream, NamespaceEvents |
-| 9 | GPUNodeDrillDown | `drilldown/views/GPUNodeDrillDown.tsx` | GPUInventory, GPUStatus cards |
-| 10 | HelmReleaseDrillDown | `drilldown/views/HelmReleaseDrillDown.tsx` | HelmReleaseStatus, HelmHistory |
-| 11 | KustomizationDrillDown | `drilldown/views/KustomizationDrillDown.tsx` | KustomizationStatus, OverlayComparison |
-| 12 | LogsDrillDown | `drilldown/views/LogsDrillDown.tsx` | Pod logs access |
-| 13 | MultiClusterSummaryDrillDown | `drilldown/views/MultiClusterSummaryDrillDown.tsx` | All-clusters, all-namespaces, all-deployments, all-pods views |
-| 14 | NamespaceDrillDown | `drilldown/views/NamespaceDrillDown.tsx` | NamespaceOverview card |
-| 15 | NodeDrillDown | `drilldown/views/NodeDrillDown.tsx` | Node items in ComputeOverview |
-| 16 | OperatorDrillDown | `drilldown/views/OperatorDrillDown.tsx` | OperatorStatus, OperatorSubscriptions |
-| 17 | PodDrillDown | `drilldown/views/PodDrillDown.tsx` | TopPods, PodIssues cards |
-| 18 | PolicyDrillDown | `drilldown/views/PolicyDrillDown.tsx` | OPAPolicies, KyvernoPolicies |
-| 19 | ReplicaSetDrillDown | `drilldown/views/ReplicaSetDrillDown.tsx` | ReplicaSet resources |
-| 20 | ResourcesDrillDown | `drilldown/views/ResourcesDrillDown.tsx` | Generic resource drill-down |
-| 21 | SecretDrillDown | `drilldown/views/SecretDrillDown.tsx` | Secret resources |
-| 22 | ServiceAccountDrillDown | `drilldown/views/ServiceAccountDrillDown.tsx` | RBAC service accounts |
-| 23 | YAMLDrillDown | `drilldown/views/YAMLDrillDown.tsx` | YAML view for any resource |
+| 9 | GPUNamespaceDrillDown | `drilldown/views/GPUNamespaceDrillDown.tsx` | GPUNamespaceAllocations card |
+| 10 | GPUNodeDrillDown | `drilldown/views/GPUNodeDrillDown.tsx` | GPUInventory, GPUStatus cards |
+| 11 | HelmReleaseDrillDown | `drilldown/views/HelmReleaseDrillDown.tsx` | HelmReleaseStatus, HelmHistory |
+| 12 | KustomizationDrillDown | `drilldown/views/KustomizationDrillDown.tsx` | KustomizationStatus, OverlayComparison |
+| 13 | LogsDrillDown | `drilldown/views/LogsDrillDown.tsx` | Pod logs access |
+| 14 | MultiClusterSummaryDrillDown | `drilldown/views/MultiClusterSummaryDrillDown.tsx` | All-clusters, all-namespaces, all-deployments, all-pods views |
+| 15 | NamespaceDrillDown | `drilldown/views/NamespaceDrillDown.tsx` | NamespaceOverview card |
+| 16 | NodeDrillDown | `drilldown/views/NodeDrillDown.tsx` | Node items in ComputeOverview |
+| 17 | OperatorDrillDown | `drilldown/views/OperatorDrillDown.tsx` | OperatorStatus, OperatorSubscriptions |
+| 18 | PodDrillDown | `drilldown/views/PodDrillDown.tsx` | TopPods, PodIssues cards |
+| 19 | PolicyDrillDown | `drilldown/views/PolicyDrillDown.tsx` | OPAPolicies, KyvernoPolicies |
+| 20 | ReplicaSetDrillDown | `drilldown/views/ReplicaSetDrillDown.tsx` | ReplicaSet resources |
+| 21 | ResourcesDrillDown | `drilldown/views/ResourcesDrillDown.tsx` | Generic resource drill-down |
+| 22 | SecretDrillDown | `drilldown/views/SecretDrillDown.tsx` | Secret resources |
+| 23 | ServiceAccountDrillDown | `drilldown/views/ServiceAccountDrillDown.tsx` | RBAC service accounts |
+| 24 | YAMLDrillDown | `drilldown/views/YAMLDrillDown.tsx` | YAML view for any resource |
 
 ---
 
-## 9. Cards with Drill-Down (37 with actual views + 3 planned)
+## 9. Cards with Drill-Down (38 with actual views + 3 planned)
 
 Cards that have `useDrillDownActions` hook for clickable items:
 
@@ -685,32 +687,33 @@ Cards that have `useDrillDownActions` hook for clickable items:
 | 11 | EventStream | drillToEvents | EventsDrillDown | ✓ |
 | 12 | GitOpsDrift | drillToDrift | DriftDrillDown | ✓ |
 | 13 | GPUInventory | drillToGPUNode | GPUNodeDrillDown | ✓ |
-| 14 | GPUOverview | drillToGPUNode | GPUNodeDrillDown | ✓ |
-| 15 | GPUStatus | drillToCluster | ClusterDrillDown | ✓ |
-| 16 | GPUWorkloads | drillToPod | PodDrillDown | ✓ |
-| 17 | HelmHistory | drillToHelm | HelmReleaseDrillDown | ✓ |
-| 18 | HelmReleaseStatus | drillToHelm | HelmReleaseDrillDown | ✓ |
-| 19 | HelmValuesDiff | drillToHelm | HelmReleaseDrillDown | ✓ |
-| 20 | KubecostOverview | drillToCost | CostDrillDown | **Planned** |
-| 21 | KustomizationStatus | drillToKustomization | KustomizationDrillDown | ✓ |
-| 22 | NamespaceEvents | drillToEvents | EventsDrillDown | ✓ |
-| 23 | NamespaceOverview | drillToNamespace | NamespaceDrillDown | ✓ |
-| 24 | NamespaceRBAC | drillToRBAC | ServiceAccountDrillDown | ✓ |
-| 25 | NetworkOverview | drillToService | ServiceDrillDown | **Planned** |
-| 26 | OpenCostOverview | drillToCost | CostDrillDown | **Planned** |
-| 27 | OperatorStatus | drillToOperator | OperatorDrillDown | ✓ |
-| 28 | OperatorSubscriptions | drillToOperator | OperatorDrillDown | ✓ |
-| 29 | OverlayComparison | drillToKustomization | KustomizationDrillDown | ✓ |
-| 30 | PodIssues | drillToPod | PodDrillDown | ✓ |
-| 31 | PVCStatus | drillToPVC | PVCDrillDown | **Planned** |
-| 32 | ResourceCapacity | drillToNode | NodeDrillDown | ✓ |
-| 33 | ResourceUsage | drillToNode | NodeDrillDown | ✓ |
-| 34 | SecurityIssues | drillToPod | PodDrillDown | ✓ |
-| 35 | ServiceStatus | drillToService | ServiceDrillDown | **Planned** |
-| 36 | StorageOverview | drillToPVC | PVCDrillDown | **Planned** |
-| 37 | TopPods | drillToPod | PodDrillDown | ✓ |
-| 38 | UpgradeStatus | drillToCluster | ClusterDrillDown | ✓ |
-| 39 | UserManagement | drillToRBAC | ServiceAccountDrillDown | ✓ |
+| 14 | GPUNamespaceAllocations | drillToGPUNamespace | GPUNamespaceDrillDown | ✓ |
+| 15 | GPUOverview | drillToGPUNode | GPUNodeDrillDown | ✓ |
+| 16 | GPUStatus | drillToCluster | ClusterDrillDown | ✓ |
+| 17 | GPUWorkloads | drillToPod | PodDrillDown | ✓ |
+| 18 | HelmHistory | drillToHelm | HelmReleaseDrillDown | ✓ |
+| 19 | HelmReleaseStatus | drillToHelm | HelmReleaseDrillDown | ✓ |
+| 20 | HelmValuesDiff | drillToHelm | HelmReleaseDrillDown | ✓ |
+| 21 | KubecostOverview | drillToCost | CostDrillDown | **Planned** |
+| 22 | KustomizationStatus | drillToKustomization | KustomizationDrillDown | ✓ |
+| 23 | NamespaceEvents | drillToEvents | EventsDrillDown | ✓ |
+| 24 | NamespaceOverview | drillToNamespace | NamespaceDrillDown | ✓ |
+| 25 | NamespaceRBAC | drillToRBAC | ServiceAccountDrillDown | ✓ |
+| 26 | NetworkOverview | drillToService | ServiceDrillDown | **Planned** |
+| 27 | OpenCostOverview | drillToCost | CostDrillDown | **Planned** |
+| 28 | OperatorStatus | drillToOperator | OperatorDrillDown | ✓ |
+| 29 | OperatorSubscriptions | drillToOperator | OperatorDrillDown | ✓ |
+| 30 | OverlayComparison | drillToKustomization | KustomizationDrillDown | ✓ |
+| 31 | PodIssues | drillToPod | PodDrillDown | ✓ |
+| 32 | PVCStatus | drillToPVC | PVCDrillDown | **Planned** |
+| 33 | ResourceCapacity | drillToNode | NodeDrillDown | ✓ |
+| 34 | ResourceUsage | drillToNode | NodeDrillDown | ✓ |
+| 35 | SecurityIssues | drillToPod | PodDrillDown | ✓ |
+| 36 | ServiceStatus | drillToService | ServiceDrillDown | **Planned** |
+| 37 | StorageOverview | drillToPVC | PVCDrillDown | **Planned** |
+| 38 | TopPods | drillToPod | PodDrillDown | ✓ |
+| 39 | UpgradeStatus | drillToCluster | ClusterDrillDown | ✓ |
+| 40 | UserManagement | drillToRBAC | ServiceAccountDrillDown | ✓ |
 
 **Note**: Cards marked as "Planned" reference drill-down views that don't yet exist as separate files. They may use generic ResourcesDrillDown or open inline views until dedicated drill-down components are implemented.
 
