@@ -23,7 +23,11 @@ export function loadSavedFeeds(): FeedConfig[] {
 
 // Save feeds to localStorage
 export function saveFeeds(feeds: FeedConfig[]) {
-  localStorage.setItem(FEEDS_KEY, JSON.stringify(feeds))
+  try {
+    localStorage.setItem(FEEDS_KEY, JSON.stringify(feeds))
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 // Get cached feed data

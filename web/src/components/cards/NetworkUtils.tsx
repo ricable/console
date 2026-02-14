@@ -257,7 +257,11 @@ export function NetworkUtils() {
     if (!exists) {
       const updated = [...savedHosts, newHost]
       setSavedHosts(updated)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+      } catch {
+        // Ignore localStorage errors
+      }
     }
 
     setHostInput('')
@@ -269,7 +273,11 @@ export function NetworkUtils() {
       !(h.host === host && h.type === type && h.port === port)
     )
     setSavedHosts(updated)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+    } catch {
+      // Ignore localStorage errors
+    }
 
     // Remove results
     setPingResults(prev => {

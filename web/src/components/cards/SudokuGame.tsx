@@ -282,7 +282,11 @@ export function SudokuGame({ config: _config }: SudokuGameProps) {
         }))
       ),
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave))
+    } catch {
+      // Ignore localStorage errors
+    }
   }, [gameState])
 
   // Start new game
@@ -393,7 +397,11 @@ export function SudokuGame({ config: _config }: SudokuGameProps) {
       if (!currentBest || gameState.timer < currentBest) {
         const newBestTimes = { ...bestTimes, [gameState.difficulty]: gameState.timer }
         setBestTimes(newBestTimes)
-        localStorage.setItem(BEST_TIMES_KEY, JSON.stringify(newBestTimes))
+        try {
+          localStorage.setItem(BEST_TIMES_KEY, JSON.stringify(newBestTimes))
+        } catch {
+          // Ignore localStorage errors
+        }
       }
     }
   }, [gameState, selectedCell, pencilMode, addToHistory, bestTimes])

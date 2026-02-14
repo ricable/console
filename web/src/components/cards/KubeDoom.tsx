@@ -97,8 +97,12 @@ export function KubeDoom() {
   const [level, setLevel] = useState(1)
   const [kills, setKills] = useState(0)
   const [highScore, setHighScore] = useState(() => {
-    const saved = localStorage.getItem('kubeDoomHighScore')
-    return saved ? parseInt(saved, 10) : 0
+    try {
+      const saved = localStorage.getItem('kubeDoomHighScore')
+      return saved ? parseInt(saved, 10) : 0
+    } catch {
+      return 0
+    }
   })
 
   const playerRef = useRef({ x: 1.5, y: 1.5, angle: 0 })
@@ -259,7 +263,11 @@ export function KubeDoom() {
             setScore(s => {
               if (s > highScore) {
                 setHighScore(s)
-                localStorage.setItem('kubeDoomHighScore', s.toString())
+                try {
+                  localStorage.setItem('kubeDoomHighScore', s.toString())
+                } catch {
+                  // Ignore localStorage errors
+                }
               }
               return s
             })

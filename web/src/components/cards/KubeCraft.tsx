@@ -306,14 +306,22 @@ export function KubeCraft() {
 
   // Save world
   const saveWorld = useCallback(() => {
-    localStorage.setItem('kubeCraftWorld', JSON.stringify(world))
+    try {
+      localStorage.setItem('kubeCraftWorld', JSON.stringify(world))
+    } catch {
+      // Ignore localStorage errors
+    }
   }, [world])
 
   // Reset world
   const resetWorld = useCallback(() => {
     const newWorld = generateWorld()
     setWorld(newWorld)
-    localStorage.removeItem('kubeCraftWorld')
+    try {
+      localStorage.removeItem('kubeCraftWorld')
+    } catch {
+      // Ignore localStorage errors
+    }
   }, [])
 
   // Clear world
