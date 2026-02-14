@@ -3,6 +3,7 @@ import { useFrame } from "@react-three/fiber"
 // NOTE: Wildcard import is required for React Three Fiber (R3F) type support
 // R3F uses THREE namespace for type annotations and JSX intrinsic elements
 import * as THREE from "three"
+import { COLORS } from "./colors"
 
 interface DataPacketProps {
   path: [number, number, number][]
@@ -11,7 +12,7 @@ interface DataPacketProps {
   size?: number
 }
 
-const DataPacket = ({ path, speed = 1, color = "#00E396", size = 0.08 }: DataPacketProps) => {
+const DataPacket = ({ path, speed = 1, color = COLORS.success, size = 0.08 }: DataPacketProps) => {
   const ref = useRef<THREE.Mesh>(null)
   const [progress, setProgress] = useState(0)
   const trailRef = useRef<THREE.Points>(null)

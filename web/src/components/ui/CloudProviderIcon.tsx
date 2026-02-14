@@ -14,8 +14,8 @@ const AWSIcon: React.FC<{ size: number; className?: string }> = ({ size, classNa
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
     <defs>
       <linearGradient id="eksGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#6B7AE8" />
-        <stop offset="100%" stopColor="#4B5BD4" />
+        <stop offset="0%" stopColor="var(--cloud-aws-primary)" />
+        <stop offset="100%" stopColor="var(--cloud-aws-secondary)" />
       </linearGradient>
     </defs>
     {/* Outer hexagon */}
@@ -23,7 +23,7 @@ const AWSIcon: React.FC<{ size: number; className?: string }> = ({ size, classNa
     {/* Inner white hexagon cutout */}
     <polygon points="12,5 18,8 18,16 12,19 6,16 6,8" fill="white" />
     {/* K letter */}
-    <text x="12" y="15" textAnchor="middle" fill="#4B5BD4" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">K</text>
+    <text x="12" y="15" textAnchor="middle" fill="var(--cloud-aws-secondary)" fontSize="9" fontWeight="bold" fontFamily="Arial, sans-serif">K</text>
   </svg>
 )
 
@@ -31,7 +31,7 @@ const AWSIcon: React.FC<{ size: number; className?: string }> = ({ size, classNa
 const GCPIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
     {/* Blue rounded hexagon background */}
-    <path d="M12 2 L20 6.5 Q22 8 22 10 L22 14 Q22 16 20 17.5 L12 22 L4 17.5 Q2 16 2 14 L2 10 Q2 8 4 6.5 Z" fill="#4285F4" />
+    <path d="M12 2 L20 6.5 Q22 8 22 10 L22 14 Q22 16 20 17.5 L12 22 L4 17.5 Q2 16 2 14 L2 10 Q2 8 4 6.5 Z" fill="var(--cloud-gcp-blue)" />
     {/* 3D cube icon - outer hexagon frame */}
     <polygon points="12,5 17,7.5 17,12.5 12,15 7,12.5 7,7.5" stroke="white" strokeWidth="1.2" fill="none" />
     {/* Cube top connector */}
@@ -52,27 +52,27 @@ const AzureIcon: React.FC<{ size: number; className?: string }> = ({ size, class
   <svg viewBox="0 0 16 16" width={size} height={size} className={className}>
     <defs>
       <linearGradient id="aksGradient1" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" stopColor="#B77AF4" />
-        <stop offset="100%" stopColor="#773ADC" />
+        <stop offset="0%" stopColor="var(--cloud-azure-primary)" />
+        <stop offset="100%" stopColor="var(--cloud-azure-secondary)" />
       </linearGradient>
     </defs>
     {/* Top row - 2 cubes */}
     <path fill="url(#aksGradient1)" d="M5.5 2l-2.2.4v3l2.2.5 2.2-.9V2.8L5.5 2z"/>
-    <path fill="#341A6E" d="M3.3 2.4v3l2.2.5V2l-2.2.4zm.9 2.8l-.6-.1V2.8l.6-.1v2.5zm1 .2l-.7-.1V2.6l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M3.3 2.4v3l2.2.5V2l-2.2.4zm.9 2.8l-.6-.1V2.8l.6-.1v2.5zm1 .2l-.7-.1V2.6l.7-.1v2.9z"/>
     <path fill="url(#aksGradient1)" d="M10.3 2l-2.2.4v3l2.2.5 2.2-.9V2.8L10.3 2z"/>
-    <path fill="#341A6E" d="M8.1 2.5v3l2.2.5V2l-2.2.4zm.9 2.8l-.6-.1V2.8l.6-.1v2.5zm1 .2l-.7-.1V2.6l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M8.1 2.5v3l2.2.5V2l-2.2.4zm.9 2.8l-.6-.1V2.8l.6-.1v2.5zm1 .2l-.7-.1V2.6l.7-.1v2.9z"/>
     {/* Middle row - 3 cubes */}
     <path fill="url(#aksGradient1)" d="M3.2 6.2l-2.2.4v3l2.2.5 2.2-.9V7L3.2 6.2z"/>
-    <path fill="#341A6E" d="M1 6.6v3l2.2.5V6.2L1 6.6zm.9 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M1 6.6v3l2.2.5V6.2L1 6.6zm.9 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
     <path fill="url(#aksGradient1)" d="M8 6.2l-2.2.4v3l2.2.5 2.2-.9V6.9L8 6.2z"/>
-    <path fill="#341A6E" d="M5.8 6.6v3l2.2.5V6.2l-2.2.4zm.9 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M5.8 6.6v3l2.2.5V6.2l-2.2.4zm.9 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
     <path fill="url(#aksGradient1)" d="M12.8 6.2l-2.2.4v3l2.2.5 2.2-.9V7l-2.2-.8z"/>
-    <path fill="#341A6E" d="M10.6 6.6v3l2.2.5V6.2l-2.2.4zm1 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M10.6 6.6v3l2.2.5V6.2l-2.2.4zm1 2.8l-.6-.1V6.9l.6-.1v2.6zm1 .2l-.7-.1V6.8l.7-.1v2.9z"/>
     {/* Bottom row - 2 cubes */}
     <path fill="url(#aksGradient1)" d="M5.5 10.4l-2.2.4v3l2.2.5 2.2-.9v-2.3l-2.2-.7z"/>
-    <path fill="#341A6E" d="M3.2 10.8v3l2.2.5v-4l-2.2.5zm1 2.8l-.6-.1v-2.3l.6-.1v2.5zm1 .2l-.7-.1v-2.7l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M3.2 10.8v3l2.2.5v-4l-2.2.5zm1 2.8l-.6-.1v-2.3l.6-.1v2.5zm1 .2l-.7-.1v-2.7l.7-.1v2.9z"/>
     <path fill="url(#aksGradient1)" d="M10.3 10.4l-2.2.4v3l2.2.5 2.2-.9v-2.3l-2.2-.7z"/>
-    <path fill="#341A6E" d="M8 10.9v3l2.2.5v-3.9l-2.2.4zm1 2.8l-.6-.1v-2.3l.6-.1v2.5zm1 .2l-.7-.1v-2.7l.7-.1v2.9z"/>
+    <path fill="var(--cloud-azure-dark)" d="M8 10.9v3l2.2.5v-3.9l-2.2.4zm1 2.8l-.6-.1v-2.3l.6-.1v2.5zm1 .2l-.7-.1v-2.7l.7-.1v2.9z"/>
   </svg>
 )
 
@@ -80,26 +80,26 @@ const AzureIcon: React.FC<{ size: number; className?: string }> = ({ size, class
 const OpenShiftIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 100 100" width={size} height={size} className={className}>
     {/* Top horizontal bar with slight tilt */}
-    <rect x="5" y="28" width="90" height="12" rx="2" fill="#EE0000" transform="rotate(-10 50 34)" />
+    <rect x="5" y="28" width="90" height="12" rx="2" fill="var(--cloud-redhat-red)" transform="rotate(-10 50 34)" />
     {/* Bottom horizontal bar with slight tilt */}
-    <rect x="5" y="60" width="90" height="12" rx="2" fill="#EE0000" transform="rotate(-10 50 66)" />
+    <rect x="5" y="60" width="90" height="12" rx="2" fill="var(--cloud-redhat-red)" transform="rotate(-10 50 66)" />
     {/* Main red O ring */}
-    <circle cx="50" cy="50" r="35" fill="#EE0000" />
+    <circle cx="50" cy="50" r="35" fill="var(--cloud-redhat-red)" />
     {/* White center hole */}
     <circle cx="50" cy="50" r="18" fill="white" />
     {/* Darker overlap areas on top bar */}
-    <path d="M15 28 L38 28 L38 40 L15 40 Z" fill="#C00000" transform="rotate(-10 50 34)" />
-    <path d="M62 28 L85 28 L85 40 L62 40 Z" fill="#C00000" transform="rotate(-10 50 34)" />
+    <path d="M15 28 L38 28 L38 40 L15 40 Z" fill="var(--cloud-redhat-dark)" transform="rotate(-10 50 34)" />
+    <path d="M62 28 L85 28 L85 40 L62 40 Z" fill="var(--cloud-redhat-dark)" transform="rotate(-10 50 34)" />
     {/* Darker overlap areas on bottom bar */}
-    <path d="M15 60 L38 60 L38 72 L15 72 Z" fill="#C00000" transform="rotate(-10 50 66)" />
-    <path d="M62 60 L85 60 L85 72 L62 72 Z" fill="#C00000" transform="rotate(-10 50 66)" />
+    <path d="M15 60 L38 60 L38 72 L15 72 Z" fill="var(--cloud-redhat-dark)" transform="rotate(-10 50 66)" />
+    <path d="M62 60 L85 60 L85 72 L62 72 Z" fill="var(--cloud-redhat-dark)" transform="rotate(-10 50 66)" />
   </svg>
 )
 
 // Oracle Cloud icon - red with O
 const OCIIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
-    <rect width="24" height="24" rx="4" fill="#C74634" />
+    <rect width="24" height="24" rx="4" fill="var(--cloud-oracle-red)" />
     <circle cx="12" cy="12" r="5" stroke="white" strokeWidth="2" fill="none" />
   </svg>
 )
@@ -108,30 +108,30 @@ const OCIIcon: React.FC<{ size: number; className?: string }> = ({ size, classNa
 const AlibabaIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
     {/* Outer hexagon outline */}
-    <polygon points="12,2 21,7 21,17 12,22 3,17 3,7" stroke="#FF6A00" strokeWidth="2" fill="none" />
+    <polygon points="12,2 21,7 21,17 12,22 3,17 3,7" stroke="var(--cloud-alibaba-orange)" strokeWidth="2" fill="none" />
     {/* Inner hexagon */}
-    <polygon points="12,6 17,9 17,15 12,18 7,15 7,9" stroke="#FF6A00" strokeWidth="1.5" fill="none" />
+    <polygon points="12,6 17,9 17,15 12,18 7,15 7,9" stroke="var(--cloud-alibaba-orange)" strokeWidth="1.5" fill="none" />
     {/* Center cube */}
-    <rect x="10" y="10" width="4" height="4" fill="#FF6A00" rx="0.5" />
+    <rect x="10" y="10" width="4" height="4" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Top node */}
-    <rect x="10.5" y="4" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="10.5" y="4" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Top-right node */}
-    <rect x="16" y="7" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="16" y="7" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Bottom-right node */}
-    <rect x="16" y="14" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="16" y="14" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Bottom node */}
-    <rect x="10.5" y="17" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="10.5" y="17" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Bottom-left node */}
-    <rect x="5" y="14" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="5" y="14" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Top-left node */}
-    <rect x="5" y="7" width="3" height="3" fill="#FF6A00" rx="0.5" />
+    <rect x="5" y="7" width="3" height="3" fill="var(--cloud-alibaba-orange)" rx="0.5" />
     {/* Connecting lines */}
-    <line x1="12" y1="7" x2="12" y2="10" stroke="#FF6A00" strokeWidth="1" />
-    <line x1="14" y1="11" x2="16" y2="9" stroke="#FF6A00" strokeWidth="1" />
-    <line x1="14" y1="13" x2="16" y2="15" stroke="#FF6A00" strokeWidth="1" />
-    <line x1="12" y1="14" x2="12" y2="17" stroke="#FF6A00" strokeWidth="1" />
-    <line x1="10" y1="13" x2="8" y2="15" stroke="#FF6A00" strokeWidth="1" />
-    <line x1="10" y1="11" x2="8" y2="9" stroke="#FF6A00" strokeWidth="1" />
+    <line x1="12" y1="7" x2="12" y2="10" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
+    <line x1="14" y1="11" x2="16" y2="9" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
+    <line x1="14" y1="13" x2="16" y2="15" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
+    <line x1="12" y1="14" x2="12" y2="17" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
+    <line x1="10" y1="13" x2="8" y2="15" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
+    <line x1="10" y1="11" x2="8" y2="9" stroke="var(--cloud-alibaba-orange)" strokeWidth="1" />
   </svg>
 )
 
@@ -141,15 +141,15 @@ const DigitalOceanIcon: React.FC<{ size: number; className?: string }> = ({ size
     {/* Main arc/circle shape */}
     <path
       d="M12 4C7.6 4 4 7.6 4 12c0 4.4 3.6 8 8 8v-4c-2.2 0-4-1.8-4-4s1.8-4 4-4c2.2 0 4 1.8 4 4h4c0-4.4-3.6-8-8-8z"
-      fill="#0080FF"
+      fill="var(--cloud-digitalocean-blue)"
     />
     {/* Bottom right square pixels */}
-    <rect x="12" y="16" width="4" height="4" fill="#0080FF" />
-    <rect x="16" y="12" width="4" height="4" fill="#0080FF" />
+    <rect x="12" y="16" width="4" height="4" fill="var(--cloud-digitalocean-blue)" />
+    <rect x="16" y="12" width="4" height="4" fill="var(--cloud-digitalocean-blue)" />
     {/* Small pixel squares */}
-    <rect x="17" y="8" width="2" height="2" fill="#0080FF" />
-    <rect x="19" y="10" width="1.5" height="1.5" fill="#0080FF" />
-    <rect x="15" y="6" width="1.5" height="1.5" fill="#0080FF" />
+    <rect x="17" y="8" width="2" height="2" fill="var(--cloud-digitalocean-blue)" />
+    <rect x="19" y="10" width="1.5" height="1.5" fill="var(--cloud-digitalocean-blue)" />
+    <rect x="15" y="6" width="1.5" height="1.5" fill="var(--cloud-digitalocean-blue)" />
   </svg>
 )
 
@@ -157,7 +157,7 @@ const DigitalOceanIcon: React.FC<{ size: number; className?: string }> = ({ size
 const RancherIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
     {/* Blue rounded background */}
-    <rect width="24" height="24" rx="4" fill="#2453FF" />
+    <rect width="24" height="24" rx="4" fill="var(--cloud-rancher-blue)" />
     {/* Simplified cow head - based on Rancher logo */}
     {/* Left ear/horn */}
     <path d="M5 7 L7 5 L7 8 Z" fill="white" />
@@ -166,14 +166,14 @@ const RancherIcon: React.FC<{ size: number; className?: string }> = ({ size, cla
     {/* Head shape */}
     <path d="M7 7 L7 13 C7 16 9 18 12 18 C15 18 17 16 17 13 L17 7 C17 5 15 4 12 4 C9 4 7 5 7 7 Z" fill="white" />
     {/* Left eye */}
-    <circle cx="9.5" cy="10" r="1.2" fill="#2453FF" />
+    <circle cx="9.5" cy="10" r="1.2" fill="var(--cloud-rancher-blue)" />
     {/* Right eye */}
-    <circle cx="14.5" cy="10" r="1.2" fill="#2453FF" />
+    <circle cx="14.5" cy="10" r="1.2" fill="var(--cloud-rancher-blue)" />
     {/* Nose/snout */}
-    <ellipse cx="12" cy="14.5" rx="3" ry="2" fill="#2453FF" fillOpacity="0.3" />
+    <ellipse cx="12" cy="14.5" rx="3" ry="2" fill="var(--cloud-rancher-blue)" fillOpacity="0.3" />
     {/* Nostrils */}
-    <circle cx="10.5" cy="14.5" r="0.6" fill="#2453FF" />
-    <circle cx="13.5" cy="14.5" r="0.6" fill="#2453FF" />
+    <circle cx="10.5" cy="14.5" r="0.6" fill="var(--cloud-rancher-blue)" />
+    <circle cx="13.5" cy="14.5" r="0.6" fill="var(--cloud-rancher-blue)" />
   </svg>
 )
 
@@ -196,7 +196,7 @@ const MinikubeIcon: React.FC<{ size: number; className?: string }> = ({ size, cl
     <polygon
       points="12,1 22,5.5 22,18.5 12,23 2,18.5 2,5.5"
       fill="none"
-      stroke="#326CE5"
+      stroke="var(--cloud-k8s-blue)"
       strokeWidth="1.5"
     />
     {/* Inner hexagon (slightly smaller) */}
@@ -205,22 +205,22 @@ const MinikubeIcon: React.FC<{ size: number; className?: string }> = ({ size, cl
       fill="white"
     />
     {/* Container/box shape at top - light cyan */}
-    <path d="M6 7 L12 4 L18 7 L18 11 L12 14 L6 11 Z" fill="#8FE3E3" />
-    <path d="M12 4 L12 8 L6 11 L6 7 Z" fill="#5DD3D3" />
-    <path d="M12 4 L12 8 L18 11 L18 7 Z" fill="#B8F0F0" />
+    <path d="M6 7 L12 4 L18 7 L18 11 L12 14 L6 11 Z" fill="var(--cloud-k8s-cyan)" />
+    <path d="M12 4 L12 8 L6 11 L6 7 Z" fill="var(--cloud-k8s-cyan-dark)" />
+    <path d="M12 4 L12 8 L18 11 L18 7 Z" fill="var(--cloud-k8s-cyan-light)" />
     {/* Helm wheel - blue */}
-    <circle cx="12" cy="16" r="4" fill="none" stroke="#326CE5" strokeWidth="1.5" />
-    <circle cx="12" cy="16" r="1" fill="#326CE5" />
+    <circle cx="12" cy="16" r="4" fill="none" stroke="var(--cloud-k8s-blue)" strokeWidth="1.5" />
+    <circle cx="12" cy="16" r="1" fill="var(--cloud-k8s-blue)" />
     {/* Helm spokes */}
-    <line x1="12" y1="12" x2="12" y2="14.5" stroke="#326CE5" strokeWidth="1" />
-    <line x1="12" y1="17.5" x2="12" y2="20" stroke="#326CE5" strokeWidth="1" />
-    <line x1="8" y1="16" x2="10.5" y2="16" stroke="#326CE5" strokeWidth="1" />
-    <line x1="13.5" y1="16" x2="16" y2="16" stroke="#326CE5" strokeWidth="1" />
+    <line x1="12" y1="12" x2="12" y2="14.5" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="12" y1="17.5" x2="12" y2="20" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="8" y1="16" x2="10.5" y2="16" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="13.5" y1="16" x2="16" y2="16" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
     {/* Diagonal spokes */}
-    <line x1="9.2" y1="13.2" x2="10.8" y2="14.8" stroke="#326CE5" strokeWidth="1" />
-    <line x1="13.2" y1="17.2" x2="14.8" y2="18.8" stroke="#326CE5" strokeWidth="1" />
-    <line x1="14.8" y1="13.2" x2="13.2" y2="14.8" stroke="#326CE5" strokeWidth="1" />
-    <line x1="10.8" y1="17.2" x2="9.2" y2="18.8" stroke="#326CE5" strokeWidth="1" />
+    <line x1="9.2" y1="13.2" x2="10.8" y2="14.8" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="13.2" y1="17.2" x2="14.8" y2="18.8" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="14.8" y1="13.2" x2="13.2" y2="14.8" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
+    <line x1="10.8" y1="17.2" x2="9.2" y2="18.8" stroke="var(--cloud-k8s-blue)" strokeWidth="1" />
   </svg>
 )
 
@@ -228,7 +228,7 @@ const MinikubeIcon: React.FC<{ size: number; className?: string }> = ({ size, cl
 const K3sIcon: React.FC<{ size: number; className?: string }> = ({ size, className }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} className={className}>
     {/* Yellow rounded rectangle background */}
-    <rect width="24" height="24" rx="5" fill="#FFC61C" />
+    <rect width="24" height="24" rx="5" fill="var(--cloud-k3s-yellow)" />
     {/* Three-blade propeller shape */}
     {/* Top blade */}
     <path
@@ -261,7 +261,7 @@ const KubernetesIcon: React.FC<{ size: number; className?: string }> = ({ size, 
   <svg viewBox="0 0 722.9 702" width={size} height={size} className={className}>
     {/* Blue heptagon background */}
     <path
-      fill="#326ce5"
+      fill="var(--cloud-k8s-blue)"
       d="M358.986 10.06a46.725 46.342 0 0 0-17.906 4.532L96.736 131.34a46.725 46.342 0 0 0-25.281 31.438L11.174 425.03a46.725 46.342 0 0 0 6.344 35.53 46.725 46.342 0 0 0 2.656 3.688l169.125 210.281a46.725 46.342 0 0 0 36.531 17.438l271.219-.063a46.725 46.342 0 0 0 36.531-17.406l169.031-210.312a46.725 46.342 0 0 0 9.031-39.219l-60.374-262.25a46.725 46.342 0 0 0-25.282-31.437L381.642 14.592a46.725 46.342 0 0 0-22.656-4.531z"
     />
     {/* White helm wheel */}
@@ -323,19 +323,23 @@ export function getProviderLabel(provider: CloudProvider): string {
 
 // Get the primary brand color for each provider (for borders, accents, etc.)
 export function getProviderColor(provider: CloudProvider): string {
+  // Use CSS variables for consistent theming
+  const root = document.documentElement
+  const getVar = (name: string) => getComputedStyle(root).getPropertyValue(name).trim()
+  
   switch (provider) {
-    case 'eks': return '#5B6AD4'         // EKS Blue/Purple
-    case 'gke': return '#4285F4'         // Google Blue
-    case 'aks': return '#773ADC'         // AKS Purple
-    case 'openshift': return '#EE0000'   // Red Hat Red
-    case 'oci': return '#C74634'         // Oracle Red
-    case 'alibaba': return '#FF6A00'     // Alibaba Orange
-    case 'digitalocean': return '#0080FF' // DO Blue
-    case 'rancher': return '#2453FF'     // Rancher Blue
-    case 'kind': return '#2496ED'        // Kind Blue
-    case 'minikube': return '#326CE5'    // K8s Blue
-    case 'k3s': return '#FFC61C'         // K3s Yellow
-    default: return '#326CE5'            // Kubernetes Blue
+    case 'eks': return getVar('--cloud-aws-secondary') || '#5B6AD4'
+    case 'gke': return getVar('--cloud-gcp-blue') || '#4285F4'
+    case 'aks': return getVar('--cloud-azure-secondary') || '#773ADC'
+    case 'openshift': return getVar('--cloud-redhat-red') || '#EE0000'
+    case 'oci': return getVar('--cloud-oracle-red') || '#C74634'
+    case 'alibaba': return getVar('--cloud-alibaba-orange') || '#FF6A00'
+    case 'digitalocean': return getVar('--cloud-digitalocean-blue') || '#0080FF'
+    case 'rancher': return getVar('--cloud-rancher-blue') || '#2453FF'
+    case 'kind': return getVar('--cloud-kind-blue') || '#2496ED'
+    case 'minikube': return getVar('--cloud-k8s-blue') || '#326CE5'
+    case 'k3s': return getVar('--cloud-k3s-yellow') || '#FFC61C'
+    default: return getVar('--cloud-k8s-blue') || '#326CE5'
   }
 }
 

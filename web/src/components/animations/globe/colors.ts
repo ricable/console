@@ -1,12 +1,20 @@
-// KubeStellar theme colors
+// KubeStellar theme colors - use CSS variables for consistency
+const getCSSVariable = (name: string, fallback: string): string => {
+  if (typeof window !== 'undefined') {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    return value || fallback
+  }
+  return fallback
+}
+
 export const COLORS = {
-  primary: "#1a90ff", // Main blue color
-  secondary: "#6236FF", // Purple accent
-  highlight: "#00C2FF", // Bright blue for highlights
-  success: "#00E396", // Green for active connections
-  background: "#0a0f1c", // Dark background
-  accent1: "#FF5E84", // Accent color for special elements
-  accent2: "#FFD166", // Secondary accent for highlights
-  aiTraining: "#B83FF7", // Brighter purple for AI Training
-  aiInference: "#00D6E4", // Brighter cyan for AI Inference
+  primary: getCSSVariable('--globe-primary', '#1a90ff'),
+  secondary: getCSSVariable('--globe-secondary', '#6236FF'),
+  highlight: getCSSVariable('--globe-highlight', '#00C2FF'),
+  success: getCSSVariable('--globe-success', '#00E396'),
+  background: getCSSVariable('--globe-background', '#0a0f1c'),
+  accent1: getCSSVariable('--globe-accent1', '#FF5E84'),
+  accent2: getCSSVariable('--globe-accent2', '#FFD166'),
+  aiTraining: getCSSVariable('--globe-ai-training', '#B83FF7'),
+  aiInference: getCSSVariable('--globe-ai-inference', '#00D6E4'),
 }

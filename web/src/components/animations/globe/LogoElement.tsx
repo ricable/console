@@ -5,14 +5,7 @@ import { useFrame } from "@react-three/fiber"
 // Named imports would break R3F's type system which expects the THREE namespace
 import * as THREE from "three"
 import GlowingSphere from "./GlowingSphere"
-
-const COLORS = {
-  primary: "#1a90ff",
-  secondary: "#6236FF",
-  highlight: "#00C2FF",
-  accent1: "#FF5E84",
-  accent2: "#FFD166",
-}
+import { COLORS } from "./colors"
 
 interface LogoElementProps {
   position?: [number, number, number]

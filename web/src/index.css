@@ -40,6 +40,37 @@
     --color-error: #ef4444;
     --color-info: #06b6d4;
 
+    /* Cloud Provider Brand Colors */
+    --cloud-aws-primary: #6B7AE8;
+    --cloud-aws-secondary: #4B5BD4;
+    --cloud-gcp-blue: #4285F4;
+    --cloud-azure-primary: #B77AF4;
+    --cloud-azure-secondary: #773ADC;
+    --cloud-azure-dark: #341A6E;
+    --cloud-redhat-red: #EE0000;
+    --cloud-redhat-dark: #C00000;
+    --cloud-oracle-red: #C74634;
+    --cloud-alibaba-orange: #FF6A00;
+    --cloud-digitalocean-blue: #0080FF;
+    --cloud-rancher-blue: #2453FF;
+    --cloud-kind-blue: #2496ED;
+    --cloud-k8s-blue: #326CE5;
+    --cloud-k8s-cyan: #8FE3E3;
+    --cloud-k8s-cyan-dark: #5DD3D3;
+    --cloud-k8s-cyan-light: #B8F0F0;
+    --cloud-k3s-yellow: #FFC61C;
+
+    /* Globe/Animation Colors */
+    --globe-primary: #1a90ff;
+    --globe-secondary: #6236FF;
+    --globe-highlight: #00C2FF;
+    --globe-success: #00E396;
+    --globe-background: #0a0f1c;
+    --globe-accent1: #FF5E84;
+    --globe-accent2: #FFD166;
+    --globe-ai-training: #B83FF7;
+    --globe-ai-inference: #00D6E4;
+
     /* Glass effect - can be overridden by theme */
     --glass-background: rgba(17, 24, 39, 0.92);
     --glass-border: rgba(255, 255, 255, 0.1);

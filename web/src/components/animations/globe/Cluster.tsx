@@ -4,15 +4,7 @@ import { Sphere, Line, Text, Billboard } from "@react-three/drei"
 // NOTE: Wildcard import is required for React Three Fiber (R3F) type support
 // R3F uses THREE namespace for type annotations and JSX intrinsic elements
 import * as THREE from "three"
-
-// KubeStellar theme colors
-const COLORS = {
-  primary: "#1a90ff",
-  secondary: "#6236FF",
-  highlight: "#00C2FF",
-  success: "#00E396",
-  background: "#0a0f1c",
-}
+import { COLORS } from "./colors"
 
 // Cluster visualization with dynamic elements
 interface ClusterProps {
