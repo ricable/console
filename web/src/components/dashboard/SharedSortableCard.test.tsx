@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import * as SharedSortableCardModule from './SharedSortableCard'
+import { SharedSortableCard } from './SharedSortableCard'
 
 describe('SharedSortableCard (SortableCard) Component', () => {
   it('exports SortableCard component', () => {

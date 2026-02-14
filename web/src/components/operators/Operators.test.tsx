@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import * as OperatorsModule from './Operators'
+import { Operators } from './Operators'
 
 describe('Operators Component', () => {
   it('exports Operators component', () => {
-    expect(OperatorsModule.Operators).toBeDefined()
-    expect(typeof OperatorsModule.Operators).toBe('function')
+    expect(Operators).toBeDefined()
+    expect(typeof Operators).toBe('function')
   })
 
   it('Operators component is a valid React component', () => {
-    const component = OperatorsModule.Operators
+    const component = Operators
     expect(component.length).toBeGreaterThanOrEqual(0)
   })
 })

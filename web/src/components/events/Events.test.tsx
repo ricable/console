@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import * as EventsModule from './Events'
+import { Events } from './Events'
 
 describe('Events Component', () => {
   it('exports Events component', () => {
-    expect(EventsModule.Events).toBeDefined()
-    expect(typeof EventsModule.Events).toBe('function')
+    expect(Events).toBeDefined()
+    expect(typeof Events).toBe('function')
   })
 
   it('Events component is a valid React component', () => {
-    const component = EventsModule.Events
+    const component = Events
     expect(component.length).toBeGreaterThanOrEqual(0)
   })
 })

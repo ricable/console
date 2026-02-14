@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import * as AgentSelectorModule from './AgentSelector'
+import { AgentSelector } from './AgentSelector'
 
 describe('AgentSelector Component', () => {
   it('exports AgentSelector component', () => {
-    expect(AgentSelectorModule.AgentSelector).toBeDefined()
-    expect(typeof AgentSelectorModule.AgentSelector).toBe('function')
+    expect(AgentSelector).toBeDefined()
+    expect(typeof AgentSelector).toBe('function')
   })
 })

@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import * as DashboardModule from './Dashboard'
+import { Dashboard } from './Dashboard'
 
 describe('Dashboard Component', () => {
   it('exports Dashboard component', () => {
-    expect(DashboardModule.Dashboard).toBeDefined()
-    expect(typeof DashboardModule.Dashboard).toBe('function')
+    expect(Dashboard).toBeDefined()
+    expect(typeof Dashboard).toBe('function')
   })
 })

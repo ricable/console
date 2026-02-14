@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import * as SyncDialogModule from './SyncDialog'
+import { SyncDialog } from './SyncDialog'
 
 describe('SyncDialog Component', () => {
   it('exports SyncDialog component', () => {
-    expect(SyncDialogModule.SyncDialog).toBeDefined()
-    expect(typeof SyncDialogModule.SyncDialog).toBe('function')
+    expect(SyncDialog).toBeDefined()
+    expect(typeof SyncDialog).toBe('function')
   })
 })

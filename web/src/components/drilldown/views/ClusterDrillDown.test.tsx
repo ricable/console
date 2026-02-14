@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import * as ClusterDrillDownModule from './ClusterDrillDown'
+import { ClusterDrillDown } from './ClusterDrillDown'
 
 describe('ClusterDrillDown Component', () => {
   it('exports ClusterDrillDown component', () => {
-    expect(ClusterDrillDownModule.ClusterDrillDown).toBeDefined()
-    expect(typeof ClusterDrillDownModule.ClusterDrillDown).toBe('function')
+    expect(ClusterDrillDown).toBeDefined()
+    expect(typeof ClusterDrillDown).toBe('function')
   })
 })

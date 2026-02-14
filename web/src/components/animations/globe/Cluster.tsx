@@ -1,9 +1,8 @@
 import { useRef, useState, useMemo, useEffect } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Sphere, Line, Text, Billboard } from "@react-three/drei"
-// NOTE: Wildcard import is required for React Three Fiber (R3F) type support
-// R3F uses THREE namespace for type annotations and JSX intrinsic elements
-import * as THREE from "three"
+import type { Group } from "three"
+import { Vector3 } from "three"
 
 // KubeStellar theme colors
 const COLORS = {
@@ -32,7 +31,7 @@ const Cluster = ({
   color,
   description,
 }: ClusterProps) => {
-  const clusterRef = useRef<THREE.Group>(null)
+  const clusterRef = useRef<Group>(null)
   const [activeNodes, setActiveNodes] = useState<number[]>([])
   const [hovered, setHovered] = useState(false)
 
@@ -73,7 +72,7 @@ const Cluster = ({
       // Scale effect on hover
       const targetScale = hovered ? 1.05 : 1
       clusterRef.current.scale.lerp(
-        new THREE.Vector3(targetScale, targetScale, targetScale),
+        new Vector3(targetScale, targetScale, targetScale),
         0.1
       )
     }
