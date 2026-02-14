@@ -74,7 +74,7 @@ export function ProwStatus({ config: _config }: ProwStatusProps) {
 
       {/* Footer */}
       <div className="mt-4 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-        <a href="https://prow2.kubestellar.io" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline flex items-center gap-1">
+        <a href="https://prow2.kubestellar.io" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline flex items-center gap-1 py-2 px-2 -ml-2">
           Open Prow Dashboard <ExternalLink className="w-3 h-3" />
         </a>
       </div>
