@@ -32,6 +32,7 @@ export function MissionChat({ mission, isFullScreen = false, fontSize = 'base' a
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const focusTimerRef = useRef<NodeJS.Timeout | null>(null)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const lastMessageCountRef = useRef(mission.messages.length)
   // Command history for up/down arrow navigation
@@ -42,6 +43,15 @@ export function MissionChat({ mission, isFullScreen = false, fontSize = 'base' a
   const [showSaveDialog, setShowSaveDialog] = useState(false)
   const [appliedResolutionId, setAppliedResolutionId] = useState<string | null>(null)
   const [resolutionPanelView, setResolutionPanelView] = useState<'related' | 'history'>('related')
+
+  useEffect(() => {
+    // Cleanup focus timer on unmount
+    return () => {
+      if (focusTimerRef.current) {
+        clearTimeout(focusTimerRef.current)
+      }
+    }
+  }, [])
 
   // Find related resolutions based on mission content
   const relatedResolutions = useMemo(() => {
@@ -152,9 +162,10 @@ export function MissionChat({ mission, isFullScreen = false, fontSize = 'base' a
   useEffect(() => {
     if (isFullScreen) {
       // Small delay to allow layout to settle
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
       }, 100)
+      return () => clearTimeout(timer)
     }
   }, [isFullScreen])
 
@@ -199,7 +210,10 @@ export function MissionChat({ mission, isFullScreen = false, fontSize = 'base' a
     sendMessage(mission.id, input.trim())
     setInput('')
     // Keep focus on input after sending
-    setTimeout(() => inputRef.current?.focus(), 0)
+    if (focusTimerRef.current) {
+      clearTimeout(focusTimerRef.current)
+    }
+    focusTimerRef.current = setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

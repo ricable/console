@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Rocket, Copy, Check, Terminal, ExternalLink, ChevronDown, ChevronRight, KeyRound, Server } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
 
@@ -32,11 +32,24 @@ export function SetupInstructionsDialog({ isOpen, onClose }: SetupInstructionsDi
   const [showOAuthGuide, setShowOAuthGuide] = useState(false)
   const [showDevGuide, setShowDevGuide] = useState(false)
   const [showK8sGuide, setShowK8sGuide] = useState(false)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   const copyToClipboard = async (text: string, stepKey: number) => {
     await navigator.clipboard.writeText(text)
     setCopiedStep(stepKey)
-    setTimeout(() => setCopiedStep(null), 2000)
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current)
+    }
+    copiedTimerRef.current = setTimeout(() => setCopiedStep(null), 2000)
   }
 
   return (

@@ -5,7 +5,7 @@
  * for Übersicht (macOS) and other platforms.
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { Download, Monitor, Smartphone, Copy, Check, ExternalLink, Info } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
 import {
@@ -35,6 +35,16 @@ export function WidgetExportModal({ isOpen, onClose, cardType, mode: _mode = 'pi
   const [refreshInterval, setRefreshInterval] = useState(30)
   const [copied, setCopied] = useState(false)
   const [showCode, setShowCode] = useState(false)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   // Determine what we're exporting
   const exportConfig = useMemo((): WidgetConfig | null => {
@@ -100,7 +110,10 @@ export function WidgetExportModal({ isOpen, onClose, cardType, mode: _mode = 'pi
     if (!widgetCode) return
     await navigator.clipboard.writeText(widgetCode)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current)
+    }
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
   }
 
   // Toggle stat selection

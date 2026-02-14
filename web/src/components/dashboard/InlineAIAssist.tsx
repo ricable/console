@@ -42,6 +42,8 @@ export function InlineAIAssist<T>({
     const assistantMessages = trackedMission.messages.filter(m => m.role === 'assistant')
     const lastMsg = assistantMessages[assistantMessages.length - 1]
 
+    let successTimer: NodeJS.Timeout | null = null
+
     if (
       (trackedMission.status === 'waiting_input' || trackedMission.status === 'completed') &&
       lastMsg
@@ -53,7 +55,7 @@ export function InlineAIAssist<T>({
           if (validation.valid) {
             onResult(validation.result)
             setPhase('success')
-            setTimeout(() => {
+            successTimer = setTimeout(() => {
               setPhase('collapsed')
               setInput('')
             }, 1500)
@@ -64,7 +66,7 @@ export function InlineAIAssist<T>({
         } else {
           onResult(data as T)
           setPhase('success')
-          setTimeout(() => {
+          successTimer = setTimeout(() => {
             setPhase('collapsed')
             setInput('')
           }, 1500)
@@ -78,6 +80,10 @@ export function InlineAIAssist<T>({
     if (trackedMission.status === 'failed') {
       setError('AI generation failed. Check your agent connection.')
       setPhase('error')
+    }
+
+    return () => {
+      if (successTimer) clearTimeout(successTimer)
     }
   }, [trackedMission, phase, validateResult, onResult])
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Loader2, AlertCircle } from 'lucide-react'
 
 interface Props {
@@ -11,6 +11,16 @@ export function LogsDrillDown({ data }: Props) {
   const [tailLines, setTailLines] = useState(100)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+    }
+  }, [])
 
   // In a real implementation, this would fetch logs from the API
   // For now, show a placeholder with the log fetch parameters
@@ -39,7 +49,10 @@ Connect to kubestellar-ops MCP server to fetch real logs.`
     // Placeholder for future API refresh
     setIsLoading(true)
     setError(null)
-    setTimeout(() => {
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current)
+    }
+    refreshTimerRef.current = setTimeout(() => {
       setIsLoading(false)
     }, 500)
   }

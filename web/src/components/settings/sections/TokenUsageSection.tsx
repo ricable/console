@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Save, Coins, RefreshCw } from 'lucide-react'
 import type { TokenUsage } from '../../../hooks/useTokenUsage'
 
@@ -13,6 +13,16 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage }: TokenUs
   const [warningThreshold, setWarningThreshold] = useState(usage.warningThreshold * 100)
   const [criticalThreshold, setCriticalThreshold] = useState(usage.criticalThreshold * 100)
   const [saved, setSaved] = useState(false)
+  const savedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleSaveTokenSettings = () => {
     updateSettings({
@@ -21,7 +31,10 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage }: TokenUs
       criticalThreshold: criticalThreshold / 100,
     })
     setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current)
+    }
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
   }
 
   return (

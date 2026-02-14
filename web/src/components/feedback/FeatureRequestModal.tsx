@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Bug, Sparkles, Loader2, ExternalLink, Bell, Check, Clock, GitPullRequest, Eye, RefreshCw, MessageSquare, AlertTriangle } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
 import {
@@ -133,6 +133,16 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
   const [actionLoading, setActionLoading] = useState<string | null>(null) // request ID being acted on
   const [actionError, setActionError] = useState<string | null>(null)
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
+  const resetTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleLoginRedirect = () => {
     // Clear demo token and redirect to GitHub login via backend
@@ -193,7 +203,10 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
       })
       setSuccess({ issueUrl: result.github_issue_url })
       // Reset form after short delay
-      setTimeout(() => {
+      if (resetTimerRef.current) {
+        clearTimeout(resetTimerRef.current)
+      }
+      resetTimerRef.current = setTimeout(() => {
         setTitle('')
         setDescription('')
         setRequestType('bug')

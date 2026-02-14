@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AlertTriangle, Terminal, Stethoscope, Wrench, CheckCircle, Copy, ExternalLink } from 'lucide-react'
 import { useDrillDownActions, useDrillDown } from '../../../hooks/useDrillDown'
 import { useMissions } from '../../../hooks/useMissions'
@@ -19,6 +19,16 @@ export function NodeDrillDown({ data }: Props) {
   const { close: closeDialog } = useDrillDown()
   const { startMission } = useMissions()
   const [copied, setCopied] = useState<string | null>(null)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   const isOffline = status === 'Cordoned' || status === 'NotReady' || unschedulable
   const clusterShort = cluster.split('/').pop() || cluster
@@ -26,7 +36,10 @@ export function NodeDrillDown({ data }: Props) {
   const copyCommand = (cmd: string, label: string) => {
     navigator.clipboard.writeText(cmd)
     setCopied(label)
-    setTimeout(() => setCopied(null), 2000)
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current)
+    }
+    copiedTimerRef.current = setTimeout(() => setCopied(null), 2000)
   }
 
   const startDiagnosis = () => {

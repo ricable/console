@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Monitor, Download, Copy, Check, ExternalLink, Smartphone, Globe, Apple, Chrome } from 'lucide-react'
 import { cn } from '../../../lib/cn'
 
@@ -371,6 +371,20 @@ export function WidgetSettingsSection() {
   const [copied, setCopied] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const downloadedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timers on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+      if (downloadedTimerRef.current) {
+        clearTimeout(downloadedTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleDownload = () => {
     const blob = new Blob([WIDGET_CODE], { type: 'text/javascript' })
@@ -383,13 +397,19 @@ export function WidgetSettingsSection() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
     setDownloaded(true)
-    setTimeout(() => setDownloaded(false), 3000)
+    if (downloadedTimerRef.current) {
+      clearTimeout(downloadedTimerRef.current)
+    }
+    downloadedTimerRef.current = setTimeout(() => setDownloaded(false), 3000)
   }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(WIDGET_CODE)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    if (copiedTimerRef.current) {
+      clearTimeout(copiedTimerRef.current)
+    }
+    copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
   }
 
   const widgetPath = '~/Library/Application Support/Übersicht/widgets/'

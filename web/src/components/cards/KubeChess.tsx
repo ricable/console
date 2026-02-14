@@ -498,7 +498,7 @@ function KubeChessInternal() {
       setIsThinking(true)
 
       // Use setTimeout to allow UI to update
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         const depth = difficulty + 1 // 2, 3, or 4
         const bestMove = findBestMove(gameState, depth)
 
@@ -508,6 +508,8 @@ function KubeChessInternal() {
 
         setIsThinking(false)
       }, 300)
+
+      return () => clearTimeout(timer)
     }
   }, [gameState.turn, playerColor, gameResult, difficulty, isThinking, gameState])
 

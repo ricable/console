@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { TrendingUp, Save, RotateCcw, Sparkles, Clock, Percent, Layers, Info } from 'lucide-react'
 import type { PredictionSettings } from '../../../types/predictions'
 import { usePredictionFeedback } from '../../../hooks/usePredictionFeedback'
@@ -18,10 +18,23 @@ export function PredictionSettingsSection({
   const [saved, setSaved] = useState(false)
   const { getStats, clearFeedback, feedbackCount } = usePredictionFeedback()
   const stats = getStats()
+  const savedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (savedTimerRef.current) {
+        clearTimeout(savedTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleSave = () => {
     setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    if (savedTimerRef.current) {
+      clearTimeout(savedTimerRef.current)
+    }
+    savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
   }
 
   const handleToggleAI = () => {

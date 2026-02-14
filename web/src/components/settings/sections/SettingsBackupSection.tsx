@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { HardDrive, Check, Loader2, AlertCircle, WifiOff, Download, Upload, Shield } from 'lucide-react'
 import type { SyncStatus } from '../../../hooks/usePersistedSettings'
 
@@ -42,6 +42,16 @@ export function SettingsBackupSection({
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current)
+      }
+    }
+  }, [])
 
   const status = STATUS_CONFIG[syncStatus]
   const StatusIcon = status.icon
@@ -70,7 +80,10 @@ export function SettingsBackupSection({
     try {
       await onImport(file)
       setImportSuccess(true)
-      setTimeout(() => setImportSuccess(false), 3000)
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current)
+      }
+      successTimerRef.current = setTimeout(() => setImportSuccess(false), 3000)
     } catch {
       setImportError('Failed to import settings. Check that the file is a valid backup.')
     } finally {

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { X, Copy, Check, ExternalLink, Settings, Rocket, Key, Download, ChevronRight, Github, Server } from 'lucide-react'
 import { useDemoMode, isDemoModeForced } from '../../hooks/useDemoMode'
@@ -8,12 +8,25 @@ const DISMISSED_KEY = 'kc-demo-install-dismissed'
 
 function CopyCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(command)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
     }

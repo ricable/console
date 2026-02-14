@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Copy, Check, Download, RefreshCw } from 'lucide-react'
 import { api } from '../../../lib/api'
 import { useToast } from '../../ui/Toast'
@@ -18,6 +18,16 @@ export function YAMLDrillDown({ data }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     fetchYAML()
@@ -48,7 +58,10 @@ export function YAMLDrillDown({ data }: Props) {
     try {
       await navigator.clipboard.writeText(yaml)
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      if (copiedTimerRef.current) {
+        clearTimeout(copiedTimerRef.current)
+      }
+      copiedTimerRef.current = setTimeout(() => setCopied(false), 2000)
     } catch (err) {
       console.error('Failed to copy:', err)
       showToast('Failed to copy to clipboard', 'error')

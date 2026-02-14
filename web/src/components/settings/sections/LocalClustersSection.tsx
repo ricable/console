@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Container, RefreshCw, Plus, Trash2, Check, AlertCircle, Loader2 } from 'lucide-react'
 import { useLocalClusterTools } from '../../../hooks/useLocalClusterTools'
 
@@ -19,6 +19,16 @@ export function LocalClustersSection() {
   const [selectedTool, setSelectedTool] = useState<string>('')
   const [clusterName, setClusterName] = useState('')
   const [createMessage, setCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    // Cleanup timer on unmount
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+    }
+  }, [])
 
   const handleCreate = async () => {
     if (!selectedTool || !clusterName.trim()) return
@@ -30,7 +40,10 @@ export function LocalClustersSection() {
       setCreateMessage({ type: 'success', text: result.message })
       setClusterName('')
       // Refresh after a delay to pick up the new cluster
-      setTimeout(() => refresh(), 5000)
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current)
+      }
+      refreshTimerRef.current = setTimeout(() => refresh(), 5000)
     } else {
       setCreateMessage({ type: 'error', text: result.message })
     }

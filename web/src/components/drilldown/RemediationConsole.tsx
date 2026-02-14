@@ -95,7 +95,17 @@ export function RemediationConsole({
   const logsEndRef = useRef<HTMLDivElement>(null)
   const shellInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef(false)
+  const focusTimerRef = useRef<NodeJS.Timeout | null>(null)
   const { addTokens } = useTokenUsage()
+
+  useEffect(() => {
+    // Cleanup focus timer on unmount
+    return () => {
+      if (focusTimerRef.current) {
+        clearTimeout(focusTimerRef.current)
+      }
+    }
+  }, [])
 
   // Auto-scroll to bottom when new logs appear
   useEffect(() => {
@@ -376,7 +386,10 @@ Labels:       app=${resourceName.split('-')[0]}
           <button
             onClick={() => {
               setActiveTab('shell')
-              setTimeout(() => shellInputRef.current?.focus(), 100)
+              if (focusTimerRef.current) {
+                clearTimeout(focusTimerRef.current)
+              }
+              focusTimerRef.current = setTimeout(() => shellInputRef.current?.focus(), 100)
             }}
             className={cn(
               'flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors',

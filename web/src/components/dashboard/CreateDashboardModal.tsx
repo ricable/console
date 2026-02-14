@@ -32,7 +32,8 @@ export function CreateDashboardModal({
       setShowTemplates(false)
       setExpandedCategory(null)
       // Focus input after animation
-      setTimeout(() => inputRef.current?.focus(), 100)
+      const timer = setTimeout(() => inputRef.current?.focus(), 100)
+      return () => clearTimeout(timer)
     }
   }, [isOpen])
 
