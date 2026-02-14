@@ -356,8 +356,39 @@ export function ParetoFrontier({ config }: ParetoFrontierProps) {
 
   // ---- ECharts option ----
   const option = useMemo(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const allSeries: any[] = [...seriesMap.entries()]
+    interface SeriesData {
+      value: [number, number]
+      point: ParetoPoint
+    }
+    interface SeriesItem {
+      name: string
+      type: string
+      smooth: boolean
+      symbol?: string
+      symbolSize?: number
+      data: SeriesData[] | number[][]
+      lineStyle: { color: string; width: number; opacity: number; type?: string }
+      itemStyle: {
+        color: string
+        borderColor?: string
+        borderWidth?: number
+      }
+      label?: {
+        show: boolean
+        formatter: (p: { data?: SeriesData }) => string
+        fontSize: number
+        color: string
+        position: string
+        distance: number
+      }
+      emphasis?: {
+        itemStyle: { borderColor: string; borderWidth: number; shadowBlur: number; shadowColor: string }
+        scale: number
+      }
+      z: number
+      silent?: boolean
+    }
+    const allSeries: SeriesItem[] = [...seriesMap.entries()]
       .filter(([hw]) => !hiddenHw.has(hw))
       .map(([hw, pts]) => {
         const color = HARDWARE_COLORS[hw] ?? '#6b7280'
@@ -367,7 +398,7 @@ export function ParetoFrontier({ config }: ParetoFrontierProps) {
           smooth: true,
           symbol: 'circle',
           symbolSize: highContrast ? 10 : 7,
-          data: pts.map(p => ({ value: [preset.xAxis.getValue(p), preset.yAxis.getValue(p)], point: p })),
+          data: pts.map(p => ({ value: [preset.xAxis.getValue(p), preset.yAxis.getValue(p)] as [number, number], point: p })),
           lineStyle: { color, width: highContrast ? 2 : 1.5, opacity: highContrast ? 0.85 : 0.55 },
           itemStyle: {
             color,
@@ -376,9 +407,8 @@ export function ParetoFrontier({ config }: ParetoFrontierProps) {
           },
           label: {
             show: !hideLabels,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter: (p: any) => {
-              const pt = p.data?.point as ParetoPoint | undefined
+            formatter: (p: { data?: SeriesData }) => {
+              const pt = p.data?.point
               return pt && pt.gpuCount > 1 ? `${pt.gpuCount}` : ''
             },
             fontSize: 9,
@@ -421,9 +451,8 @@ export function ParetoFrontier({ config }: ParetoFrontierProps) {
         padding: [10, 14],
         textStyle: { color: '#e2e8f0', fontSize: 11 },
         extraCssText: 'box-shadow:0 4px 12px rgba(0,0,0,0.3);',
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        formatter: (params: any) => {
-          const pt = params.data?.point as ParetoPoint | undefined
+        formatter: (params: { data?: SeriesData }) => {
+          const pt = params.data?.point
           if (!pt) return ''
           const hw = getHardwareShort(pt.hardware)
           const model = getModelShort(pt.model)

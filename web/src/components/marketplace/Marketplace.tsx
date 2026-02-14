@@ -526,30 +526,34 @@ export function Marketplace() {
         showToast(`Added "${item.name}" card to your dashboard`, 'success')
       } else if (result.type === 'theme') {
         showToast(`Installed theme "${item.name}" — activate in Settings`, 'success')
-      } else if (result.type === 'dashboard' && result.data?.id) {
-        // Use the marketplace slug as the vanity URL
-        const href = `/custom-dashboard/${item.id}`
-        // Seed localStorage so CustomDashboard loads cards instantly
-        const cards = result.data.cards || []
-        try {
-          localStorage.setItem(`kubestellar-custom-dashboard-${item.id}-cards`, JSON.stringify(cards))
-        } catch { /* non-critical */ }
-        // Add to sidebar if not already present
-        const alreadyInSidebar = [...sidebarConfig.primaryNav, ...sidebarConfig.secondaryNav]
-          .some(si => si.href === href)
-        if (!alreadyInSidebar) {
-          addItem({
-            name: item.name,
-            icon: suggestIconSync(item.name),
-            href,
-            type: 'link',
-            description: item.description,
-          }, 'primary')
+      } else if (result.type === 'dashboard' && result.data) {
+        // Type assertion for dashboard data
+        const dashboardData = result.data as { id?: string; cards?: unknown[] }
+        if (dashboardData.id) {
+          // Use the marketplace slug as the vanity URL
+          const href = `/custom-dashboard/${item.id}`
+          // Seed localStorage so CustomDashboard loads cards instantly
+          const cards = dashboardData.cards || []
+          try {
+            localStorage.setItem(`kubestellar-custom-dashboard-${item.id}-cards`, JSON.stringify(cards))
+          } catch { /* non-critical */ }
+          // Add to sidebar if not already present
+          const alreadyInSidebar = [...sidebarConfig.primaryNav, ...sidebarConfig.secondaryNav]
+            .some(si => si.href === href)
+          if (!alreadyInSidebar) {
+            addItem({
+              name: item.name,
+              icon: suggestIconSync(item.name),
+              href,
+              type: 'link',
+              description: item.description,
+            }, 'primary')
+          }
+          showToast(`Installed "${item.name}" — redirecting to dashboard...`, 'success')
+          setTimeout(() => navigate(href), 1500)
+        } else {
+          showToast(`Installed "${item.name}"`, 'success')
         }
-        showToast(`Installed "${item.name}" — redirecting to dashboard...`, 'success')
-        setTimeout(() => navigate(href), 1500)
-      } else {
-        showToast(`Installed "${item.name}"`, 'success')
       }
     } catch {
       showToast(`Failed to install "${item.name}"`, 'error')

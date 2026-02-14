@@ -23,8 +23,8 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock IntersectionObserver
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).IntersectionObserver = class IntersectionObserver {
+// Using 'unknown' for globalThis to avoid modifying global type definitions
+(globalThis as unknown as { IntersectionObserver: typeof IntersectionObserver }).IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
@@ -35,8 +35,8 @@ Object.defineProperty(window, 'matchMedia', {
 }
 
 // Mock ResizeObserver
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-;(globalThis as any).ResizeObserver = class ResizeObserver {
+// Using 'unknown' for globalThis to avoid modifying global type definitions
+(globalThis as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}
   observe() {}

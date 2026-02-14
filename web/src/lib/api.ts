@@ -303,7 +303,7 @@ class ApiClient {
     }
   }
 
-  async post<T = any>(path: string, body?: any, options?: { timeout?: number }): Promise<{ data: T }> {
+  async post<T = unknown>(path: string, body?: unknown, options?: { timeout?: number }): Promise<{ data: T }> {
     // Check backend availability
     const available = await checkBackendAvailability()
     if (!available) {
@@ -346,7 +346,7 @@ class ApiClient {
     }
   }
 
-  async put<T = any>(path: string, body?: any, options?: { timeout?: number }): Promise<{ data: T }> {
+  async put<T = unknown>(path: string, body?: unknown, options?: { timeout?: number }): Promise<{ data: T }> {
     // Check backend availability
     const available = await checkBackendAvailability()
     if (!available) {

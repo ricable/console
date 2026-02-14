@@ -12,6 +12,7 @@ import { useCache } from '../lib/cache'
 import {
   generateDemoNightlyData,
   type NightlyGuideStatus,
+  type NightlyRun,
 } from '../lib/llmd/nightlyE2EDemoData'
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000 // 5 minutes
@@ -21,6 +22,29 @@ const DEMO_DATA = generateDemoNightlyData()
 export interface NightlyE2EData {
   guides: NightlyGuideStatus[]
   isDemo: boolean
+}
+
+// Backend API response types
+interface BackendNightlyRun {
+  id: number
+  status: string
+  conclusion: string | null
+  createdAt: string
+  updatedAt: string
+  htmlUrl: string
+  runNumber: number
+}
+
+interface BackendGuideStatus {
+  guide: string
+  acronym: string
+  platform: string
+  repo: string
+  workflowFile: string
+  runs: BackendNightlyRun[]
+  passRate: number
+  trend: string
+  latestConclusion: string | null
 }
 
 function getAuthHeaders(): Record<string, string> {
@@ -50,24 +74,21 @@ export function useNightlyE2EData() {
           const data = await res.json()
           if (data.guides && data.guides.length > 0) {
             const hasAnyRuns = data.guides.some(
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              (g: any) => g.runs && g.runs.length > 0
+              (g: BackendGuideStatus) => g.runs && g.runs.length > 0
             )
             if (hasAnyRuns) {
               // Map backend response to frontend types
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const guides: NightlyGuideStatus[] = data.guides.map((g: any) => ({
+              const guides: NightlyGuideStatus[] = data.guides.map((g: BackendGuideStatus) => ({
                 guide: g.guide,
                 acronym: g.acronym,
-                platform: g.platform,
+                platform: g.platform as 'OCP' | 'GKE' | 'CKS',
                 repo: g.repo,
                 workflowFile: g.workflowFile,
                 runs: (g.runs ?? []).map(
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  (r: any) => ({
+                  (r: BackendNightlyRun): NightlyRun => ({
                     id: r.id,
-                    status: r.status,
-                    conclusion: r.conclusion,
+                    status: r.status as 'completed' | 'in_progress' | 'queued',
+                    conclusion: r.conclusion as 'success' | 'failure' | 'cancelled' | 'skipped' | null,
                     createdAt: r.createdAt,
                     updatedAt: r.updatedAt,
                     htmlUrl: r.htmlUrl,
@@ -75,7 +96,7 @@ export function useNightlyE2EData() {
                   })
                 ),
                 passRate: g.passRate,
-                trend: g.trend,
+                trend: g.trend as 'up' | 'down' | 'steady',
                 latestConclusion: g.latestConclusion,
               }))
               return { guides, isDemo: false }
