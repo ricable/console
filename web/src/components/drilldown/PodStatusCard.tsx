@@ -11,6 +11,7 @@ interface PodStatusCardProps {
 const getIssueSeverity = (issue: string): 'critical' | 'warning' | 'info' => {
   const lowerIssue = issue.toLowerCase()
 
+  // Critical errors that prevent pod from working
   if (lowerIssue.includes('crashloopbackoff') ||
       lowerIssue.includes('oomkilled') ||
       lowerIssue.includes('oom') ||
@@ -21,14 +22,15 @@ const getIssueSeverity = (issue: string): 'critical' | 'warning' | 'info' => {
       lowerIssue.includes('evicted')) {
     return 'critical'
   }
+  
+  // Warnings for transient states
   if (lowerIssue.includes('pending') || lowerIssue.includes('waiting')) {
     return 'warning'
   }
-  if (lowerIssue.includes('creating') || lowerIssue.includes('running')) {
-    return 'info'
-  }
-
-  return 'warning'
+  
+  // Info for other statuses (e.g., 'creating')
+  // Note: 'running' should not typically appear as an issue
+  return 'info'
 }
 
 /**

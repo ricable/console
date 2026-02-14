@@ -4,6 +4,7 @@ import { cn } from '../../lib/cn'
 
 interface MetadataEditorProps {
   title: string
+  singularTitle?: string
   metadata: Record<string, string>
   isEditing: boolean
   pendingChanges: Record<string, string | null>
@@ -24,6 +25,7 @@ interface MetadataEditorProps {
 
 export function MetadataEditor({
   title,
+  singularTitle,
   metadata,
   isEditing,
   pendingChanges,
@@ -136,7 +138,7 @@ export function MetadataEditor({
                       <button
                         onClick={() => onRemove(key)}
                         className="p-1 rounded hover:bg-red-500/20 text-red-400"
-                        title={`Remove ${title.toLowerCase().slice(0, -1)}`}
+                        title={`Remove ${singularTitle || title.toLowerCase()}`}
                       >
                         <Trash2 className="w-3 h-3" />
                       </button>

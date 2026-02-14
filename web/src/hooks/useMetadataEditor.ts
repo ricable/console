@@ -95,7 +95,8 @@ export function useMetadataEditor(options: UseMetadataEditorOptions = {}): UseMe
       setNewKey('')
       setNewValue('')
     } catch (err) {
-      setError(`Failed to save: ${err}`)
+      const errorMessage = err instanceof Error ? err.message : String(err)
+      setError(`Failed to save: ${errorMessage}`)
     } finally {
       setIsSaving(false)
     }
