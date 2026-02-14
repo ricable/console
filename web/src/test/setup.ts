@@ -24,7 +24,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock IntersectionObserver
 // Using 'unknown' for globalThis to avoid modifying global type definitions
-(globalThis as unknown as { IntersectionObserver: typeof IntersectionObserver }).IntersectionObserver = class IntersectionObserver {
+;(globalThis as unknown as { IntersectionObserver: typeof IntersectionObserver }).IntersectionObserver = class IntersectionObserver {
   constructor() {}
   disconnect() {}
   observe() {}
@@ -36,7 +36,7 @@ Object.defineProperty(window, 'matchMedia', {
 
 // Mock ResizeObserver
 // Using 'unknown' for globalThis to avoid modifying global type definitions
-(globalThis as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver = class ResizeObserver {
+;(globalThis as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver = class ResizeObserver {
   constructor() {}
   disconnect() {}
   observe() {}
