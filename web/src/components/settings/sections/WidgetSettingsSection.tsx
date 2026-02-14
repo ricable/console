@@ -371,8 +371,8 @@ export function WidgetSettingsSection() {
   const [copied, setCopied] = useState(false)
   const [downloaded, setDownloaded] = useState(false)
   const [selectedWidget, setSelectedWidget] = useState<string | null>(null)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const downloadedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
+  const downloadedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timers on unmount

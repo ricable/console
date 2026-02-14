@@ -18,7 +18,7 @@ export function YAMLDrillDown({ data }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

@@ -18,7 +18,7 @@ export function PredictionSettingsSection({
   const [saved, setSaved] = useState(false)
   const { getStats, clearFeedback, feedbackCount } = usePredictionFeedback()
   const stats = getStats()
-  const savedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const savedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

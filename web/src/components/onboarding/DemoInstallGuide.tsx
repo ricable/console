@@ -8,7 +8,7 @@ const DISMISSED_KEY = 'kc-demo-install-dismissed'
 
 function CopyCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

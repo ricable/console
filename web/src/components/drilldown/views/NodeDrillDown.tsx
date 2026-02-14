@@ -19,7 +19,7 @@ export function NodeDrillDown({ data }: Props) {
   const { close: closeDialog } = useDrillDown()
   const { startMission } = useMissions()
   const [copied, setCopied] = useState<string | null>(null)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

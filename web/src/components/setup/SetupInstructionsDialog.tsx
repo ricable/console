@@ -32,7 +32,7 @@ export function SetupInstructionsDialog({ isOpen, onClose }: SetupInstructionsDi
   const [showOAuthGuide, setShowOAuthGuide] = useState(false)
   const [showDevGuide, setShowDevGuide] = useState(false)
   const [showK8sGuide, setShowK8sGuide] = useState(false)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

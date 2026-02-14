@@ -19,7 +19,7 @@ export function LocalClustersSection() {
   const [selectedTool, setSelectedTool] = useState<string>('')
   const [clusterName, setClusterName] = useState('')
   const [createMessage, setCreateMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

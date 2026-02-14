@@ -42,7 +42,7 @@ export function InlineAIAssist<T>({
     const assistantMessages = trackedMission.messages.filter(m => m.role === 'assistant')
     const lastMsg = assistantMessages[assistantMessages.length - 1]
 
-    let successTimer: NodeJS.Timeout | null = null
+    let successTimer: number | null = null
 
     if (
       (trackedMission.status === 'waiting_input' || trackedMission.status === 'completed') &&

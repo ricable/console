@@ -95,7 +95,7 @@ export function RemediationConsole({
   const logsEndRef = useRef<HTMLDivElement>(null)
   const shellInputRef = useRef<HTMLInputElement>(null)
   const abortRef = useRef(false)
-  const focusTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const focusTimerRef = useRef<number | null>(null)
   const { addTokens } = useTokenUsage()
 
   useEffect(() => {

@@ -32,7 +32,7 @@ export function MissionChat({ mission, isFullScreen = false, fontSize = 'base' a
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const focusTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const focusTimerRef = useRef<number | null>(null)
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true)
   const lastMessageCountRef = useRef(mission.messages.length)
   // Command history for up/down arrow navigation

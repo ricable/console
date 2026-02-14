@@ -11,7 +11,7 @@ export function LogsDrillDown({ data }: Props) {
   const [tailLines, setTailLines] = useState(100)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const refreshTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

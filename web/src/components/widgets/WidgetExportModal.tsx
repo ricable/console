@@ -35,7 +35,7 @@ export function WidgetExportModal({ isOpen, onClose, cardType, mode: _mode = 'pi
   const [refreshInterval, setRefreshInterval] = useState(30)
   const [copied, setCopied] = useState(false)
   const [showCode, setShowCode] = useState(false)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

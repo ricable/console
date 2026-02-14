@@ -79,7 +79,7 @@ export function CardChat({
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   const quickPrompts = QUICK_PROMPTS[cardType] || QUICK_PROMPTS.default
 

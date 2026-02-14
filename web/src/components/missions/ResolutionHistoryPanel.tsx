@@ -32,7 +32,7 @@ export function ResolutionHistoryPanel({ onApplyResolution }: ResolutionHistoryP
   const [showPersonal, setShowPersonal] = useState(true)
   const [showShared, setShowShared] = useState(true)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const deleteTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const deleteTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

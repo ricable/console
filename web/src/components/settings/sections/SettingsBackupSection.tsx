@@ -42,7 +42,7 @@ export function SettingsBackupSection({
   const [importError, setImportError] = useState<string | null>(null)
   const [importSuccess, setImportSuccess] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const successTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const successTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

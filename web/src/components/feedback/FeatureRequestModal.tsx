@@ -133,7 +133,7 @@ export function FeatureRequestModal({ isOpen, onClose }: FeatureRequestModalProp
   const [actionLoading, setActionLoading] = useState<string | null>(null) // request ID being acted on
   const [actionError, setActionError] = useState<string | null>(null)
   const [showLoginPrompt, setShowLoginPrompt] = useState(false)
-  const resetTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const resetTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount

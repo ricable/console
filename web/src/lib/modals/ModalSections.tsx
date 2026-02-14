@@ -79,7 +79,7 @@ function KeyValueItem({
   onNavigate?: (target: NavigationTarget) => void
 }) {
   const [copied, setCopied] = useState(false)
-  const copiedTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const copiedTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Cleanup timer on unmount
