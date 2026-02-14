@@ -118,11 +118,12 @@ export function useClusterFiltering<T extends Cluster>(
         case 'pods':
           cmp = (a.podCount || 0) - (b.podCount || 0)
           break
-        case 'health':
+        case 'health': {
           const aHealth = isClusterUnreachable(a) ? 0 : a.healthy ? 2 : 1
           const bHealth = isClusterUnreachable(b) ? 0 : b.healthy ? 2 : 1
           cmp = aHealth - bHealth
           break
+        }
       }
       return sortAsc ? cmp : -cmp
     })
