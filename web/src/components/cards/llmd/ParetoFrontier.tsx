@@ -488,7 +488,7 @@ export function ParetoFrontier({ config }: ParetoFrontierProps) {
   )
 
   return (
-    <div className="h-full flex flex-col" style={{ padding: '12px 14px 8px' }}>
+    <div className="h-full flex flex-col px-3.5 pt-3 pb-2">
       {/* Dropdown filters row */}
       <div className="flex items-end gap-3 mb-2 flex-shrink-0 flex-wrap">
         <FilterDropdown label="Model" value={modelFilter} onChange={setModelFilter} options={filterOptions.models} />
