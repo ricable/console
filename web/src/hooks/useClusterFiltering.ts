@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState } from 'react'
 
 type HealthFilter = 'all' | 'healthy' | 'unhealthy' | 'unreachable'
 type SortField = 'name' | 'nodes' | 'pods' | 'health'
