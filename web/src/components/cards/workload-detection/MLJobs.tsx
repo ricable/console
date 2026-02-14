@@ -57,15 +57,15 @@ export function MLJobs({ config: _config }: MLJobsProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'running':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 flex items-center gap-1"><Play className="w-2.5 h-2.5" /> Running</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300 flex items-center gap-1"><Play className="w-2.5 h-2.5" /> Running</span>
       case 'queued':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 flex items-center gap-1"><Clock className="w-2.5 h-2.5" /> Queued</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 dark:bg-yellow-500/30 dark:text-yellow-300 flex items-center gap-1"><Clock className="w-2.5 h-2.5" /> Queued</span>
       case 'completed':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex items-center gap-1"><CheckCircle className="w-2.5 h-2.5" /> Done</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300 flex items-center gap-1"><CheckCircle className="w-2.5 h-2.5" /> Done</span>
       case 'failed':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 flex items-center gap-1"><XCircle className="w-2.5 h-2.5" /> Failed</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 dark:bg-red-500/30 dark:text-red-300 flex items-center gap-1"><XCircle className="w-2.5 h-2.5" /> Failed</span>
       default:
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">{status}</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">{status}</span>
     }
   }
 

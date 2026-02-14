@@ -48,13 +48,13 @@ export function MLNotebooks({ config: _config }: MLNotebooksProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'running':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Active</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300">Active</span>
       case 'idle':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400">Idle</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 dark:bg-yellow-500/30 dark:text-yellow-300">Idle</span>
       case 'stopped':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">Stopped</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">Stopped</span>
       default:
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">{status}</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">{status}</span>
     }
   }
 

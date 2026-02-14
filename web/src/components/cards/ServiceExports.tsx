@@ -85,13 +85,13 @@ const getStatusIcon = (status: ServiceExportStatus) => {
 const getStatusColors = (status: ServiceExportStatus) => {
   switch (status) {
     case 'Ready':
-      return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/20', iconBg: 'bg-green-500/20' }
+      return { bg: 'bg-green-500/20 dark:bg-green-500/30', text: 'text-green-400 dark:text-green-300', border: 'border-green-500/20 dark:border-green-500/30', iconBg: 'bg-green-500/20 dark:bg-green-500/30' }
     case 'Pending':
-      return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', border: 'border-yellow-500/20', iconBg: 'bg-yellow-500/20' }
+      return { bg: 'bg-yellow-500/20 dark:bg-yellow-500/30', text: 'text-yellow-400 dark:text-yellow-300', border: 'border-yellow-500/20 dark:border-yellow-500/30', iconBg: 'bg-yellow-500/20 dark:bg-yellow-500/30' }
     case 'Failed':
-      return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/20', iconBg: 'bg-red-500/20' }
+      return { bg: 'bg-red-500/20 dark:bg-red-500/30', text: 'text-red-400 dark:text-red-300', border: 'border-red-500/20 dark:border-red-500/30', iconBg: 'bg-red-500/20 dark:bg-red-500/30' }
     default:
-      return { bg: 'bg-gray-500/20', text: 'text-gray-400', border: 'border-gray-500/20', iconBg: 'bg-gray-500/20' }
+      return { bg: 'bg-gray-500/20 dark:bg-gray-500/30', text: 'text-gray-400 dark:text-gray-300', border: 'border-gray-500/20 dark:border-gray-500/30', iconBg: 'bg-gray-500/20 dark:bg-gray-500/30' }
   }
 }
 

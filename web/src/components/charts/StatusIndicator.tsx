@@ -16,14 +16,14 @@ const statusConfig: Record<Status, {
   bg: string
   label: string
 }> = {
-  healthy: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500', label: 'Healthy' },
-  error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500', label: 'Error' },
-  warning: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Warning' },
-  critical: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-600', label: 'Critical' },
-  pending: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500', label: 'Pending' },
-  loading: { icon: Loader2, color: 'text-purple-400', bg: 'bg-purple-500', label: 'Loading' },
-  unknown: { icon: AlertTriangle, color: 'text-gray-400', bg: 'bg-gray-500', label: 'Unknown' },
-  unreachable: { icon: WifiOff, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Offline' },
+  healthy: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500 dark:bg-green-600', label: 'Healthy' },
+  error: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500 dark:bg-red-600', label: 'Error' },
+  warning: { icon: AlertTriangle, color: 'text-yellow-400', bg: 'bg-yellow-500 dark:bg-yellow-600', label: 'Warning' },
+  critical: { icon: XCircle, color: 'text-red-500', bg: 'bg-red-600 dark:bg-red-700', label: 'Critical' },
+  pending: { icon: Clock, color: 'text-blue-400', bg: 'bg-blue-500 dark:bg-blue-600', label: 'Pending' },
+  loading: { icon: Loader2, color: 'text-purple-400', bg: 'bg-purple-500 dark:bg-purple-600', label: 'Loading' },
+  unknown: { icon: AlertTriangle, color: 'text-gray-400', bg: 'bg-gray-500 dark:bg-gray-600', label: 'Unknown' },
+  unreachable: { icon: WifiOff, color: 'text-yellow-400', bg: 'bg-yellow-500 dark:bg-yellow-600', label: 'Offline' },
 }
 
 const sizes = {
@@ -119,7 +119,7 @@ export function BooleanSwitch({
         }`}
       >
         <div
-          className={`${dotSizes[size]} bg-white rounded-full absolute top-0.5 transition-transform ${
+          className={`${dotSizes[size]} bg-white dark:bg-gray-200 rounded-full absolute top-0.5 transition-transform ${
             value ? 'translate-x-full -ml-0.5' : 'translate-x-0.5'
           }`}
         />

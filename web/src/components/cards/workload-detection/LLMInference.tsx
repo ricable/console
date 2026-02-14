@@ -108,25 +108,25 @@ export function LLMInference({ config: _config }: LLMInferenceProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'running':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 flex items-center gap-1"><Play className="w-2.5 h-2.5" /> Running</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300 flex items-center gap-1"><Play className="w-2.5 h-2.5" /> Running</span>
       case 'scaling':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Scaling</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Scaling</span>
       case 'stopped':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 flex items-center gap-1"><Pause className="w-2.5 h-2.5" /> Stopped</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300 flex items-center gap-1"><Pause className="w-2.5 h-2.5" /> Stopped</span>
       default:
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">{status}</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">{status}</span>
     }
   }
 
   const getTypeBadge = (type: LLMdServer['type']) => {
     const colors: Record<string, string> = {
-      'vllm': 'bg-purple-500/20 text-purple-400',
-      'tgi': 'bg-blue-500/20 text-blue-400',
-      'llm-d': 'bg-cyan-500/20 text-cyan-400',
-      'triton': 'bg-green-500/20 text-green-400',
-      'unknown': 'bg-gray-500/20 text-gray-400',
+      'vllm': 'bg-purple-500/20 text-purple-400 dark:bg-purple-500/30 dark:text-purple-300',
+      'tgi': 'bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300',
+      'llm-d': 'bg-cyan-500/20 text-cyan-400 dark:bg-cyan-500/30 dark:text-cyan-300',
+      'triton': 'bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300',
+      'unknown': 'bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300',
     }
-    return colors[type] || 'bg-gray-500/20 text-gray-400'
+    return colors[type] || 'bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300'
   }
 
   const getTypeLabel = (type: LLMdServer['type']) => {
@@ -142,12 +142,12 @@ export function LLMInference({ config: _config }: LLMInferenceProps) {
 
   const getComponentBadge = (componentType: LLMdComponentType) => {
     const config: Record<LLMdComponentType, { bg: string, text: string, label: string }> = {
-      'model': { bg: 'bg-purple-500/20', text: 'text-purple-400', label: 'Model' },
-      'epp': { bg: 'bg-cyan-500/20', text: 'text-cyan-400', label: 'EPP' },
-      'gateway': { bg: 'bg-blue-500/20', text: 'text-blue-400', label: 'Gateway' },
-      'prometheus': { bg: 'bg-orange-500/20', text: 'text-orange-400', label: 'Prometheus' },
-      'autoscaler': { bg: 'bg-yellow-500/20', text: 'text-yellow-400', label: 'Autoscaler' },
-      'other': { bg: 'bg-gray-500/20', text: 'text-gray-400', label: 'Other' },
+      'model': { bg: 'bg-purple-500/20 dark:bg-purple-500/30', text: 'text-purple-400 dark:text-purple-300', label: 'Model' },
+      'epp': { bg: 'bg-cyan-500/20 dark:bg-cyan-500/30', text: 'text-cyan-400 dark:text-cyan-300', label: 'EPP' },
+      'gateway': { bg: 'bg-blue-500/20 dark:bg-blue-500/30', text: 'text-blue-400 dark:text-blue-300', label: 'Gateway' },
+      'prometheus': { bg: 'bg-orange-500/20 dark:bg-orange-500/30', text: 'text-orange-400 dark:text-orange-300', label: 'Prometheus' },
+      'autoscaler': { bg: 'bg-yellow-500/20 dark:bg-yellow-500/30', text: 'text-yellow-400 dark:text-yellow-300', label: 'Autoscaler' },
+      'other': { bg: 'bg-gray-500/20 dark:bg-gray-500/30', text: 'text-gray-400 dark:text-gray-300', label: 'Other' },
     }
     return config[componentType] || config['other']
   }
@@ -315,8 +315,8 @@ export function LLMInference({ config: _config }: LLMInferenceProps) {
                   <span
                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${
                       server.gatewayStatus === 'running'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-gray-500/20 text-gray-400'
+                        ? 'bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300'
+                        : 'bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300'
                     }`}
                     title={`Gateway (${server.gatewayType || 'envoy'}): ${server.gatewayStatus}`}
                   >
@@ -329,8 +329,8 @@ export function LLMInference({ config: _config }: LLMInferenceProps) {
                   <span
                     className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${
                       server.prometheusStatus === 'running'
-                        ? 'bg-orange-500/20 text-orange-400'
-                        : 'bg-gray-500/20 text-gray-400'
+                        ? 'bg-orange-500/20 text-orange-400 dark:bg-orange-500/30 dark:text-orange-300'
+                        : 'bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300'
                     }`}
                     title={`Prometheus: ${server.prometheusStatus}`}
                   >

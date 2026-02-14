@@ -70,15 +70,15 @@ export function LLMModels({ config: _config }: LLMModelsProps) {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'loaded':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400">Loaded</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300">Loaded</span>
       case 'downloading':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Downloading</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5 animate-spin" /> Downloading</span>
       case 'stopped':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">Stopped</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">Stopped</span>
       case 'error':
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Error</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 dark:bg-red-500/30 dark:text-red-300">Error</span>
       default:
-        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400">{status}</span>
+        return <span className="text-xs px-1.5 py-0.5 rounded bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300">{status}</span>
     }
   }
 

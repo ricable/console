@@ -97,12 +97,12 @@ export function ProwJobs({ config: _config }: ProwJobsProps) {
 
   const getTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      presubmit: 'bg-blue-500/20 text-blue-400',
-      postsubmit: 'bg-green-500/20 text-green-400',
-      periodic: 'bg-purple-500/20 text-purple-400',
-      batch: 'bg-cyan-500/20 text-cyan-400',
+      presubmit: 'bg-blue-500/20 text-blue-400 dark:bg-blue-500/30 dark:text-blue-300',
+      postsubmit: 'bg-green-500/20 text-green-400 dark:bg-green-500/30 dark:text-green-300',
+      periodic: 'bg-purple-500/20 text-purple-400 dark:bg-purple-500/30 dark:text-purple-300',
+      batch: 'bg-cyan-500/20 text-cyan-400 dark:bg-cyan-500/30 dark:text-cyan-300',
     }
-    return colors[type] || 'bg-gray-500/20 text-gray-400'
+    return colors[type] || 'bg-gray-500/20 text-gray-400 dark:bg-gray-500/30 dark:text-gray-300'
   }
 
   if (isLoading) {
