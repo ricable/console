@@ -321,25 +321,40 @@ export function getProviderLabel(provider: CloudProvider): string {
   }
 }
 
+// Cache for CSS variable values to avoid repeated getComputedStyle calls
+const colorCache = new Map<string, string>()
+
+// Helper to get CSS variable with caching
+function getCachedCSSVar(name: string, fallback: string): string {
+  if (colorCache.has(name)) {
+    return colorCache.get(name)!
+  }
+  
+  if (typeof document !== 'undefined') {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+    const result = value || fallback
+    colorCache.set(name, result)
+    return result
+  }
+  
+  return fallback
+}
+
 // Get the primary brand color for each provider (for borders, accents, etc.)
 export function getProviderColor(provider: CloudProvider): string {
-  // Use CSS variables for consistent theming
-  const root = document.documentElement
-  const getVar = (name: string) => getComputedStyle(root).getPropertyValue(name).trim()
-  
   switch (provider) {
-    case 'eks': return getVar('--cloud-aws-secondary') || '#5B6AD4'
-    case 'gke': return getVar('--cloud-gcp-blue') || '#4285F4'
-    case 'aks': return getVar('--cloud-azure-secondary') || '#773ADC'
-    case 'openshift': return getVar('--cloud-redhat-red') || '#EE0000'
-    case 'oci': return getVar('--cloud-oracle-red') || '#C74634'
-    case 'alibaba': return getVar('--cloud-alibaba-orange') || '#FF6A00'
-    case 'digitalocean': return getVar('--cloud-digitalocean-blue') || '#0080FF'
-    case 'rancher': return getVar('--cloud-rancher-blue') || '#2453FF'
-    case 'kind': return getVar('--cloud-kind-blue') || '#2496ED'
-    case 'minikube': return getVar('--cloud-k8s-blue') || '#326CE5'
-    case 'k3s': return getVar('--cloud-k3s-yellow') || '#FFC61C'
-    default: return getVar('--cloud-k8s-blue') || '#326CE5'
+    case 'eks': return getCachedCSSVar('--cloud-aws-secondary', '#5B6AD4')
+    case 'gke': return getCachedCSSVar('--cloud-gcp-blue', '#4285F4')
+    case 'aks': return getCachedCSSVar('--cloud-azure-secondary', '#773ADC')
+    case 'openshift': return getCachedCSSVar('--cloud-redhat-red', '#EE0000')
+    case 'oci': return getCachedCSSVar('--cloud-oracle-red', '#C74634')
+    case 'alibaba': return getCachedCSSVar('--cloud-alibaba-orange', '#FF6A00')
+    case 'digitalocean': return getCachedCSSVar('--cloud-digitalocean-blue', '#0080FF')
+    case 'rancher': return getCachedCSSVar('--cloud-rancher-blue', '#2453FF')
+    case 'kind': return getCachedCSSVar('--cloud-kind-blue', '#2496ED')
+    case 'minikube': return getCachedCSSVar('--cloud-k8s-blue', '#326CE5')
+    case 'k3s': return getCachedCSSVar('--cloud-k3s-yellow', '#FFC61C')
+    default: return getCachedCSSVar('--cloud-k8s-blue', '#326CE5')
   }
 }
 
