@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useReducer } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings, Check, GripVertical, Eye, EyeOff, Plus, Trash2, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
@@ -292,29 +292,70 @@ export function StatsConfigModal({
   title = 'Configure Stats',
 }: StatsConfigModalProps) {
   const { t: _t } = useTranslation()
-  const [localBlocks, setLocalBlocks] = useState<StatBlockConfig[]>(blocks)
-  const [showAddPanel, setShowAddPanel] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  type LocalState = {
+    localBlocks: StatBlockConfig[]
+    showAddPanel: boolean
+    searchQuery: string
+    expandedCategories: Set<string>
+  }
+  
+  type LocalAction =
+    | { type: 'RESET'; payload: { blocks: StatBlockConfig[] } }
+    | { type: 'SET_LOCAL_BLOCKS'; payload: StatBlockConfig[] }
+    | { type: 'TOGGLE_ADD_PANEL' }
+    | { type: 'SET_SEARCH_QUERY'; payload: string }
+    | { type: 'SET_EXPANDED_CATEGORIES'; payload: Set<string> }
+  
+  // Use useReducer to batch multiple state updates and prevent flicker
+  const [localState, dispatchLocal] = useReducer(
+    (state: LocalState, action: LocalAction): LocalState => {
+      switch (action.type) {
+        case 'RESET':
+          return {
+            localBlocks: action.payload.blocks,
+            showAddPanel: false,
+            searchQuery: '',
+            expandedCategories: new Set<string>(),
+          }
+        case 'SET_LOCAL_BLOCKS':
+          return { ...state, localBlocks: action.payload }
+        case 'TOGGLE_ADD_PANEL':
+          return { ...state, showAddPanel: !state.showAddPanel }
+        case 'SET_SEARCH_QUERY':
+          return { ...state, searchQuery: action.payload }
+        case 'SET_EXPANDED_CATEGORIES':
+          return { ...state, expandedCategories: action.payload }
+        default:
+          return state
+      }
+    },
+    {
+      localBlocks: blocks,
+      showAddPanel: false,
+      searchQuery: '',
+      expandedCategories: new Set<string>(),
+    }
+  )
 
   useEffect(() => {
     if (isOpen) {
-      setLocalBlocks(blocks)
-      setShowAddPanel(false)
-      setSearchQuery('')
-      setExpandedCategories(new Set())
+      // Single dispatch batches all state resets
+      dispatchLocal({ type: 'RESET', payload: { blocks } })
     }
   }, [isOpen, blocks])
 
   const toggleCategory = (type: string) => {
-    setExpandedCategories(prev => {
-      const next = new Set(prev)
-      if (next.has(type)) {
-        next.delete(type)
-      } else {
-        next.add(type)
-      }
-      return next
+    dispatchLocal({
+      type: 'SET_EXPANDED_CATEGORIES',
+      payload: (() => {
+        const next = new Set(localState.expandedCategories)
+        if (next.has(type)) {
+          next.delete(type)
+        } else {
+          next.add(type)
+        }
+        return next
+      })()
     })
   }
 
@@ -327,11 +368,11 @@ export function StatsConfigModal({
   const defaultBlockIds = useMemo(() => new Set(defaultBlocks.map(b => b.id)), [defaultBlocks])
 
   // Get current block IDs to filter out already-added stats
-  const currentBlockIds = useMemo(() => new Set(localBlocks.map(b => b.id)), [localBlocks])
+  const currentBlockIds = useMemo(() => new Set(localState.localBlocks.map(b => b.id)), [localState.localBlocks])
 
   // Get available stats per dashboard category, filtered by search
   const availableStatsByCategory = useMemo(() => {
-    const query = searchQuery.toLowerCase().trim()
+    const query = localState.searchQuery.toLowerCase().trim()
     const result: Map<DashboardStatsType, StatBlockConfig[]> = new Map()
 
     for (const category of DASHBOARD_CATEGORIES) {
@@ -348,51 +389,62 @@ export function StatsConfigModal({
       }
     }
     return result
-  }, [currentBlockIds, searchQuery])
+  }, [currentBlockIds, localState.searchQuery])
 
   // Check if any stats are available
   const hasAvailableStats = availableStatsByCategory.size > 0
 
   // Auto-expand categories when searching
   useEffect(() => {
-    if (searchQuery.trim()) {
+    if (localState.searchQuery.trim()) {
       // Expand all categories that have matching results
-      setExpandedCategories(new Set(availableStatsByCategory.keys()))
+      dispatchLocal({
+        type: 'SET_EXPANDED_CATEGORIES',
+        payload: new Set(availableStatsByCategory.keys())
+      })
     }
-  }, [searchQuery, availableStatsByCategory])
+  }, [localState.searchQuery, availableStatsByCategory])
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
-      setLocalBlocks(prev => {
-        const oldIndex = prev.findIndex(b => b.id === active.id)
-        const newIndex = prev.findIndex(b => b.id === over.id)
-        return arrayMove(prev, oldIndex, newIndex)
+      const oldIndex = localState.localBlocks.findIndex(b => b.id === active.id)
+      const newIndex = localState.localBlocks.findIndex(b => b.id === over.id)
+      dispatchLocal({
+        type: 'SET_LOCAL_BLOCKS',
+        payload: arrayMove(localState.localBlocks, oldIndex, newIndex)
       })
     }
   }
 
   const toggleVisibility = (id: string) => {
-    setLocalBlocks(prev =>
-      prev.map(b => b.id === id ? { ...b, visible: !b.visible } : b)
-    )
+    dispatchLocal({
+      type: 'SET_LOCAL_BLOCKS',
+      payload: localState.localBlocks.map(b => b.id === id ? { ...b, visible: !b.visible } : b)
+    })
   }
 
   const handleAddStat = (block: StatBlockConfig) => {
-    setLocalBlocks(prev => [...prev, { ...block, visible: true }])
+    dispatchLocal({
+      type: 'SET_LOCAL_BLOCKS',
+      payload: [...localState.localBlocks, { ...block, visible: true }]
+    })
   }
 
   const handleRemoveStat = (id: string) => {
-    setLocalBlocks(prev => prev.filter(b => b.id !== id))
+    dispatchLocal({
+      type: 'SET_LOCAL_BLOCKS',
+      payload: localState.localBlocks.filter(b => b.id !== id)
+    })
   }
 
   const handleSave = () => {
-    onSave(localBlocks)
+    onSave(localState.localBlocks)
     onClose()
   }
 
   const handleReset = () => {
-    setLocalBlocks(defaultBlocks)
+    dispatchLocal({ type: 'SET_LOCAL_BLOCKS', payload: defaultBlocks })
   }
 
   return (
@@ -413,8 +465,8 @@ export function StatsConfigModal({
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={localBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
-              {localBlocks.map(block => (
+            <SortableContext items={localState.localBlocks.map(b => b.id)} strategy={verticalListSortingStrategy}>
+              {localState.localBlocks.map(block => (
                 <SortableItem
                   key={block.id}
                   block={block}
@@ -428,22 +480,22 @@ export function StatsConfigModal({
         </div>
 
         {/* Add Stats Panel */}
-        {showAddPanel ? (
+        {localState.showAddPanel ? (
           <div className="mt-4 pt-4 border-t border-border">
             <div className="flex items-center gap-2 mb-3">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <input
                   type="text"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
+                  value={localState.searchQuery}
+                  onChange={e => dispatchLocal({ type: 'SET_SEARCH_QUERY', payload: e.target.value })}
                   placeholder="Search all available stats..."
                   className="w-full pl-9 pr-3 py-2 bg-secondary/30 border border-border rounded-lg text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-purple-500/50"
                   autoFocus
                 />
               </div>
               <button
-                onClick={() => setShowAddPanel(false)}
+                onClick={() => dispatchLocal({ type: 'TOGGLE_ADD_PANEL' })}
                 className="text-sm text-muted-foreground hover:text-foreground"
               >
                 Done
@@ -460,21 +512,21 @@ export function StatsConfigModal({
                       category={category}
                       availableBlocks={categoryBlocks}
                       onAdd={handleAddStat}
-                      isExpanded={expandedCategories.has(category.type)}
+                      isExpanded={localState.expandedCategories.has(category.type)}
                       onToggle={() => toggleCategory(category.type)}
                     />
                   )
                 })
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  {searchQuery ? 'No stats match your search' : 'All stats are already added'}
+                  {localState.searchQuery ? 'No stats match your search' : 'All stats are already added'}
                 </p>
               )}
             </div>
           </div>
         ) : (
           <button
-            onClick={() => setShowAddPanel(true)}
+            onClick={() => dispatchLocal({ type: 'TOGGLE_ADD_PANEL' })}
             className="mt-4 w-full flex items-center justify-center gap-2 py-2 border border-dashed border-border rounded-lg text-sm text-muted-foreground hover:text-foreground hover:border-purple-500/50 transition-colors"
           >
             <Plus className="w-4 h-4" />

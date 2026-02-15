@@ -8,6 +8,36 @@ import { formatLastSeen } from '../../lib/errorClassifier'
 // Must match animation duration (1s) defined in index.css for animate-spin-min
 const MIN_SPIN_DURATION = 1000
 
+// Custom hook to manage spinning state with minimum duration
+// Prevents flicker by batching state updates
+function useMinimumSpinDuration(isRefreshing: boolean) {
+  const [isVisuallySpinning, setIsVisuallySpinning] = useState(false)
+  const spinStartRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (isRefreshing) {
+      setIsVisuallySpinning(true)
+      spinStartRef.current = Date.now()
+    } else if (spinStartRef.current !== null) {
+      const elapsed = Date.now() - spinStartRef.current
+      const remaining = Math.max(0, MIN_SPIN_DURATION - elapsed)
+
+      if (remaining > 0) {
+        const timeout = setTimeout(() => {
+          setIsVisuallySpinning(false)
+          spinStartRef.current = null
+        }, remaining)
+        return () => clearTimeout(timeout)
+      } else {
+        setIsVisuallySpinning(false)
+        spinStartRef.current = null
+      }
+    }
+  }, [isRefreshing])
+
+  return isVisuallySpinning
+}
+
 interface RefreshIndicatorProps {
   isRefreshing: boolean
   lastUpdated?: Date | null
@@ -33,30 +63,8 @@ export function RefreshIndicator({
   showLabel = true,
   staleThresholdMinutes = 5,
 }: RefreshIndicatorProps) {
-  // Track visual spinning state separately to ensure minimum spin duration
-  const [isVisuallySpinning, setIsVisuallySpinning] = useState(false)
-  const spinStartRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (isRefreshing) {
-      setIsVisuallySpinning(true)
-      spinStartRef.current = Date.now()
-    } else if (spinStartRef.current !== null) {
-      const elapsed = Date.now() - spinStartRef.current
-      const remaining = Math.max(0, MIN_SPIN_DURATION - elapsed)
-
-      if (remaining > 0) {
-        const timeout = setTimeout(() => {
-          setIsVisuallySpinning(false)
-          spinStartRef.current = null
-        }, remaining)
-        return () => clearTimeout(timeout)
-      } else {
-        setIsVisuallySpinning(false)
-        spinStartRef.current = null
-      }
-    }
-  }, [isRefreshing])
+  // Use custom hook to prevent flicker with batched state updates
+  const isVisuallySpinning = useMinimumSpinDuration(isRefreshing)
 
   const isStale = lastUpdated &&
     (Date.now() - lastUpdated.getTime()) > staleThresholdMinutes * 60 * 1000
@@ -148,32 +156,8 @@ export function RefreshButton({
   className = '',
 }: RefreshButtonProps) {
   const { t } = useTranslation('common')
-  // Track visual spinning state separately to ensure minimum spin duration
-  const [isVisuallySpinning, setIsVisuallySpinning] = useState(false)
-  const spinStartRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (isRefreshing) {
-      // Start spinning
-      setIsVisuallySpinning(true)
-      spinStartRef.current = Date.now()
-    } else if (spinStartRef.current !== null) {
-      // Refresh ended - ensure minimum spin duration
-      const elapsed = Date.now() - spinStartRef.current
-      const remaining = Math.max(0, MIN_SPIN_DURATION - elapsed)
-
-      if (remaining > 0) {
-        const timeout = setTimeout(() => {
-          setIsVisuallySpinning(false)
-          spinStartRef.current = null
-        }, remaining)
-        return () => clearTimeout(timeout)
-      } else {
-        setIsVisuallySpinning(false)
-        spinStartRef.current = null
-      }
-    }
-  }, [isRefreshing])
+  // Use custom hook to prevent flicker with batched state updates
+  const isVisuallySpinning = useMinimumSpinDuration(isRefreshing)
 
   const sizeClasses = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
   const buttonPadding = size === 'sm' ? 'p-0.5' : 'p-1'
@@ -223,30 +207,8 @@ export function RefreshSpinner({
   size?: 'sm' | 'md'
   className?: string
 }) {
-  // Track visual spinning state separately to ensure minimum spin duration
-  const [isVisuallySpinning, setIsVisuallySpinning] = useState(false)
-  const spinStartRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (isRefreshing) {
-      setIsVisuallySpinning(true)
-      spinStartRef.current = Date.now()
-    } else if (spinStartRef.current !== null) {
-      const elapsed = Date.now() - spinStartRef.current
-      const remaining = Math.max(0, MIN_SPIN_DURATION - elapsed)
-
-      if (remaining > 0) {
-        const timeout = setTimeout(() => {
-          setIsVisuallySpinning(false)
-          spinStartRef.current = null
-        }, remaining)
-        return () => clearTimeout(timeout)
-      } else {
-        setIsVisuallySpinning(false)
-        spinStartRef.current = null
-      }
-    }
-  }, [isRefreshing])
+  // Use custom hook to prevent flicker with batched state updates
+  const isVisuallySpinning = useMinimumSpinDuration(isRefreshing)
 
   if (!isVisuallySpinning) return null
 

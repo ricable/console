@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect, useReducer } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Bell, AlertTriangle, CheckCircle, Clock, ChevronRight, X, Server, Search, ExternalLink, CheckSquare, Square, MinusSquare } from 'lucide-react'
@@ -14,33 +14,51 @@ import { ROUTES } from '../../config/routes'
 // Animated counter component for the badge - exported for future use
 export function AnimatedCounter({ value, className }: { value: number; className?: string }) {
   const { t: _t } = useTranslation()
-  const [displayValue, setDisplayValue] = useState(value)
-  const [isAnimating, setIsAnimating] = useState(false)
-  const [direction, setDirection] = useState<'up' | 'down'>('up')
+  
+  type AnimState = { displayValue: number; isAnimating: boolean; direction: 'up' | 'down' }
+  type AnimAction = { type: 'START_ANIMATION'; value: number } | { type: 'UPDATE_VALUE'; value: number } | { type: 'END_ANIMATION' }
+  
+  // Use useReducer to batch animation state updates
+  const [animState, dispatch] = useReducer(
+    (state: AnimState, action: AnimAction): AnimState => {
+      switch (action.type) {
+        case 'START_ANIMATION':
+          return { ...state, isAnimating: true, direction: action.value > state.displayValue ? 'up' : 'down' }
+        case 'UPDATE_VALUE':
+          return { ...state, displayValue: action.value }
+        case 'END_ANIMATION':
+          return { ...state, isAnimating: false }
+        default:
+          return state
+      }
+    },
+    { displayValue: value, isAnimating: false, direction: 'up' }
+  )
+  
   const prevValueRef = useRef(value)
 
   useEffect(() => {
     if (value !== prevValueRef.current) {
-      setDirection(value > prevValueRef.current ? 'up' : 'down')
-      setIsAnimating(true)
+      // Single dispatch to start animation - batches direction and isAnimating
+      dispatch({ type: 'START_ANIMATION', value })
       // Wait for exit animation, then update value
       const timer = setTimeout(() => {
-        setDisplayValue(value)
+        dispatch({ type: 'UPDATE_VALUE', value })
         prevValueRef.current = value
         // Reset animation after enter completes
-        setTimeout(() => setIsAnimating(false), 200)
+        setTimeout(() => dispatch({ type: 'END_ANIMATION' }), 200)
       }, 150)
       return () => clearTimeout(timer)
     }
   }, [value])
 
-  const displayText = displayValue > 99 ? '99+' : displayValue.toString()
+  const displayText = animState.displayValue > 99 ? '99+' : animState.displayValue.toString()
 
   return (
     <span
       className={`inline-block transition-all duration-200 ${className} ${
-        isAnimating
-          ? direction === 'up'
+        animState.isAnimating
+          ? animState.direction === 'up'
             ? 'animate-roll-up'
             : 'animate-roll-down'
           : ''
@@ -104,6 +122,7 @@ export function AlertBadge() {
     e.stopPropagation()
     const mission = getMissionForAlert(alert)
     if (mission) {
+      // React 18 auto-batches these state updates in event handlers
       setActiveMission(mission.id)
       openSidebar()
       setIsOpen(false)

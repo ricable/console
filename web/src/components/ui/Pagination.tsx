@@ -13,6 +13,7 @@ export function usePagination<T>(items: T[], defaultPerPage: number = 5, resetOn
   useEffect(() => {
     if (prevDefaultPerPage.current !== defaultPerPage) {
       prevDefaultPerPage.current = defaultPerPage
+      // React 18 auto-batches these state updates
       setItemsPerPage(defaultPerPage)
       setCurrentPage(1)
     }
@@ -55,6 +56,7 @@ export function usePagination<T>(items: T[], defaultPerPage: number = 5, resetOn
   }, [])
 
   const setPerPage = useCallback((perPage: number) => {
+    // React 18 auto-batches these state updates in callbacks
     setItemsPerPage(perPage)
     setCurrentPage(1)
   }, [])
