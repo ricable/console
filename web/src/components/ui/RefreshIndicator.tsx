@@ -8,8 +8,22 @@ import { formatLastSeen } from '../../lib/errorClassifier'
 // Must match animation duration (1s) defined in index.css for animate-spin-min
 const MIN_SPIN_DURATION = 1000
 
-// Custom hook to manage spinning state with minimum duration
-// Prevents flicker by batching state updates
+/**
+ * Custom hook to manage spinning state with minimum duration
+ * 
+ * Prevents UI flicker by ensuring the refresh icon spins for at least MIN_SPIN_DURATION
+ * milliseconds, even if the actual refresh completes faster. This provides visual feedback
+ * consistency and batches state updates to avoid multiple renders.
+ * 
+ * @param isRefreshing - Whether a refresh operation is currently in progress
+ * @returns isVisuallySpinning - Whether the spinner should be displayed as spinning
+ * 
+ * @example
+ * ```tsx
+ * const isVisuallySpinning = useMinimumSpinDuration(isRefreshing)
+ * return <RefreshCw className={isVisuallySpinning ? 'animate-spin-min' : ''} />
+ * ```
+ */
 function useMinimumSpinDuration(isRefreshing: boolean) {
   const [isVisuallySpinning, setIsVisuallySpinning] = useState(false)
   const spinStartRef = useRef<number | null>(null)

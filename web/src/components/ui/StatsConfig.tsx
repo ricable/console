@@ -345,17 +345,15 @@ export function StatsConfigModal({
   }, [isOpen, blocks])
 
   const toggleCategory = (type: string) => {
+    const next = new Set(localState.expandedCategories)
+    if (next.has(type)) {
+      next.delete(type)
+    } else {
+      next.add(type)
+    }
     dispatchLocal({
       type: 'SET_EXPANDED_CATEGORIES',
-      payload: (() => {
-        const next = new Set(localState.expandedCategories)
-        if (next.has(type)) {
-          next.delete(type)
-        } else {
-          next.add(type)
-        }
-        return next
-      })()
+      payload: next
     })
   }
 
@@ -408,12 +406,20 @@ export function StatsConfigModal({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
     if (over && active.id !== over.id) {
-      const oldIndex = localState.localBlocks.findIndex(b => b.id === active.id)
-      const newIndex = localState.localBlocks.findIndex(b => b.id === over.id)
-      dispatchLocal({
-        type: 'SET_LOCAL_BLOCKS',
-        payload: arrayMove(localState.localBlocks, oldIndex, newIndex)
-      })
+      // Optimize: find both indices in a single pass
+      let oldIndex = -1
+      let newIndex = -1
+      for (let i = 0; i < localState.localBlocks.length; i++) {
+        if (localState.localBlocks[i].id === active.id) oldIndex = i
+        if (localState.localBlocks[i].id === over.id) newIndex = i
+        if (oldIndex !== -1 && newIndex !== -1) break
+      }
+      if (oldIndex !== -1 && newIndex !== -1) {
+        dispatchLocal({
+          type: 'SET_LOCAL_BLOCKS',
+          payload: arrayMove(localState.localBlocks, oldIndex, newIndex)
+        })
+      }
     }
   }
 
