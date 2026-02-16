@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Filter, ChevronDown, Server } from 'lucide-react'
 import { ClusterStatusDot, getClusterState, type ClusterState } from './ClusterStatusBadge'
 import type { ClusterErrorType } from '../../lib/errorClassifier'
+import { useDropdownNavigation } from '../../hooks/useDropdownNavigation'
 
 interface ClusterFilterDropdownProps {
   localClusterFilter: string[]
@@ -68,6 +69,25 @@ export function ClusterFilterDropdown({
     }
   }, [showClusterFilter, calculatePosition])
 
+  // Keyboard navigation - include "All clusters" option in item count
+  type SelectableItem = { name: string; isAllOption: true } | typeof availableClusters[0]
+  const selectableItems: SelectableItem[] = [{ name: '__all__', isAllOption: true }, ...availableClusters]
+  const { selectedIndex, handleKeyDown: handleDropdownKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
+    isOpen: showClusterFilter,
+    itemCount: selectableItems.length,
+    onSelect: (index) => {
+      const item = selectableItems[index]
+      if ('isAllOption' in item && item.isAllOption) {
+        clearClusterFilter()
+      } else if (!('isAllOption' in item) && item.reachable !== false) {
+        toggleClusterFilter(item.name)
+      }
+    },
+    onClose: () => setShowClusterFilter(false),
+    loop: true,
+    enableHomeEnd: true,
+  })
+
   if (availableClusters.length < minClusters) {
     return null
   }
@@ -107,17 +127,21 @@ export function ClusterFilterDropdown({
               left: dropdownStyle.left,
               right: dropdownStyle.right,
             }}
+            onKeyDown={handleDropdownKeyDown}
           >
             <div className="p-1">
               <button
+                {...getItemProps(0)}
+                ref={selectedIndex === 0 ? selectedRef as React.RefObject<HTMLButtonElement> : null}
                 onClick={clearClusterFilter}
                 className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors ${
                   localClusterFilter.length === 0 ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-secondary text-foreground'
-                }`}
+                } ${selectedIndex === 0 ? 'ring-1 ring-blue-500/50' : ''}`}
               >
                 All clusters
               </button>
-              {availableClusters.map(cluster => {
+              {availableClusters.map((cluster, idx) => {
+                const itemIndex = idx + 1 // +1 for "All clusters" option
                 const clusterState: ClusterState = cluster.healthy !== undefined || cluster.reachable !== undefined
                   ? getClusterState(
                       cluster.healthy ?? true,
@@ -138,6 +162,8 @@ export function ClusterFilterDropdown({
                 return (
                   <button
                     key={cluster.name}
+                    {...getItemProps(itemIndex)}
+                    ref={selectedIndex === itemIndex ? selectedRef as React.RefObject<HTMLButtonElement> : null}
                     onClick={() => !isUnreachable && toggleClusterFilter(cluster.name)}
                     disabled={isUnreachable}
                     className={`w-full px-2 py-1.5 text-xs text-left rounded transition-colors flex items-center gap-2 ${
@@ -146,7 +172,7 @@ export function ClusterFilterDropdown({
                         : localClusterFilter.includes(cluster.name)
                           ? 'bg-purple-500/20 text-purple-400'
                           : 'hover:bg-secondary text-foreground'
-                    }`}
+                    } ${selectedIndex === itemIndex && !isUnreachable ? 'ring-1 ring-blue-500/50' : ''}`}
                     title={stateLabel ? `${cluster.name} (${stateLabel})` : cluster.name}
                   >
                     <ClusterStatusDot state={clusterState} size="sm" />

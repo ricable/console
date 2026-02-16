@@ -4,6 +4,7 @@ import { ChevronDown } from 'lucide-react'
 import { ClusterStatusDot, getClusterState, type ClusterState } from './ClusterStatusBadge'
 import type { ClusterErrorType } from '../../lib/errorClassifier'
 import { cn } from '../../lib/cn'
+import { useDropdownNavigation } from '../../hooks/useDropdownNavigation'
 
 interface ClusterInfo {
   name: string
@@ -89,6 +90,26 @@ export function ClusterSelect({
         : 'healthy')
     : null
 
+  // Keyboard navigation - include empty option in item count
+  type SelectableItem = { name: string; isPlaceholder: true } | ClusterInfo
+  const selectableItems: SelectableItem[] = [{ name: '', isPlaceholder: true }, ...clusters]
+  const { selectedIndex, handleKeyDown: handleDropdownKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
+    isOpen,
+    itemCount: selectableItems.length,
+    onSelect: (index) => {
+      const item = selectableItems[index]
+      if ('isPlaceholder' in item && item.isPlaceholder) {
+        onChange('')
+      } else if (!('isPlaceholder' in item) && item.reachable !== false) {
+        onChange(item.name)
+      }
+      setIsOpen(false)
+    },
+    onClose: () => setIsOpen(false),
+    loop: true,
+    enableHomeEnd: true,
+  })
+
   return (
     <>
       <button
@@ -113,19 +134,24 @@ export function ClusterSelect({
           className="fixed max-h-48 overflow-y-auto rounded-lg bg-card border border-border shadow-lg z-50"
           style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
           onMouseDown={e => e.stopPropagation()}
+          onKeyDown={handleDropdownKeyDown}
         >
           <div className="p-1">
             {/* Empty option */}
             <button
+              {...getItemProps(0)}
+              ref={selectedIndex === 0 ? selectedRef as React.RefObject<HTMLButtonElement> : null}
               onClick={() => { onChange(''); setIsOpen(false) }}
               className={cn(
                 'w-full px-2 py-1.5 text-xs text-left rounded transition-colors',
                 !value ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-secondary text-muted-foreground',
+                selectedIndex === 0 && 'ring-1 ring-blue-500/50',
               )}
             >
               {placeholder}
             </button>
-            {clusters.map(cluster => {
+            {clusters.map((cluster, idx) => {
+              const itemIndex = idx + 1 // +1 for placeholder
               const clusterState: ClusterState = cluster.healthy !== undefined || cluster.reachable !== undefined
                 ? getClusterState(cluster.healthy ?? true, cluster.reachable, cluster.nodeCount, undefined, cluster.errorType)
                 : 'healthy'
@@ -140,6 +166,8 @@ export function ClusterSelect({
               return (
                 <button
                   key={cluster.name}
+                  {...getItemProps(itemIndex)}
+                  ref={selectedIndex === itemIndex ? selectedRef as React.RefObject<HTMLButtonElement> : null}
                   onClick={() => {
                     if (!isUnreachable) {
                       onChange(cluster.name)
@@ -154,6 +182,7 @@ export function ClusterSelect({
                       : value === cluster.name
                         ? 'bg-purple-500/20 text-purple-400'
                         : 'hover:bg-secondary text-foreground',
+                    selectedIndex === itemIndex && !isUnreachable && 'ring-1 ring-blue-500/50',
                   )}
                   title={stateLabel ? `${cluster.name} (${stateLabel})` : cluster.name}
                 >
