@@ -3,6 +3,7 @@ import { Key, Check, AlertCircle, Loader2, Trash2, Eye, EyeOff, ExternalLink, Co
 import { cn } from '../../lib/cn'
 import { AgentIcon } from './AgentIcon'
 import { BaseModal } from '../../lib/modals'
+import { ConfirmDialog } from '../../lib/modals/ConfirmDialog'
 import { KC_AGENT, AI_PROVIDER_DOCS } from '../../config/externalApis'
 import { useTranslation } from 'react-i18next'
 
@@ -55,6 +56,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
   const [showKey, setShowKey] = useState(false)
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [deleteProvider, setDeleteProvider] = useState<string | null>(null)
+  const [deleteProviderName, setDeleteProviderName] = useState<string>('')
   const timeoutRef = useRef<number>()
 
   const copyInstallCommand = async () => {
@@ -137,6 +140,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
       }
 
       await fetchKeysStatus()
+      setDeleteProvider(null)
+      setDeleteProviderName('')
     } catch (err) {
       setError(err instanceof Error ? err.message : t('agent.failedToDeleteKey'))
     } finally {
@@ -158,7 +163,8 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
   }
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} size="md" closeOnBackdrop={false}>
+    <>
+      <BaseModal isOpen={isOpen} onClose={onClose} size="md" closeOnBackdrop={false}>
       <BaseModal.Header
         title={t('agent.apiKeySettings')}
         icon={Key}
@@ -267,7 +273,10 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
                     <div className="flex items-center gap-2">
                       {key.configured && key.source !== 'env' && (
                         <button
-                          onClick={() => handleDeleteKey(key.provider)}
+                          onClick={() => {
+                            setDeleteProvider(key.provider)
+                            setDeleteProviderName(key.displayName)
+                          }}
                           disabled={saving}
                           className="p-1.5 hover:bg-destructive/20 rounded transition-colors text-muted-foreground hover:text-destructive"
                           title={t('agent.removeKey')}
@@ -366,5 +375,20 @@ export function APIKeySettings({ isOpen, onClose }: APIKeySettingsProps) {
         </p>
       </BaseModal.Footer>
     </BaseModal>
+
+    {/* Delete Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteProvider !== null}
+      onClose={() => {
+        setDeleteProvider(null)
+        setDeleteProviderName('')
+      }}
+      onConfirm={() => deleteProvider && handleDeleteKey(deleteProvider)}
+      title="Delete API Key"
+      message={`Are you sure you want to delete the ${deleteProviderName} API key? You will need to re-enter it to use ${deleteProviderName} features.`}
+      confirmLabel="Delete"
+      variant="danger"
+    />
+    </>
   )
 }

@@ -5,6 +5,7 @@ import {
   AlertTriangle, CheckCircle, Loader2, Trash2, LayoutTemplate,
 } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
+import { ConfirmDialog } from '../../lib/modals/ConfirmDialog'
 import { cn } from '../../lib/cn'
 import { saveDynamicCard, deleteDynamicCard, getAllDynamicCards } from '../../lib/dynamic-cards'
 import { compileCardCode, createCardComponent } from '../../lib/dynamic-cards/compiler'
@@ -492,6 +493,8 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
   const [existingCards, setExistingCards] = useState<DynamicCardDefinition[]>([])
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [deleteCardId, setDeleteCardId] = useState<string | null>(null)
+  const [deleteCardTitle, setDeleteCardTitle] = useState<string>('')
 
   // Track timeouts for cleanup
   const timeoutsRef = useRef<number[]>([])
@@ -623,6 +626,8 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
   const handleDelete = useCallback((id: string) => {
     deleteDynamicCard(id)
     setExistingCards(getAllDynamicCards())
+    setDeleteCardId(null)
+    setDeleteCardTitle('')
   }, [])
 
   // Add column (Tier 1)
@@ -695,6 +700,7 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
   )
 
   return (
+    <>
     <BaseModal
       isOpen={isOpen}
       onClose={onClose}
@@ -1093,7 +1099,10 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
                       </p>
                     </div>
                     <button
-                      onClick={() => handleDelete(card.id)}
+                      onClick={() => {
+                        setDeleteCardId(card.id)
+                        setDeleteCardTitle(card.title)
+                      }}
                       className="p-1.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors shrink-0"
                       title={t('dashboard.cardFactory.deleteCard')}
                     >
@@ -1108,6 +1117,21 @@ export function CardFactoryModal({ isOpen, onClose, onCardCreated }: CardFactory
       </div>
       </BaseModal.Content>
     </BaseModal>
+
+    {/* Delete Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteCardId !== null}
+      onClose={() => {
+        setDeleteCardId(null)
+        setDeleteCardTitle('')
+      }}
+      onConfirm={() => deleteCardId && handleDelete(deleteCardId)}
+      title="Delete Card"
+      message={`Are you sure you want to delete "${deleteCardTitle}"? This action cannot be undone.`}
+      confirmLabel="Delete"
+      variant="danger"
+    />
+    </>
   )
 }
 

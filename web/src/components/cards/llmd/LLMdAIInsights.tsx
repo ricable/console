@@ -12,6 +12,7 @@ import { useCardDemoState, useReportCardDataState } from '../CardDataContext'
 import { generateAIInsights, type AIInsight } from '../../../lib/llmd/mockData'
 import type { LLMdStack } from '../../../hooks/useStackDiscovery'
 import { useTranslation } from 'react-i18next'
+import { useToast } from '../../ui/Toast'
 
 const INSIGHT_ICONS = {
   optimization: Lightbulb,
@@ -320,6 +321,7 @@ export function LLMdAIInsights() {
   const { t } = useTranslation(['cards', 'common'])
   const stackContext = useOptionalStack()
   const { shouldUseDemoData, showDemoBadge, reason } = useCardDemoState({ requires: 'stack' })
+  const { showToast } = useToast()
 
   // Report demo state to CardWrapper so it can show demo badge and yellow outline
   // Use showDemoBadge (true when global demo mode) rather than shouldUseDemoData (false when stack selected)
@@ -396,6 +398,7 @@ export function LLMdAIInsights() {
     }
 
     setChatHistory(prev => [...prev, { role: 'ai', message: response }])
+    showToast('AI response generated', 'success')
   }
 
   const insightCounts = {

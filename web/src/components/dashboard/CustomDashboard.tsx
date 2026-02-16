@@ -39,6 +39,7 @@ import { TemplatesModal } from './TemplatesModal'
 import { FloatingDashboardActions } from './FloatingDashboardActions'
 import { DashboardTemplate } from './templates'
 import { BaseModal } from '../../lib/modals'
+import { ConfirmDialog } from '../../lib/modals/ConfirmDialog'
 import { formatCardTitle } from '../../lib/formatCardTitle'
 import { StatsOverview, StatBlockValue } from '../ui/StatsOverview'
 import { useUniversalStats, createMergedStatValueGetter } from '../../hooks/useUniversalStats'
@@ -206,6 +207,8 @@ export function CustomDashboard() {
   const [isConfigureCardOpen, setIsConfigureCardOpen] = useState(false)
   const [isTemplatesOpen, setIsTemplatesOpen] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false)
+  const [cardToRemove, setCardToRemove] = useState<string | null>(null)
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
 
   // Drag state
@@ -332,7 +335,8 @@ export function CustomDashboard() {
         showToast('Failed to delete card from backend', 'error')
       }
     }
-  }, [id])
+    setCardToRemove(null)
+  }, [id, showToast])
 
   const handleConfigureCard = useCallback((card: Card) => {
     setSelectedCard(card)
@@ -388,6 +392,7 @@ export function CustomDashboard() {
     setCards([])
     safeRemoveItem(storageKey)
     showToast('Dashboard reset to empty', 'info')
+    setIsResetConfirmOpen(false)
   }, [storageKey, showToast])
 
   const handleDeleteDashboard = useCallback(() => {
@@ -540,7 +545,7 @@ export function CustomDashboard() {
                   key={card.id}
                   card={card}
                   onConfigure={() => handleConfigureCard(card)}
-                  onRemove={() => handleRemoveCard(card.id)}
+                  onRemove={() => setCardToRemove(card.id)}
                   onWidthChange={(w) => handleWidthChange(card.id, w)}
                   isDragging={activeId === card.id}
                   isRefreshing={isRefreshing}
@@ -565,7 +570,7 @@ export function CustomDashboard() {
       <FloatingDashboardActions
         onAddCard={() => setIsAddCardOpen(true)}
         onOpenTemplates={() => setIsTemplatesOpen(true)}
-        onResetToDefaults={handleReset}
+        onResetToDefaults={() => setIsResetConfirmOpen(true)}
         isCustomized={cards.length > 0}
         onExport={id ? async () => {
           try {
@@ -657,6 +662,28 @@ export function CustomDashboard() {
           </button>
         </BaseModal.Footer>
       </BaseModal>
+
+      {/* Reset Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isResetConfirmOpen}
+        onClose={() => setIsResetConfirmOpen(false)}
+        onConfirm={handleReset}
+        title="Reset Dashboard"
+        message="Are you sure you want to reset this dashboard to empty? All cards will be removed. This action cannot be undone."
+        confirmLabel="Reset"
+        variant="warning"
+      />
+
+      {/* Card Removal Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={cardToRemove !== null}
+        onClose={() => setCardToRemove(null)}
+        onConfirm={() => cardToRemove && handleRemoveCard(cardToRemove)}
+        title="Remove Card"
+        message="Are you sure you want to remove this card from the dashboard?"
+        confirmLabel="Remove"
+        variant="danger"
+      />
     </div>
   )
 }

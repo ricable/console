@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useCachedNodes } from '../../hooks/useCachedData'
 import { useKubectl } from '../../hooks/useKubectl'
+import { useToast } from '../ui/Toast'
 
 const DEBUG_COMMANDS = [
   { label: 'Node Info', cmd: (node: string) => [`describe`, `node`, node] },
@@ -64,6 +65,7 @@ type TabMode = 'inspect' | 'exec'
 export function NodeDebug() {
   const { nodes, isLoading } = useCachedNodes()
   const { execute } = useKubectl()
+  const { showToast } = useToast()
   const [selectedCluster, setSelectedCluster] = useState<string>('')
   const [selectedNode, setSelectedNode] = useState<string>('')
   const [output, setOutput] = useState<string>('')
@@ -84,12 +86,14 @@ export function NodeDebug() {
     try {
       const result = await execute(selectedCluster || 'default', args)
       setOutput(`$ ${cmdStr}\n\n${result || 'Command completed'}`)
+      showToast('Command executed successfully', 'success')
     } catch (err) {
       setOutput(`$ ${cmdStr}\n\nError: ${err instanceof Error ? err.message : String(err)}`)
+      showToast('Command execution failed', 'error')
     } finally {
       setIsRunning(false)
     }
-  }, [selectedNode, selectedCluster, execute])
+  }, [selectedNode, selectedCluster, execute, showToast])
 
   const handleExec = useCallback(async (shellCmd: string) => {
     if (!selectedNode || !shellCmd.trim()) return
@@ -105,12 +109,14 @@ export function NodeDebug() {
     try {
       const result = await execute(selectedCluster || 'default', args)
       setOutput(`$ ${cmdStr}\n\n${result || 'Command completed (no output)'}`)
+      showToast('Debug command executed successfully', 'success')
     } catch (err) {
       setOutput(`$ ${cmdStr}\n\nError: ${err instanceof Error ? err.message : String(err)}`)
+      showToast('Debug command failed', 'error')
     } finally {
       setIsRunning(false)
     }
-  }, [selectedNode, selectedCluster, execImage, execute])
+  }, [selectedNode, selectedCluster, execImage, execute, showToast])
 
   if (isLoading && nodes.length === 0) {
     return (

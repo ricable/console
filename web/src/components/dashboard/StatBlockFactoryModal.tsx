@@ -11,6 +11,7 @@ import {
 import * as Icons from 'lucide-react'
 import { LucideIcon } from 'lucide-react'
 import { BaseModal } from '../../lib/modals'
+import { ConfirmDialog } from '../../lib/modals/ConfirmDialog'
 import { cn } from '../../lib/cn'
 import {
   saveDynamicStatsDefinition,
@@ -248,6 +249,8 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
   // Manage state
   const [existingStats, setExistingStats] = useState<StatsDefinition[]>([])
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
+  const [deleteStatsType, setDeleteStatsType] = useState<string | null>(null)
+  const [deleteStatsTitle, setDeleteStatsTitle] = useState<string>('')
 
   // Preview state
   const [previewCollapsed, setPreviewCollapsed] = useState(false)
@@ -355,6 +358,8 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
     startTransition(() => {
       setExistingStats(getAllDynamicStats())
     })
+    setDeleteStatsType(null)
+    setDeleteStatsTitle('')
   }, [])
 
   // Handle inline AI assist result
@@ -393,6 +398,7 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
   ]
 
   return (
+    <>
     <BaseModal isOpen={isOpen} onClose={onClose} size="xl" closeOnBackdrop={false}>
       <BaseModal.Header title={t('dashboard.statFactory.title')} icon={Activity} onClose={onClose} showBack={false} />
 
@@ -788,7 +794,10 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
                     </div>
                   </div>
                   <button
-                    onClick={() => handleDelete(stats.type)}
+                    onClick={() => {
+                      setDeleteStatsType(stats.type)
+                      setDeleteStatsTitle(stats.title || 'this stat block')
+                    }}
                     className="p-1.5 rounded hover:bg-red-500/20 text-muted-foreground hover:text-red-400 transition-colors shrink-0"
                     title={t('dashboard.statFactory.deleteStatBlock')}
                   >
@@ -801,5 +810,20 @@ export function StatBlockFactoryModal({ isOpen, onClose, onStatsCreated }: StatB
         )}
       </BaseModal.Content>
     </BaseModal>
+
+    {/* Delete Confirmation Dialog */}
+    <ConfirmDialog
+      isOpen={deleteStatsType !== null}
+      onClose={() => {
+        setDeleteStatsType(null)
+        setDeleteStatsTitle('')
+      }}
+      onConfirm={() => deleteStatsType && handleDelete(deleteStatsType)}
+      title="Delete Stat Block"
+      message={`Are you sure you want to delete "${deleteStatsTitle}"? This action cannot be undone.`}
+      confirmLabel="Delete"
+      variant="danger"
+    />
+    </>
   )
 }
