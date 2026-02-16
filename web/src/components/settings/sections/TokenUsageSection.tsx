@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Save, Coins, RefreshCw } from 'lucide-react'
+import { Save, Coins, RefreshCw, Loader2 } from 'lucide-react'
 import type { TokenUsage } from '../../../hooks/useTokenUsage'
 
 interface TokenUsageSectionProps {
@@ -16,6 +16,7 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage, isDemoDat
   const [warningThreshold, setWarningThreshold] = useState(usage.warningThreshold * 100)
   const [criticalThreshold, setCriticalThreshold] = useState(usage.criticalThreshold * 100)
   const [saved, setSaved] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
 
   const handleSaveTokenSettings = () => {
     updateSettings({
@@ -25,6 +26,17 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage, isDemoDat
     })
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const handleResetUsage = async () => {
+    setIsResetting(true)
+    try {
+      resetUsage()
+      // Give feedback time
+      setTimeout(() => setIsResetting(false), 500)
+    } catch {
+      setIsResetting(false)
+    }
   }
 
   return (
@@ -47,10 +59,15 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage, isDemoDat
           </div>
         </div>
         <button
-          onClick={resetUsage}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          onClick={handleResetUsage}
+          disabled={isResetting}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-50"
         >
-          <RefreshCw className="w-4 h-4" />
+          {isResetting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
           {t('settings.tokens.resetUsage')}
         </button>
       </div>

@@ -226,10 +226,15 @@ export function FeatureRequestList() {
         <h3 className="text-sm font-medium text-foreground">Your Requests</h3>
         <button
           onClick={() => loadRequests()}
-          className="p-1 rounded hover:bg-secondary/50 text-muted-foreground"
+          disabled={isLoading}
+          className="p-1 rounded hover:bg-secondary/50 text-muted-foreground disabled:opacity-50"
           title={t('common.refresh')}
         >
-          <RefreshCw className="w-4 h-4" />
+          {isLoading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
         </button>
       </div>
 

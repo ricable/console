@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plug, RefreshCw, Check, X, Copy, Cpu } from 'lucide-react'
+import { Plug, RefreshCw, Check, X, Copy, Cpu, Loader2 } from 'lucide-react'
 import type { AgentHealth } from '../../../hooks/useLocalAgent'
 
 interface AgentSectionProps {
@@ -14,12 +14,24 @@ const INSTALL_COMMAND = 'brew install kubestellar/tap/kc-agent && kc-agent'
 export function AgentSection({ isConnected, health, refresh }: AgentSectionProps) {
   const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const timeoutRef = useRef<number>()
 
   const copyInstallCommand = async () => {
     await navigator.clipboard.writeText(INSTALL_COMMAND)
     setCopied(true)
     timeoutRef.current = setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      refresh()
+      // Give feedback time
+      setTimeout(() => setIsRefreshing(false), 500)
+    } catch {
+      setIsRefreshing(false)
+    }
   }
 
   // Cleanup timeout on unmount
@@ -44,10 +56,15 @@ export function AgentSection({ isConnected, health, refresh }: AgentSectionProps
           </div>
         </div>
         <button
-          onClick={refresh}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 disabled:opacity-50"
         >
-          <RefreshCw className="w-4 h-4" />
+          {isRefreshing ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <RefreshCw className="w-4 h-4" />
+          )}
           {t('settings.agent.refresh')}
         </button>
       </div>
