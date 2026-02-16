@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { ChevronDown, Check, Loader2, Settings } from 'lucide-react'
 import { useMissions } from '../../hooks/useMissions'
 import { useDemoMode, getDemoMode } from '../../hooks/useDemoMode'
+import { useDropdownNavigation } from '../../hooks/useDropdownNavigation'
 import { AgentIcon } from './AgentIcon'
 import { APIKeySettings } from './APIKeySettings'
 import type { AgentInfo } from '../../types/agent'
@@ -130,6 +131,30 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
     setIsOpen(false)
   }
 
+  // Keyboard navigation - include Settings button in item count
+  // Items: sorted agents + 1 settings button
+  const totalItems = sortedAgents.length + 1
+  const { selectedIndex, handleKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
+    isOpen,
+    itemCount: totalItems,
+    onSelect: (index) => {
+      if (index < sortedAgents.length) {
+        // Agent item
+        const agent = sortedAgents[index]
+        if (agent.available) {
+          handleSelect(agent.name)
+        }
+      } else {
+        // Settings button
+        setIsSettingsOpen(true)
+        setIsOpen(false)
+      }
+    },
+    onClose: () => setIsOpen(false),
+    loop: true,
+    enableHomeEnd: true,
+  })
+
   // Always show the dropdown trigger — never a standalone gear.
   // When no agents are available, show a generic agent icon; settings gear
   // lives only inside the dropdown as a footer item.
@@ -161,18 +186,24 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 top-full mt-1 right-0 w-72 rounded-lg bg-card border border-border shadow-lg overflow-hidden">
+        <div 
+          className="absolute z-50 top-full mt-1 right-0 w-72 rounded-lg bg-card border border-border shadow-lg overflow-hidden"
+          onKeyDown={handleKeyDown}
+        >
           {sortedAgents.length > 0 && (
             <div className="py-1">
-              {sortedAgents.map((agent: AgentInfo) => (
+              {sortedAgents.map((agent: AgentInfo, idx) => (
                 <div
                   key={agent.name}
+                  {...getItemProps(idx)}
+                  ref={selectedIndex === idx ? selectedRef as React.RefObject<HTMLDivElement> : null}
                   className={cn(
                     'w-full flex items-start gap-3 px-3 py-2 text-left transition-colors',
                     agent.available
                       ? 'hover:bg-secondary cursor-pointer'
                       : 'cursor-default',
-                    agent.name === selectedAgent && 'bg-primary/10'
+                    agent.name === selectedAgent && 'bg-primary/10',
+                    selectedIndex === idx && agent.available && 'ring-1 ring-blue-500/50',
                   )}
                   onClick={() => agent.available && handleSelect(agent.name)}
                 >
@@ -221,11 +252,16 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
           {/* Settings footer inside dropdown */}
           <div className="border-t border-border">
             <button
+              {...getItemProps(sortedAgents.length)}
+              ref={selectedIndex === sortedAgents.length ? selectedRef as React.RefObject<HTMLButtonElement> : null}
               onClick={() => {
                 setIsSettingsOpen(true)
                 setIsOpen(false)
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              className={cn(
+                'w-full flex items-center gap-2 px-3 py-2 text-left text-sm text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors',
+                selectedIndex === sortedAgents.length && 'ring-1 ring-blue-500/50',
+              )}
             >
               <Settings className="w-4 h-4" />
               API Key Settings
