@@ -93,6 +93,35 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
     }
   }, [isDemoMode])
 
+  const handleSelect = (agentName: string) => {
+    selectAgent(agentName)
+    setIsOpen(false)
+  }
+
+  // Keyboard navigation - include Settings button in item count
+  // Items: sorted agents + 1 settings button
+  const totalItems = sortedAgents.length + 1
+  const { selectedIndex, handleKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
+    isOpen,
+    itemCount: totalItems,
+    onSelect: (index) => {
+      if (index < sortedAgents.length) {
+        // Agent item
+        const agent = sortedAgents[index]
+        if (agent.available) {
+          handleSelect(agent.name)
+        }
+      } else {
+        // Settings button
+        setIsSettingsOpen(true)
+        setIsOpen(false)
+      }
+    },
+    onClose: () => setIsOpen(false),
+    loop: true,
+    enableHomeEnd: true,
+  })
+
   // Loading state — only show spinner if we already had agents (reconnecting).
   // When no agents have loaded yet (e.g. cluster mode with no kc-agent), render nothing
   // to avoid a perpetual spinner from the reconnect loop.
@@ -125,35 +154,6 @@ export function AgentSelector({ compact = false, className = '' }: AgentSelector
       </div>
     )
   }
-
-  const handleSelect = (agentName: string) => {
-    selectAgent(agentName)
-    setIsOpen(false)
-  }
-
-  // Keyboard navigation - include Settings button in item count
-  // Items: sorted agents + 1 settings button
-  const totalItems = sortedAgents.length + 1
-  const { selectedIndex, handleKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
-    isOpen,
-    itemCount: totalItems,
-    onSelect: (index) => {
-      if (index < sortedAgents.length) {
-        // Agent item
-        const agent = sortedAgents[index]
-        if (agent.available) {
-          handleSelect(agent.name)
-        }
-      } else {
-        // Settings button
-        setIsSettingsOpen(true)
-        setIsOpen(false)
-      }
-    },
-    onClose: () => setIsOpen(false),
-    loop: true,
-    enableHomeEnd: true,
-  })
 
   // Always show the dropdown trigger — never a standalone gear.
   // When no agents are available, show a generic agent icon; settings gear
