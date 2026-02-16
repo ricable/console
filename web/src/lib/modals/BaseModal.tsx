@@ -38,6 +38,7 @@ import { ReactNode, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, ChevronLeft } from 'lucide-react'
 import { useModalNavigation } from './useModalNavigation'
+import { useTabNavigation } from '../../hooks/useTabNavigation'
 import {
   BaseModalProps,
   ModalHeaderProps,
@@ -289,17 +290,30 @@ function ModalTabs({
   onTabChange,
   className = '',
 }: ModalTabsProps) {
+  // Find the index of the active tab
+  const activeIndex = tabs.findIndex(tab => tab.id === activeTab)
+  
+  // Use tab navigation hook for keyboard support
+  const { getTabListProps, getTabProps } = useTabNavigation({
+    activeIndex: activeIndex >= 0 ? activeIndex : 0,
+    tabCount: tabs.length,
+    onChange: (index) => onTabChange(tabs[index].id),
+    orientation: 'horizontal',
+  })
+
   return (
-    <div className={`flex border-b border-border ${className}`}>
-      {tabs.map((tab) => {
+    <div {...getTabListProps()} className={`flex border-b border-border ${className}`}>
+      {tabs.map((tab, index) => {
         const isActive = tab.id === activeTab
         const Icon = tab.icon
+        const tabProps = getTabProps(index)
 
         return (
           <button
             key={tab.id}
+            {...tabProps}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px focus:outline-none focus:ring-2 focus:ring-purple-500/50 rounded-t ${
               isActive
                 ? 'text-purple-400 border-purple-400 bg-purple-500/5'
                 : 'text-muted-foreground hover:text-foreground border-transparent'
