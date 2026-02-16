@@ -232,7 +232,7 @@ export const render = ({ output }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl() } }}
-            aria-label="Open KubeStellar Console"
+            aria-label="Open KubeStellar Console (connecting)"
           >
             <div style={{ ...styles.statusDot, backgroundColor: styles.colors.offline }} />
             <span style={styles.title}>KubeStellar Console</span>
