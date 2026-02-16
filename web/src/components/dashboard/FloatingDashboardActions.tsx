@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Layout, RotateCcw, Download, Upload, Pencil } from 'lucide-react'
 import { useMissions } from '../../hooks/useMissions'
 import { useMobile } from '../../hooks/useMobile'
+import { useDropdownNavigation } from '../../hooks/useDropdownNavigation'
 import { ResetMode } from '../../hooks/useDashboardReset'
 import { ResetDialog } from './ResetDialog'
 import { SidebarCustomizer } from '../layout/SidebarCustomizer'
@@ -106,6 +107,29 @@ export function FloatingDashboardActions({
 
   const showResetOption = isCustomized && (onReset || onResetToDefaults)
 
+  // Build list of actions for keyboard navigation
+  const actions = [
+    { id: 'add', label: t('dashboard.actions.addCard'), icon: Plus, handler: onAddCard, enabled: true },
+    { id: 'templates', label: t('dashboard.actions.templates'), icon: Layout, handler: onOpenTemplates, enabled: true },
+    { id: 'customize', label: t('dashboard.actions.customize'), icon: Pencil, handler: () => setIsCustomizerOpen(true), enabled: true },
+    { id: 'reset', label: t('dashboard.actions.reset'), icon: RotateCcw, handler: () => setIsResetDialogOpen(true), enabled: showResetOption },
+    { id: 'export', label: t('dashboard.actions.export'), icon: Download, handler: onExport, enabled: !!onExport },
+    { id: 'import', label: t('dashboard.actions.import'), icon: Upload, handler: handleImportClick, enabled: !!onImport },
+  ].filter(a => a.enabled)
+
+  // Keyboard navigation
+  const { selectedIndex, handleKeyDown, getItemProps, selectedRef } = useDropdownNavigation({
+    isOpen,
+    itemCount: actions.length,
+    onSelect: (index) => {
+      setIsOpen(false)
+      actions[index].handler?.()
+    },
+    onClose: () => setIsOpen(false),
+    loop: true,
+    enableHomeEnd: true,
+  })
+
   const menuBtnClass = "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground bg-card/95 hover:bg-card border border-border rounded-md shadow-md backdrop-blur-sm transition-all hover:shadow-lg whitespace-nowrap"
 
   return (
@@ -122,63 +146,26 @@ export function FloatingDashboardActions({
       <div ref={menuRef} className={`fixed ${positionClasses} z-40 flex flex-col ${isMobile ? 'items-start' : 'items-end'} gap-1.5 transition-all duration-300`}>
         {/* Expanded menu items */}
         {isOpen && (
-          <div className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150">
-            {onImport && (
-              <button
-                onClick={handleImportClick}
-                className={menuBtnClass}
-                title={t('dashboard.actions.importTitle')}
-              >
-                <Upload className="w-3.5 h-3.5" />
-                {t('dashboard.actions.import')}
-              </button>
-            )}
-            {onExport && (
-              <button
-                onClick={() => { setIsOpen(false); onExport() }}
-                className={menuBtnClass}
-                title={t('dashboard.actions.exportTitle')}
-              >
-                <Download className="w-3.5 h-3.5" />
-                {t('dashboard.actions.export')}
-              </button>
-            )}
-            {showResetOption && (
-              <button
-                onClick={() => { setIsOpen(false); setIsResetDialogOpen(true) }}
-                className={menuBtnClass}
-                title={t('dashboard.actions.resetTitle')}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                {t('dashboard.actions.reset')}
-              </button>
-            )}
-            <button
-              onClick={() => { setIsOpen(false); setIsCustomizerOpen(true) }}
-              className={menuBtnClass}
-              title={t('dashboard.actions.customizeTitle')}
-            >
-              <Pencil className="w-3.5 h-3.5" />
-              {t('dashboard.actions.customize')}
-            </button>
-            <button
-              onClick={() => { setIsOpen(false); onOpenTemplates() }}
-              data-tour="templates"
-              className={menuBtnClass}
-              title={t('dashboard.actions.templatesTitle')}
-            >
-              <Layout className="w-3.5 h-3.5" />
-              {t('dashboard.actions.templates')}
-            </button>
-            <button
-              onClick={() => { setIsOpen(false); onAddCard() }}
-              data-tour="add-card"
-              className={menuBtnClass}
-              title={t('dashboard.actions.addCardTitle')}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              {t('dashboard.actions.addCard')}
-            </button>
+          <div 
+            className="flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150"
+            onKeyDown={handleKeyDown}
+          >
+            {actions.map((action, idx) => {
+              const Icon = action.icon
+              return (
+                <button
+                  key={action.id}
+                  {...getItemProps(idx)}
+                  ref={selectedIndex === idx ? selectedRef as React.RefObject<HTMLButtonElement> : null}
+                  onClick={() => { setIsOpen(false); action.handler?.() }}
+                  className={`${menuBtnClass} ${selectedIndex === idx ? 'ring-1 ring-blue-500/50' : ''}`}
+                  data-tour={action.id === 'add' ? 'add-card' : action.id === 'templates' ? 'templates' : undefined}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  {action.label}
+                </button>
+              )
+            })}
           </div>
         )}
 
