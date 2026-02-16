@@ -2374,5 +2374,18 @@
     "pod": "Pod",
     "deploy": "Deploy",
     "ns": "NS"
+  },
+  "activeUsers": {
+    "title": "Active users viewing console",
+    "heading": "Active Users",
+    "activeViewers": "Active Viewers",
+    "demoUsers": "Demo Sessions",
+    "demoMode": "Demo mode active sessions",
+    "demoModeNote": "Demo mode is enabled",
+    "description": "Real-time count of users connected to the console via WebSocket",
+    "demoDescription": "Active demo sessions tracked via heartbeat",
+    "realTimeUpdates": "Real-time updates",
+    "error": "Unable to fetch active user count. The backend may be unavailable.",
+    "retry": "Retry"
   }
 }
