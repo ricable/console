@@ -21,8 +21,10 @@ export function ActiveUsersWidget() {
     if (increase > 0) {
       setCountAnimating(true)
       const timer = setTimeout(() => setCountAnimating(false), 1000)
+      previousCountRef.current = viewerCount
       return () => clearTimeout(timer)
     }
+    // Always update ref even if count didn't increase
     previousCountRef.current = viewerCount
   }, [viewerCount])
 
@@ -97,7 +99,7 @@ export function ActiveUsersWidget() {
                   refetch()
                   setShowDetails(false)
                 }}
-                className="w-full text-xs text-purple-400 hover:text-purple-300 text-center py-2 hover:bg-secondary rounded transition-colors"
+                className="w-full text-xs text-red-400 hover:text-red-300 text-center py-2 hover:bg-secondary rounded transition-colors"
               >
                 {t('activeUsers.retry')}
               </button>
