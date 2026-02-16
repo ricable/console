@@ -25,13 +25,9 @@ export function AgentSection({ isConnected, health, refresh }: AgentSectionProps
 
   const handleRefresh = () => {
     setIsRefreshing(true)
-    try {
-      refresh()
-      // Give feedback time
-      setTimeout(() => setIsRefreshing(false), 500)
-    } catch {
-      setIsRefreshing(false)
-    }
+    refresh()
+    // Brief visual feedback before clearing loading state
+    setTimeout(() => setIsRefreshing(false), 500)
   }
 
   // Cleanup timeout on unmount

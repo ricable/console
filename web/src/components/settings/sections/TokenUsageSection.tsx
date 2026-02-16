@@ -30,13 +30,9 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage, isDemoDat
 
   const handleResetUsage = () => {
     setIsResetting(true)
-    try {
-      resetUsage()
-      // Give feedback time
-      setTimeout(() => setIsResetting(false), 500)
-    } catch {
-      setIsResetting(false)
-    }
+    resetUsage()
+    // Brief visual feedback before clearing loading state
+    setTimeout(() => setIsResetting(false), 500)
   }
 
   return (
