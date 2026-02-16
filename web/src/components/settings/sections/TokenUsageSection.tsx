@@ -28,7 +28,7 @@ export function TokenUsageSection({ usage, updateSettings, resetUsage, isDemoDat
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const handleResetUsage = async () => {
+  const handleResetUsage = () => {
     setIsResetting(true)
     try {
       resetUsage()

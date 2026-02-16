@@ -23,7 +23,7 @@ export function AgentSection({ isConnected, health, refresh }: AgentSectionProps
     timeoutRef.current = setTimeout(() => setCopied(false), 2000)
   }
 
-  const handleRefresh = async () => {
+  const handleRefresh = () => {
     setIsRefreshing(true)
     try {
       refresh()
