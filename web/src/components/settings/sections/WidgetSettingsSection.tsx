@@ -232,6 +232,7 @@ export const render = ({ output }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl() } }}
+            aria-label="Open KubeStellar Console"
           >
             <div style={{ ...styles.statusDot, backgroundColor: styles.colors.offline }} />
             <span style={styles.title}>KubeStellar Console</span>
@@ -268,6 +269,7 @@ export const render = ({ output }) => {
           role="button"
           tabIndex={0}
           onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl() } }}
+          aria-label="Open KubeStellar Console"
         >
           <div style={{ ...styles.statusDot, backgroundColor: statusColor }} />
           <span style={styles.title}>KubeStellar Console</span>
@@ -280,6 +282,7 @@ export const render = ({ output }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl('/clusters') } }}
+            aria-label="View offline clusters"
           >
             <div style={{ ...styles.statValue, color: hasIssues ? styles.colors.error : styles.colors.healthy }}>
               {offlineNodes.length}
@@ -292,6 +295,7 @@ export const render = ({ output }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl('/clusters') } }}
+            aria-label="View ready clusters"
           >
             <div style={{ ...styles.statValue, color: styles.colors.info }}>
               {nodes.length - offlineNodes.length}/{nodes.length}
@@ -304,6 +308,7 @@ export const render = ({ output }) => {
             role="button"
             tabIndex={0}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openUrl('/gpu') } }}
+            aria-label="View GPU allocation"
           >
             <div style={{ ...styles.statValue, color: styles.colors.healthy }}>
               {allocatedGPUs}/{totalGPUs}

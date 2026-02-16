@@ -261,6 +261,9 @@ export function AlertBadge() {
           )}
           <div
             ref={dropdownRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Active Alerts"
             className={`${
               isMobile
                 ? 'fixed inset-x-0 bottom-0 rounded-t-2xl max-h-[70vh]'

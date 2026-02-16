@@ -110,6 +110,8 @@ export function ClusterSelect({
       {isOpen && dropdownPos && createPortal(
         <div
           ref={dropdownRef}
+          role="listbox"
+          aria-label="Select cluster"
           className="fixed max-h-48 overflow-y-auto rounded-lg bg-card border border-border shadow-lg z-50"
           style={{ top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width }}
           onMouseDown={e => e.stopPropagation()}

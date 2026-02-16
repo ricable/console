@@ -230,6 +230,7 @@ function StockPile({
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } }}
+      aria-label="Draw card from deck"
     >
       <Card card={{ ...cards[0], faceUp: false }} size={size} />
     </div>
