@@ -6,7 +6,7 @@ import { useTokenUsage, type TokenCategory } from '../../../hooks/useTokenUsage'
 import { cn } from '../../../lib/cn'
 import { getSettingsWithHash } from '../../../config/routes'
 
-const CATEGORY_CONFIG: Record<TokenCategory, { label: string; icon: React.ElementType; color: string }> = {
+const CATEGORY_CONFIG: Record<TokenCategory, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   missions: { label: 'AI Missions', icon: Rocket, color: 'bg-purple-500' },
   diagnose: { label: 'Diagnose', icon: Stethoscope, color: 'bg-blue-500' },
   insights: { label: 'Insights', icon: Lightbulb, color: 'bg-yellow-500' },
@@ -166,7 +166,7 @@ export function TokenUsageWidget() {
                   .map((category) => {
                     const tokens = usage.byCategory[category] || 0
                     const config = CATEGORY_CONFIG[category]
-                    const Icon = config.icon as React.ComponentType<{ className?: string }>
+                    const Icon = config.icon
                     // Format tokens: 1.2M, 523k, or exact number
                     const formatTokens = (n: number) => {
                       if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
