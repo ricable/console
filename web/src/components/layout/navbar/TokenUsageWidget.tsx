@@ -166,7 +166,7 @@ export function TokenUsageWidget() {
                   .map((category) => {
                     const tokens = usage.byCategory[category] || 0
                     const config = CATEGORY_CONFIG[category]
-                    const Icon = config.icon
+                    const Icon = config.icon as React.ComponentType<{ className?: string }>
                     // Format tokens: 1.2M, 523k, or exact number
                     const formatTokens = (n: number) => {
                       if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`
