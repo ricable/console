@@ -647,7 +647,7 @@ export interface CardControlsRowProps {
     onClear: () => void
     isOpen: boolean
     setIsOpen: (open: boolean) => void
-    containerRef: React.RefObject<HTMLDivElement>
+    containerRef: React.RefObject<HTMLDivElement | null>
     minClusters?: number
   }
   /** Cluster indicator showing selected/total count */
