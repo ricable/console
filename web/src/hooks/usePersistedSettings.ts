@@ -8,6 +8,7 @@ import {
   SETTINGS_CHANGED_EVENT,
 } from '../lib/settingsSync'
 import { LOCAL_AGENT_HTTP_URL } from '../lib/constants'
+import { isNetlifyDeployment } from '../lib/demoMode'
 
 const DEBOUNCE_MS = 1000
 
@@ -134,6 +135,12 @@ export function usePersistedSettings() {
       return () => { mountedRef.current = false }
     }
 
+    // Skip local agent entirely on Netlify deployments (no kc-agent available)
+    if (isNetlifyDeployment) {
+      setLoaded(true)
+      return () => { mountedRef.current = false }
+    }
+
     async function loadSettings() {
       try {
         const data = await settingsFetch<AllSettings>('/settings')
@@ -176,6 +183,7 @@ export function usePersistedSettings() {
   // Listen for settings changes from individual hooks
   useEffect(() => {
     if (!isAuthenticated) return
+    if (isNetlifyDeployment) return // No local agent on Netlify
     const handleChange = () => {
       saveToBackend()
     }

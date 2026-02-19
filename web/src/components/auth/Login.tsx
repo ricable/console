@@ -21,9 +21,8 @@ export function Login() {
 
     const isNetlifyPreview = window.location.hostname.includes('deploy-preview-') ||
       window.location.hostname.includes('netlify.app')
-    const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 
-    if (isNetlifyPreview || isDemoMode) {
+    if (isNetlifyPreview) {
       login()
       return
     }
