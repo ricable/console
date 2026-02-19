@@ -90,6 +90,9 @@ function StatBlock({ block, data, hasData, isLoading }: StatBlockProps) {
     <div
       className={`relative glass p-4 rounded-lg ${isLoading ? 'animate-pulse' : ''} ${isClickable ? 'cursor-pointer hover:bg-secondary/50' : ''} ${isDemo ? 'border border-yellow-500/30 bg-yellow-500/5 shadow-[0_0_12px_rgba(234,179,8,0.15)]' : ''} transition-colors`}
       onClick={() => isClickable && data.onClick?.()}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); data.onClick?.() } } : undefined}
     >
       {isDemo && (
         <span className="absolute -top-1 -right-1" title="Demo data">

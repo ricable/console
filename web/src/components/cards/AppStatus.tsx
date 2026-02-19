@@ -245,6 +245,9 @@ export function AppStatus(_props: AppStatusProps) {
           <div
             key={`${app.name}-${app.namespace}`}
             onClick={() => handleAppClick(app, app.clusters[0])}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAppClick(app, app.clusters[0]) } }}
+            role="button"
+            tabIndex={0}
             className="p-3 rounded-lg bg-secondary/30 hover:bg-secondary/50 transition-colors cursor-pointer group"
             title={`Click to view details for ${app.name}`}
           >

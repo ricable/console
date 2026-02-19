@@ -307,6 +307,9 @@ export function ActiveAlerts() {
             <div
               key={alert.id}
               onClick={() => handleAlertClick(alert)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAlertClick(alert) } }}
+              role="button"
+              tabIndex={0}
               className="p-2 rounded-lg bg-secondary/30 border border-border/50 hover:bg-secondary/50 cursor-pointer transition-colors group"
             >
               <div className="flex items-start gap-2">
