@@ -48,7 +48,7 @@ export function CodeBlock({ children, language = 'text', fontSize = 'sm' }: Code
       <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
           onClick={handleCopy}
-          className="p-1.5 rounded bg-gray-800/80 hover:bg-gray-700/80 transition-colors"
+          className="p-1.5 rounded bg-secondary/80 hover:bg-secondary transition-colors"
           title={copied ? 'Copied!' : copyFailed ? 'Copy failed' : 'Copy code'}
         >
           {copied ? (
@@ -56,12 +56,12 @@ export function CodeBlock({ children, language = 'text', fontSize = 'sm' }: Code
           ) : copyFailed ? (
             <AlertCircle className="w-4 h-4 text-red-400" />
           ) : (
-            <Copy className="w-4 h-4 text-gray-400" />
+            <Copy className="w-4 h-4 text-muted-foreground" />
           )}
         </button>
       </div>
-      <pre className={`bg-gray-900 border border-gray-800 rounded-md p-4 overflow-x-auto ${fontSize === 'lg' ? 'text-sm' : fontSize === 'base' ? 'text-xs' : 'text-[11px]'}`}>
-        <code className={`language-${language} text-gray-300 font-mono`}>
+      <pre className={`bg-secondary border border-border rounded-md p-4 overflow-x-auto ${fontSize === 'lg' ? 'text-sm' : fontSize === 'base' ? 'text-xs' : 'text-[11px]'}`}>
+        <code className={`language-${language} text-muted-foreground font-mono`}>
           {children}
         </code>
       </pre>
