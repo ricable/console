@@ -255,13 +255,13 @@ export function WidgetExportModal({ isOpen, onClose, cardType, mode: _mode = 'pi
             </div>
 
             {showCode ? (
-              <div className="flex-1 bg-gray-900 rounded-lg p-3 overflow-auto">
-                <pre className="text-xs text-gray-300 whitespace-pre-wrap font-mono">
+              <div className="flex-1 bg-card rounded-lg p-3 overflow-auto">
+                <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-mono">
                   {widgetCode || '// Select an item to generate widget code'}
                 </pre>
               </div>
             ) : (
-              <div className="flex-1 bg-gray-900/50 rounded-lg p-4 flex items-center justify-center">
+              <div className="flex-1 bg-secondary rounded-lg p-4 flex items-center justify-center">
                 <WidgetPreview config={exportConfig} />
               </div>
             )}
@@ -425,7 +425,7 @@ function StatItem({
       </div>
       <div
         className={`ml-auto w-5 h-5 rounded border-2 flex items-center justify-center ${
-          selected ? 'bg-purple-500 border-purple-500' : 'border-gray-500'
+          selected ? 'bg-purple-500 border-purple-500' : 'border-border'
         }`}
       >
         {selected && <Check className="w-3 h-3 text-white" />}
