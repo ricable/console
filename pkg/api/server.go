@@ -609,6 +609,18 @@ func (s *Server) setupRoutes() {
 	api.Put("/cluster-groups/:name", workloadHandlers.UpdateClusterGroup)
 	api.Delete("/cluster-groups/:name", workloadHandlers.DeleteClusterGroup)
 
+	// Agent Swarm routes
+	agentSwarmHandlers := handlers.NewAgentSwarmHandlers(s.k8sClient)
+	api.Get("/agentswarm/summary", agentSwarmHandlers.GetSummary)
+	api.Get("/agentswarm/agents", agentSwarmHandlers.GetAgents)
+	api.Get("/agentswarm/agents/:name", agentSwarmHandlers.GetAgent)
+	api.Get("/agentswarm/runtime", agentSwarmHandlers.GetRuntime)
+	api.Get("/agentswarm/federation", agentSwarmHandlers.GetFederation)
+	api.Post("/agentswarm/deploy", agentSwarmHandlers.DeployAgent)
+	api.Post("/agentswarm/scale", agentSwarmHandlers.ScaleAgent)
+	api.Post("/agentswarm/restart/:name", agentSwarmHandlers.RestartAgent)
+	api.Delete("/agentswarm/agents/:name", agentSwarmHandlers.DeleteAgent)
+
 	// Feature requests and feedback routes
 	feedback := handlers.NewFeedbackHandler(s.store, handlers.FeedbackConfig{
 		GitHubToken:   s.config.FeedbackGitHubToken,

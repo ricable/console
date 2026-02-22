@@ -11,7 +11,7 @@ interface SetupInstructionsDialogProps {
 }
 
 const REPO_URL = 'https://github.com/kubestellar/console'
-const DOCS_URL = 'https://console-docs.kubestellar.io'
+const DOCS_URL = 'https://kubestellar.io/docs/console/readme'
 const CURL_BASE = 'https://raw.githubusercontent.com/kubestellar/console/main'
 
 const QUICKSTART_CMD = `curl -sSL ${CURL_BASE}/start.sh | bash`

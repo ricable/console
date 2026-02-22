@@ -58,6 +58,7 @@ const Arcade = lazy(() => import('./components/arcade/Arcade').then(m => ({ defa
 const Deploy = lazy(() => import('./components/deploy/Deploy').then(m => ({ default: m.Deploy })))
 const AIML = lazy(() => import('./components/aiml/AIML').then(m => ({ default: m.AIML })))
 const AIAgents = lazy(() => import('./components/aiagents/AIAgents').then(m => ({ default: m.AIAgents })))
+const AgentSwarm = lazy(() => import('./components/agentswarm/AgentSwarmPage').then(m => ({ default: m.AgentSwarmPage })))
 const LLMdBenchmarks = lazy(() => import('./components/llmd-benchmarks/LLMdBenchmarks').then(m => ({ default: m.LLMdBenchmarks })))
 const ClusterAdmin = lazy(() => import('./components/cluster-admin/ClusterAdmin').then(m => ({ default: m.ClusterAdmin })))
 const CICD = lazy(() => import('./components/cicd/CICD').then(m => ({ default: m.CICD })))
@@ -379,6 +380,7 @@ function App() {
           <Route path="/deploy" element={<Deploy />} />
           <Route path="/ai-ml" element={<AIML />} />
           <Route path="/ai-agents" element={<AIAgents />} />
+          <Route path="/agent-swarm" element={<AgentSwarm />} />
           <Route path="/llm-d-benchmarks" element={<LLMdBenchmarks />} />
           <Route path="/cluster-admin" element={<ClusterAdmin />} />
           <Route path="/ci-cd" element={<CICD />} />

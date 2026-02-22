@@ -78,8 +78,10 @@ export const REFRESH_RATES = {
   rbac: 300_000,         // 5 minutes
   operators: 300_000,    // 5 minutes
 
-  // Cost data - very infrequent
   costs: 600_000,        // 10 minutes
+
+  // Agents
+  agents: 60_000,        // 1 minute
 
   // Default
   default: 120_000,      // 2 minutes
@@ -158,7 +160,7 @@ interface CacheStorage {
  * All I/O happens off the main thread via postMessage RPC.
  */
 class WorkerStorage implements CacheStorage {
-  constructor(private rpc: CacheWorkerRpc) {}
+  constructor(private rpc: CacheWorkerRpc) { }
 
   async get<T>(key: string): Promise<CacheEntry<T> | null> {
     const result = await this.rpc.get<T>(key)
@@ -881,8 +883,8 @@ export function useCache<T>({
   return {
     data: !effectiveEnabled ? demoDisplayData
       : shouldFallbackToDemo ? demoData
-      : showOptimisticDemo ? demoData
-      : state.data,
+        : showOptimisticDemo ? demoData
+          : state.data,
     isLoading: effectiveEnabled ? (state.isLoading && !shouldFallbackToDemo && !showOptimisticDemo) : false,
     isRefreshing: state.isRefreshing || showOptimisticDemo,
     error: state.error,
