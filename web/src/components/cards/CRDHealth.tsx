@@ -26,9 +26,10 @@ interface CRD {
 
 type SortByOption = 'status' | 'name' | 'group' | 'instances'
 
-const SORT_OPTIONS_KEYS = [
-  { value: 'status' as const, labelKey: 'common.status' },
-  { value: 'name' as const, labelKey: 'common.name' },
+type CRDHealthSortKey = 'common:common.status' | 'common:common.name' | 'crdHealth.group' | 'crdHealth.instances'
+const SORT_OPTIONS_KEYS: Array<{ value: SortByOption; labelKey: CRDHealthSortKey }> = [
+  { value: 'status' as const, labelKey: 'common:common.status' },
+  { value: 'name' as const, labelKey: 'common:common.name' },
   { value: 'group' as const, labelKey: 'crdHealth.group' },
   { value: 'instances' as const, labelKey: 'crdHealth.instances' },
 ]
@@ -38,8 +39,7 @@ const statusOrder: Record<string, number> = { NotEstablished: 0, Terminating: 1,
 export function CRDHealth({ config: _config }: CRDHealthProps) {
   const { t } = useTranslation(['cards', 'common'])
   const SORT_OPTIONS = useMemo(() =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    SORT_OPTIONS_KEYS.map(opt => ({ value: opt.value, label: String(t(opt.labelKey as any)) })),
+    SORT_OPTIONS_KEYS.map(opt => ({ value: opt.value, label: String(t(opt.labelKey)) })),
     [t]
   )
   const { isLoading, deduplicatedClusters } = useClusters()

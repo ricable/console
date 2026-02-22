@@ -22,28 +22,27 @@ import { useCardData, CardClusterFilter, CardSearchInput, CardAIActions } from '
 import { useCardLoadingState } from './CardDataContext'
 import { useTranslation } from 'react-i18next'
 
-// Format relative time
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatRelativeTime(dateString: string, t: (key: any, opts?: any) => string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) return t('activeAlerts.justNow')
-  if (diffMins < 60) return t('activeAlerts.minutesAgo', { count: diffMins })
-  if (diffHours < 24) return t('activeAlerts.hoursAgo', { count: diffHours })
-  return t('activeAlerts.daysAgo', { count: diffDays })
-}
-
 type SortField = 'severity' | 'time'
 
 export function ActiveAlerts() {
   const { t } = useTranslation('cards')
   const { activeAlerts, acknowledgedAlerts, stats, acknowledgeAlert, runAIDiagnosis } = useAlerts()
   const { selectedSeverities, isAllSeveritiesSelected, customFilter } = useGlobalFilters()
+
+  // Format relative time
+  function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMins < 1) return t('activeAlerts.justNow')
+    if (diffMins < 60) return t('activeAlerts.minutesAgo', { count: diffMins })
+    if (diffHours < 24) return t('activeAlerts.hoursAgo', { count: diffHours })
+    return t('activeAlerts.daysAgo', { count: diffDays })
+  }
 
   // Report state to CardWrapper for refresh animation
   useCardLoadingState({
@@ -330,7 +329,7 @@ export function ActiveAlerts() {
                     )}
                     <span className="text-xs text-muted-foreground flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {formatRelativeTime(alert.firedAt, t)}
+                      {formatRelativeTime(alert.firedAt)}
                     </span>
                     {getMissionForAlert(alert) && (
                       <span className="text-xs text-purple-400 flex items-center gap-1">

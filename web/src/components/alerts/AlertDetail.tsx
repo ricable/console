@@ -28,27 +28,26 @@ interface AlertDetailProps {
   onClose?: () => void
 }
 
-// Format relative time using i18n keys from the time section
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function formatRelativeTime(dateString: string, t: (key: any, opts?: any) => string): string {
-  const date = new Date(dateString)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMins / 60)
-  const diffDays = Math.floor(diffHours / 24)
-
-  if (diffMins < 1) return t('time.justNow')
-  if (diffMins < MINUTES_PER_HOUR) return t('time.minutesAgo', { count: diffMins })
-  if (diffHours < HOURS_PER_DAY) return t('time.hoursAgo', { count: diffHours })
-  return t('time.daysAgo', { count: diffDays })
-}
-
 export function AlertDetail({ alert, onClose }: AlertDetailProps) {
   const { t } = useTranslation()
   const { acknowledgeAlert, resolveAlert, runAIDiagnosis } = useAlerts()
   const { webhooks } = useSlackWebhooks()
   const { sendNotification } = useSlackNotification()
+
+  // Format relative time using i18n keys from the time section
+  function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMins / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMins < 1) return t('time.justNow')
+    if (diffMins < MINUTES_PER_HOUR) return t('time.minutesAgo', { count: diffMins })
+    if (diffHours < HOURS_PER_DAY) return t('time.hoursAgo', { count: diffHours })
+    return t('time.daysAgo', { count: diffDays })
+  }
   const { missions, setActiveMission, openSidebar } = useMissions()
   const { showToast } = useToast()
 
@@ -171,13 +170,13 @@ export function AlertDetail({ alert, onClose }: AlertDetailProps) {
           <div className="flex items-center gap-2 text-sm">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span className="text-muted-foreground">{t('alerts.fired')}</span>
-            <span className="text-foreground">{formatRelativeTime(alert.firedAt, t)}</span>
+            <span className="text-foreground">{formatRelativeTime(alert.firedAt)}</span>
           </div>
           {alert.acknowledgedAt && (
             <div className="flex items-center gap-2 text-sm">
               <CheckCircle className="w-4 h-4 text-green-400" />
               <span className="text-muted-foreground">{t('alerts.acknowledged')}</span>
-              <span className="text-green-400">{formatRelativeTime(alert.acknowledgedAt, t)}</span>
+              <span className="text-green-400">{formatRelativeTime(alert.acknowledgedAt)}</span>
             </div>
           )}
         </div>

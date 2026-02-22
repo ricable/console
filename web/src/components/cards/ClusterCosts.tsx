@@ -44,7 +44,8 @@ type PricingMode = 'uniform' | 'per-cluster'
 type SortByOption = 'cost' | 'name' | 'cpus'
 
 // Labels are set at render time via t() — see getSortOptions()
-const SORT_OPTIONS_KEYS = [
+type ClusterCostsSortKey = 'clusterCosts.sortCost' | 'clusterCosts.sortName' | 'clusterCosts.sortCPUs'
+const SORT_OPTIONS_KEYS: Array<{ value: SortByOption; labelKey: ClusterCostsSortKey }> = [
   { value: 'cost' as const, labelKey: 'clusterCosts.sortCost' },
   { value: 'name' as const, labelKey: 'clusterCosts.sortName' },
   { value: 'cpus' as const, labelKey: 'clusterCosts.sortCPUs' },
@@ -187,8 +188,7 @@ export function ClusterCosts({ config }: ClusterCostsProps) {
 
   // Build sort options with translated labels
   const SORT_OPTIONS = useMemo(() =>
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    SORT_OPTIONS_KEYS.map(opt => ({ value: opt.value, label: t(opt.labelKey as any) as string })),
+    SORT_OPTIONS_KEYS.map(opt => ({ value: opt.value, label: t(opt.labelKey) as string })),
     [t]
   )
   const { deduplicatedClusters: allClusters, isLoading } = useClusters()
