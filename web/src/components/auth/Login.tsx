@@ -211,7 +211,7 @@ export function Login() {
           <button
             data-testid="github-login-button"
             onClick={login}
-            className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-medium py-3 px-4 rounded-lg hover:bg-gray-100 transition-all duration-200 hover:shadow-lg"
+            className="w-full flex items-center justify-center gap-3 bg-card text-card-foreground font-medium py-3 px-4 rounded-lg hover:bg-secondary transition-all duration-200 hover:shadow-lg"
           >
             <Github className="w-5 h-5" />
             {t('login.continueWithGitHub')}
@@ -244,7 +244,7 @@ export function Login() {
       </div>
 
       {/* Version info - bottom right */}
-      <div className="absolute bottom-4 right-4 text-xs text-gray-600 font-mono z-10 flex items-center gap-2">
+      <div className="absolute bottom-4 right-4 text-xs text-muted-foreground font-mono z-10 flex items-center gap-2">
         <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${__DEV_MODE__ ? 'bg-yellow-500/20 text-yellow-400' : 'bg-green-500/20 text-green-400'}`}>
           {__DEV_MODE__ ? 'dev' : 'prod'}
         </span>
