@@ -1333,16 +1333,7 @@ export function CardWrapper({
                 <RefreshCw className={cn('w-4 h-4', (isVisuallySpinning || effectiveIsLoading || forceSkeletonForOffline) && 'animate-spin')} aria-hidden="true" />
               </button>
             )}
-            {/* Chat button - feature not yet implemented
-            <button
-              data-tour="card-chat"
-              onClick={() => {}}
-              className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
-              title={t('common:buttons.askAI')}
-            >
-              <MessageCircle className="w-4 h-4" />
-            </button>
-            */}
+
             <button
               onClick={() => { emitCardExpanded(cardType); setIsExpanded(true) }}
               className="p-1.5 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors"
