@@ -963,7 +963,7 @@ function CreateNamespaceModal({ clusters, onClose, onCreated }: CreateNamespaceM
   )
 
   return (
-    <BaseModal isOpen={true} onClose={onClose} size="lg">
+    <BaseModal isOpen={true} onClose={onClose} size="lg" closeOnBackdrop={false}>
       <BaseModal.Header
         title="Create Namespace"
         icon={Folder}
@@ -1237,7 +1237,7 @@ function GrantAccessModal({ namespace, existingAccess, onClose, onGranted }: Gra
   }
 
   return (
-    <BaseModal isOpen={true} onClose={onClose} size="md">
+    <BaseModal isOpen={true} onClose={onClose} size="md" closeOnBackdrop={false}>
       <BaseModal.Header
         title="Grant Access"
         description={`Namespace: ${namespace.name}`}

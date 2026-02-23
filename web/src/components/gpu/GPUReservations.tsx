@@ -1456,7 +1456,7 @@ function ReservationFormModal({
   }
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onClose} size="lg">
+    <BaseModal isOpen={isOpen} onClose={onClose} size="lg" closeOnBackdrop={false}>
       <BaseModal.Header
         title={editingReservation ? t('gpuReservations.form.editTitle') : t('gpuReservations.form.createTitle')}
         icon={Calendar}

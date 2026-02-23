@@ -167,7 +167,7 @@ export function AlertRuleEditor({ isOpen = true, rule, onSave, onCancel }: Alert
   const availableClusters = clusters.filter(c => c.reachable !== false)
 
   return (
-    <BaseModal isOpen={isOpen} onClose={onCancel} size="lg">
+    <BaseModal isOpen={isOpen} onClose={onCancel} size="lg" closeOnBackdrop={false}>
       <BaseModal.Header
         title={rule ? t('alerts.editRule') : t('alerts.createRule')}
         icon={Bell}

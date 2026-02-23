@@ -253,7 +253,7 @@ export function FeatureRequestModal({ isOpen, onClose, initialTab, initialContex
   }
 
   return (
-    <BaseModal isOpen={isOpen} onClose={handleClose} size="lg" closeOnBackdrop={true} className="!h-[80vh]">
+    <BaseModal isOpen={isOpen} onClose={handleClose} size="lg" closeOnBackdrop={false} className="!h-[80vh]">
       {/* Login Prompt Dialog */}
       {showLoginPrompt && (
         <>
