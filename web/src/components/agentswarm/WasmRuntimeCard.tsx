@@ -7,12 +7,11 @@ import { Badge } from '../ui/Badge'
 
 export function WasmRuntimeCard() {
   const { t } = useTranslation('cards')
-  const { runtimes, isLoading, isRefreshing, isDemoFallback, isFailed, consecutiveFailures, refetch } =
+  const { runtimes, isLoading, isDemoFallback, isFailed, consecutiveFailures, refetch } =
     useWasmRuntime()
 
   useCardLoadingState({
     isLoading,
-    isRefreshing,
     isDemoData: isDemoFallback,
     hasAnyData: runtimes.length > 0,
     isFailed,
@@ -34,8 +33,8 @@ export function WasmRuntimeCard() {
 
   return (
     <CardWrapper
-      title={t('WASM Runtime', { defaultMessage: 'WASM Runtime Health' })}
-      className="wasm-runtime-card"
+      cardType="wasm-runtime"
+      title={t('WASM Runtime', 'WASM Runtime Health')}
       onRefresh={refetch}
     >
       <div className="space-y-3">

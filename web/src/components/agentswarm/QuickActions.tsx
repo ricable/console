@@ -1,10 +1,8 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   Plus,
   Scale,
   RefreshCw,
-  FileText,
   Zap,
 } from 'lucide-react'
 import { useAgentActions } from '../../hooks/useAgentActions'
@@ -32,7 +30,6 @@ interface QuickActionsProps {
 }
 
 export function QuickActions({ selectedAgents, onRefresh }: QuickActionsProps) {
-  const { t } = useTranslation('cards')
   const { deployAgent, scaleAgent, deleteAgent, restartAgent, isLoading } = useAgentActions()
 
   const [showDeployModal, setShowDeployModal] = useState(false)

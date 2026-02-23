@@ -14,12 +14,11 @@ import { StatsGrid } from '../ui/StatsGrid'
 
 export function SwarmOverviewCard() {
   const { t } = useTranslation('cards')
-  const { summary, isLoading, isRefreshing, isDemoFallback, isFailed, consecutiveFailures, refetch } =
+  const { summary, isLoading, isDemoFallback, isFailed, consecutiveFailures, refetch } =
     useAgentSwarmSummary()
 
   useCardLoadingState({
     isLoading,
-    isRefreshing,
     isDemoData: isDemoFallback,
     hasAnyData: summary.totalAgents > 0,
     isFailed,
@@ -67,8 +66,8 @@ export function SwarmOverviewCard() {
 
   return (
     <CardWrapper
-      title={t('Agent Swarm Overview', { defaultMessage: 'Agent Swarm Overview' })}
-      className="agent-swarm-overview"
+      cardType="swarm-overview"
+      title={t('Agent Swarm Overview', 'Agent Swarm Overview')}
       onRefresh={refetch}
     >
       <StatsGrid stats={stats} columns={3} />

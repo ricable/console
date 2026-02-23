@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { X, Terminal, Settings, FileText, Activity } from 'lucide-react'
 import { useAgentDetails } from '../../hooks/useAgentSwarm'
 import { Badge } from '../ui/Badge'
@@ -20,7 +19,6 @@ interface AgentDetailModalProps {
 }
 
 export function AgentDetailModal({ agentName, isOpen, onClose }: AgentDetailModalProps) {
-  const { t } = useTranslation('cards')
   const [activeTab, setActiveTab] = useState('overview')
 
   const { agent, isLoading } = useAgentDetails(agentName || '', {

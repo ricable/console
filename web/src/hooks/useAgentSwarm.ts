@@ -2,7 +2,6 @@
  * Agent Swarm Hooks - Data fetching for agent swarm dashboard
  */
 
-import { useCallback } from 'react'
 import { useCache, type RefreshCategory, type UseCacheResult } from '../lib/cache'
 import { api } from '../lib/api'
 

@@ -24,9 +24,9 @@ export function SelectTrigger({ className, children }: { className?: string; chi
 export function SelectValue({ placeholder }: { placeholder?: string }) {
   return <span className="text-gray-400 text-sm">{placeholder}</span>
 }
-export function SelectContent({ children }: { children: ReactNode }) {
-  return <>{children}</>
+export function SelectContent({ className, children }: { className?: string; children: ReactNode }) {
+  return <div className={className}>{children}</div>
 }
-export function SelectItem({ value, children }: { value: string; children: ReactNode }) {
-  return <option value={value}>{children}</option>
+export function SelectItem({ value, className, children }: { value: string; className?: string; children: ReactNode }) {
+  return <option value={value} className={className}>{children}</option>
 }

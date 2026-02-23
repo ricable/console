@@ -6,12 +6,11 @@ import { Skeleton } from '../ui/Skeleton'
 
 export function AgentStatusCard() {
   const { t } = useTranslation('cards')
-  const { agents, isLoading, isRefreshing, isDemoFallback, isFailed, consecutiveFailures, refetch } =
+  const { agents, isLoading, isDemoFallback, isFailed, consecutiveFailures, refetch } =
     useAgentList()
 
   useCardLoadingState({
     isLoading,
-    isRefreshing,
     isDemoData: isDemoFallback,
     hasAnyData: agents.length > 0,
     isFailed,
@@ -35,8 +34,8 @@ export function AgentStatusCard() {
 
   return (
     <CardWrapper
-      title={t('Agent Status', { defaultMessage: 'Agent Status' })}
-      className="agent-status-card"
+      cardType="agent-status"
+      title={t('Agent Status', 'Agent Status')}
       onRefresh={refetch}
     >
       <div className="space-y-3">

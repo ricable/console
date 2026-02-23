@@ -1,5 +1,4 @@
 import { cn } from '../../lib/cn'
-import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 interface DialogProps { open: boolean; onOpenChange: (open: boolean) => void; children: ReactNode }

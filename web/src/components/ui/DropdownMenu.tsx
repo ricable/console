@@ -1,13 +1,11 @@
 import { cn } from '../../lib/cn'
-import { useState, useRef, useEffect, type ReactNode } from 'react'
-
-const noop = () => {}
+import type { ReactNode } from 'react'
 
 export function DropdownMenu({ children }: { children: ReactNode }) {
   return <div className="relative inline-block">{children}</div>
 }
 
-export function DropdownMenuTrigger({ asChild, children }: { asChild?: boolean; children: ReactNode }) {
+export function DropdownMenuTrigger({ children }: { asChild?: boolean; children: ReactNode }) {
   return <>{children}</>
 }
 

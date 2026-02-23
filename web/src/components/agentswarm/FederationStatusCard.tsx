@@ -6,12 +6,11 @@ import { CardWrapper } from '../cards/CardWrapper'
 
 export function FederationStatusCard() {
   const { t } = useTranslation('cards')
-  const { federation, isLoading, isRefreshing, isDemoFallback, isFailed, consecutiveFailures, refetch } =
+  const { federation, isLoading, isDemoFallback, isFailed, consecutiveFailures, refetch } =
     useFederationStatus()
 
   useCardLoadingState({
     isLoading,
-    isRefreshing,
     isDemoData: isDemoFallback,
     hasAnyData: federation.connected,
     isFailed,
@@ -29,8 +28,8 @@ export function FederationStatusCard() {
 
   return (
     <CardWrapper
-      title={t('Federation Status', { defaultMessage: 'Federation Status' })}
-      className="federation-status-card"
+      cardType="federation-status"
+      title={t('Federation Status', 'Federation Status')}
       onRefresh={refetch}
     >
       <div className="space-y-4">

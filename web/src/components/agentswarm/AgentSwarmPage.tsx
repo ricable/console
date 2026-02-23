@@ -1,10 +1,8 @@
 import { useState, useCallback } from 'react'
 import { useAgentSwarmSummary, useAgentList } from '../../hooks/useAgentSwarm'
-import { StatBlockValue } from '../ui/StatsOverview'
+import type { StatBlockValue } from '../ui/StatsOverview'
 import { DashboardPage } from '../../lib/dashboards/DashboardPage'
-import { getDefaultCards } from '../../config/dashboards'
 import { useTranslation } from 'react-i18next'
-import { SwarmOverviewCard, AgentStatusCard, WasmRuntimeCard, FederationStatusCard } from '.'
 import { AgentSwarmTable } from './AgentSwarmTable'
 import { AgentDetailModal } from './AgentDetailModal'
 import { QuickActions } from './QuickActions'
@@ -12,16 +10,16 @@ import { QuickActions } from './QuickActions'
 const AGENT_SWARM_CARDS_KEY = 'kubestellar-agentswarm-cards'
 
 const DEFAULT_AGENT_SWARM_CARDS = [
-  { id: 'swarm-overview', component: 'SwarmOverviewCard', gridPosition: { x: 0, y: 0, w: 4, h: 3 } },
-  { id: 'agent-status', component: 'AgentStatusCard', gridPosition: { x: 4, y: 0, w: 4, h: 3 } },
-  { id: 'wasm-runtime', component: 'WasmRuntimeCard', gridPosition: { x: 0, y: 3, w: 4, h: 3 } },
-  { id: 'federation-status', component: 'FederationStatusCard', gridPosition: { x: 4, y: 3, w: 4, h: 3 } },
+  { type: 'SwarmOverviewCard' },
+  { type: 'AgentStatusCard' },
+  { type: 'WasmRuntimeCard' },
+  { type: 'FederationStatusCard' },
 ]
 
 export function AgentSwarmPage() {
   const { t } = useTranslation('common')
   const { summary, isLoading: summaryLoading, refetch: summaryRefetch } = useAgentSwarmSummary()
-  const { agents, refetch: agentsRefetch } = useAgentList()
+  const { refetch: agentsRefetch } = useAgentList()
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
   const [detailModalOpen, setDetailModalOpen] = useState(false)
 
@@ -71,12 +69,12 @@ export function AgentSwarmPage() {
 
   return (
     <DashboardPage
-      title={t('agentSwarm.title', { defaultMessage: 'Agent Swarm' })}
-      subtitle={t('agentSwarm.subtitle', { defaultMessage: 'Manage WASM agents across edge clusters' })}
+      title={t('agentSwarm.title', 'Agent Swarm')}
+      subtitle={t('agentSwarm.subtitle', 'Manage WASM agents across edge clusters')}
       icon="Bot"
       storageKey={AGENT_SWARM_CARDS_KEY}
       defaultCards={DEFAULT_AGENT_SWARM_CARDS}
-      statsType="agent-swarm"
+      statsType="ai-agents"
       getStatValue={getDashboardStatValue}
       onRefresh={handleRefresh}
       isLoading={summaryLoading}
@@ -85,14 +83,8 @@ export function AgentSwarmPage() {
       hasData={hasData}
       isDemoData={isDemoData}
       emptyState={{
-        title: t('agentSwarm.emptyTitle', { defaultMessage: 'No Agents Found' }),
-        description: t('agentSwarm.emptyDesc', { defaultMessage: 'Deploy your first WASM agent to get started' }),
-      }}
-      cardComponents={{
-        SwarmOverviewCard: () => <SwarmOverviewCard />,
-        AgentStatusCard: () => <AgentStatusCard />,
-        WasmRuntimeCard: () => <WasmRuntimeCard />,
-        FederationStatusCard: () => <FederationStatusCard />,
+        title: t('agentSwarm.emptyTitle', 'No Agents Found'),
+        description: t('agentSwarm.emptyDesc', 'Deploy your first WASM agent to get started'),
       }}
     >
       {/* Quick Actions */}

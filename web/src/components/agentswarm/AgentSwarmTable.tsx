@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   ArrowUpDown,
   ArrowUp,
@@ -37,7 +36,6 @@ export function AgentSwarmTable({
   onRestart,
   onDelete,
 }: AgentSwarmTableProps) {
-  const { t } = useTranslation('cards')
   const { agents, isLoading, refetch } = useAgentList()
 
   const [sortField, setSortField] = useState<SortField>('name')
