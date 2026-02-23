@@ -6,7 +6,6 @@ import {
 import { useCardExpanded } from './CardWrapper'
 import { useReportCardDataState } from './CardDataContext'
 import { useTranslation } from 'react-i18next'
-import { useToast } from '../ui/Toast'
 
 // Types
 type Difficulty = 'easy' | 'medium' | 'hard' | 'expert'
@@ -211,7 +210,6 @@ function isComplete(board: Cell[][], solution: number[][]): boolean {
 
 export function SudokuGame({ config: _config }: SudokuGameProps) {
   const { t } = useTranslation()
-  const { showToast } = useToast()
   useReportCardDataState({ hasData: true, isFailed: false, consecutiveFailures: 0 })
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null)
   const [pencilMode, setPencilMode] = useState(false)
@@ -249,7 +247,6 @@ export function SudokuGame({ config: _config }: SudokuGameProps) {
         setGameState(parsed)
       } catch (e) {
         console.error('Failed to load saved game:', e)
-        showToast('Failed to load saved game', 'error')
       }
     }
 
@@ -259,10 +256,9 @@ export function SudokuGame({ config: _config }: SudokuGameProps) {
         setBestTimes(JSON.parse(savedBestTimes) as BestTimes)
       } catch (e) {
         console.error('Failed to load best times:', e)
-        showToast('Failed to load best times', 'error')
       }
     }
-  }, [showToast])
+  }, [])
 
   // Timer
   useEffect(() => {
