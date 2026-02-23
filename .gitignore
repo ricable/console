@@ -68,3 +68,20 @@ vendor/
 /bin/*
 *.bak
 web/.netlify/
+
+# Spin WASM build artifacts
+.spin/
+.spin-aka/
+
+# GitHub Actions lock files
+.github/workflows/*.lock.yml
+
+# Trials output
+trials/
+
+# K3d kubeconfig
+kubeconfig-*.yaml
+
+# WASM artifacts
+*.wasm
+*.wat
