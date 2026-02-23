@@ -40,6 +40,7 @@ export function ArgoCDSyncStatus({ config: _config }: ArgoCDSyncStatusProps) {
     hasAnyData: total > 0,
     isFailed,
     consecutiveFailures,
+    isDemoData: true,
   })
 
   if (showSkeleton) {
